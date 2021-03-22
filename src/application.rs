@@ -67,7 +67,12 @@ pub trait ApplicationDelegate {
     fn application_will_start(&mut self, target: &EventLoopWindowTarget<()>);
     fn application_will_quit(&mut self, target: &EventLoopWindowTarget<()>);
 
-    fn application_received_window_event(&mut self, event: &Event<()>) -> ControlFlow;
+    fn window_will_close(&mut self, window_id: &winit::window::WindowId) -> ControlFlow;
+    fn window_resized(
+        &mut self,
+        window_id: &winit::window::WindowId,
+        size: &winit::dpi::PhysicalSize<u32>,
+    ) -> ControlFlow;
 }
 
 pub struct Application {
@@ -191,14 +196,19 @@ impl Application {
 
         self.delegate.application_will_start(&event_loop);
 
-        event_loop.run(move |event, event_loop, control_flow| {
+        event_loop.run(move |e, event_loop, control_flow| {
             *control_flow = ControlFlow::Wait;
 
-            match event {
+            match e {
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
                     window_id,
-                } => *control_flow = self.delegate.application_received_window_event(&event),
+                } => *control_flow = self.delegate.window_will_close(&window_id),
+
+                Event::WindowEvent {
+                    event: WindowEvent::Resized(physical_size),
+                    window_id,
+                } => *control_flow = self.delegate.window_resized(&window_id, &physical_size),
                 _ => (),
             }
 

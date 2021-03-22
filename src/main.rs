@@ -2,10 +2,10 @@ pub mod application;
 use application::{Application, ApplicationDelegate};
 
 use winit::{
-    window::{Window, WindowBuilder, WindowId},
-    dpi::{LogicalSize},
+    dpi::LogicalSize,
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoopWindowTarget},
+    window::{Window, WindowBuilder, WindowId},
 };
 
 use std::collections::HashMap;
@@ -35,14 +35,17 @@ impl ApplicationDelegate for Delegate {
     fn application_will_quit(&mut self, _: &EventLoopWindowTarget<()>) {
         println!("Application will quit")
     }
-    fn application_received_window_event(&mut self, event: &winit::event::Event<()>) -> ControlFlow{
-        match event {
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                window_id: _,
-            } => return winit::event_loop::ControlFlow::Exit,
-            _ => return winit::event_loop::ControlFlow::Wait,
-        }
+
+    fn window_will_close(&mut self, window_id: &winit::window::WindowId) -> ControlFlow {
+        ControlFlow::Exit
+    }
+
+    fn window_resized(
+        &mut self,
+        window_id: &winit::window::WindowId,
+        size: &winit::dpi::PhysicalSize<u32>,
+    ) -> ControlFlow {
+        ControlFlow::Wait
     }
 }
 
