@@ -8,14 +8,23 @@ use std::ffi::{CStr, CString};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
-    window::Window,
-    window::WindowBuilder,
 };
 
 use ash::extensions::{
     ext::DebugUtils,
     khr::{Surface, Swapchain, Win32Surface},
+    mvk::MacOSSurface,
 };
+
+#[cfg(target_os = "macos")]
+fn surface_extension_name() -> &'static CStr {
+    MacOSSurface::name()
+}
+
+#[cfg(target_os = "windows")]
+fn surface_extension_name() -> &'static CStr {
+    Win32Surface::name()
+}
 
 pub use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 use ash::{vk, Device, Entry, Instance};
@@ -57,10 +66,13 @@ unsafe extern "system" fn vulkan_debug_callback(
 pub trait ApplicationDelegate {
     fn application_will_start(&mut self, target: &EventLoopWindowTarget<()>);
     fn application_will_quit(&mut self, target: &EventLoopWindowTarget<()>);
+
+    fn application_received_window_event(&mut self, event: &Event<()>) -> ControlFlow;
 }
 
 pub struct Application {
     delegate: Box<dyn ApplicationDelegate>,
+    debug_callback: vk::DebugUtilsMessengerEXT,
     vulkan_instance: Instance,
     primary_device: Device,
     present_queue: Queue,
@@ -75,7 +87,7 @@ impl Application {
             .map(|raw_name| raw_name.as_ptr())
             .collect();
 
-        let surface_extensions = vec![Surface::name(), Win32Surface::name()];
+        let surface_extensions = vec![Surface::name(), surface_extension_name()];
         let mut extension_names_raw = surface_extensions
             .iter()
             .map(|ext| ext.as_ptr())
@@ -110,7 +122,7 @@ impl Application {
                 .pfn_user_callback(Some(vulkan_debug_callback));
 
             let debug_utils_loader = DebugUtils::new(&entry, &instance);
-            let debug_call_back = debug_utils_loader
+            let debug_callback = debug_utils_loader
                 .create_debug_utils_messenger(&debug_info, None)
                 .unwrap();
 
@@ -166,6 +178,7 @@ impl Application {
 
             Self {
                 delegate,
+                debug_callback,
                 vulkan_instance: instance,
                 primary_device: device,
                 present_queue: present_queue,
@@ -179,24 +192,20 @@ impl Application {
         self.delegate.application_will_start(&event_loop);
 
         event_loop.run(move |event, event_loop, control_flow| {
-            self.update(event_loop);
-
             *control_flow = ControlFlow::Wait;
 
             match event {
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
                     window_id,
-                } => (),
-                Event::MainEventsCleared => {
-                   // window.request_redraw();
-                }
+                } => *control_flow = self.delegate.application_received_window_event(&event),
+                _ => (),
+            }
+
+            match control_flow {
+                ControlFlow::Exit => self.delegate.application_will_quit(&event_loop),
                 _ => (),
             }
         });
-    }
-
-    fn update(&mut self, target: &EventLoopWindowTarget<()>) {
-        println!("Update!")
     }
 }
