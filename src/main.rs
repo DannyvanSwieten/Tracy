@@ -3,8 +3,7 @@ use application::{Application, ApplicationDelegate};
 
 use winit::{
     dpi::LogicalSize,
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoopWindowTarget},
+    event_loop::{EventLoopWindowTarget},
     window::{Window, WindowBuilder, WindowId},
 };
 
@@ -32,20 +31,9 @@ impl ApplicationDelegate for Delegate {
 
         self.windows.insert(window.id(), window);
     }
-    fn application_will_quit(&mut self, _: &EventLoopWindowTarget<()>) {
-        println!("Application will quit")
-    }
 
-    fn window_will_close(&mut self, window_id: &winit::window::WindowId) -> ControlFlow {
-        ControlFlow::Exit
-    }
-
-    fn window_resized(
-        &mut self,
-        window_id: &winit::window::WindowId,
-        size: &winit::dpi::PhysicalSize<u32>,
-    ) -> ControlFlow {
-        ControlFlow::Wait
+    fn window_will_close(&mut self, _: &winit::window::WindowId) -> winit::event_loop::ControlFlow{
+        winit::event_loop::ControlFlow::Exit
     }
 }
 

@@ -3,6 +3,7 @@ extern crate ash_window;
 extern crate winit;
 
 use std::borrow::Cow;
+use std::path::PathBuf;
 use std::ffi::{CStr, CString};
 
 use winit::{
@@ -64,15 +65,27 @@ unsafe extern "system" fn vulkan_debug_callback(
 }
 
 pub trait ApplicationDelegate {
-    fn application_will_start(&mut self, target: &EventLoopWindowTarget<()>);
-    fn application_will_quit(&mut self, target: &EventLoopWindowTarget<()>);
+    fn application_will_start(&mut self, _: &EventLoopWindowTarget<()>){}
+    fn application_will_quit(&mut self, _: &EventLoopWindowTarget<()>){}
 
-    fn window_will_close(&mut self, window_id: &winit::window::WindowId) -> ControlFlow;
+    fn window_will_close(&mut self, _: &winit::window::WindowId) -> ControlFlow{ControlFlow::Wait}
     fn window_resized(
         &mut self,
-        window_id: &winit::window::WindowId,
-        size: &winit::dpi::PhysicalSize<u32>,
-    ) -> ControlFlow;
+        _: &winit::window::WindowId,
+        _: &winit::dpi::PhysicalSize<u32>,
+    ) -> ControlFlow{ControlFlow::Wait}
+
+    fn window_moved(
+        &mut self, 
+        _: &winit::window::WindowId, 
+        _: &winit::dpi::PhysicalPosition<i32>
+    ) -> ControlFlow{ControlFlow::Wait}
+
+    fn file_dropped(
+        &mut self, 
+        _: &winit::window::WindowId,
+        _: &PathBuf
+    ) -> ControlFlow{ControlFlow::Wait}
 }
 
 pub struct Application {
@@ -84,7 +97,7 @@ pub struct Application {
 }
 
 impl Application {
-    pub fn new(name: &str, delegate: Box<ApplicationDelegate>) -> Self {
+    pub fn new(name: &str, delegate: Box<dyn ApplicationDelegate>) -> Self {
         let app_name = CString::new(name).unwrap();
         let layer_names = [CString::new("VK_LAYER_KHRONOS_validation").unwrap()];
         let layers_names_raw: Vec<*const i8> = layer_names
@@ -206,9 +219,19 @@ impl Application {
                 } => *control_flow = self.delegate.window_will_close(&window_id),
 
                 Event::WindowEvent {
+                    event: WindowEvent::Moved(physical_position),
+                    window_id,
+                } => *control_flow = self.delegate.window_moved(&window_id, &physical_position),
+
+                Event::WindowEvent {
                     event: WindowEvent::Resized(physical_size),
                     window_id,
                 } => *control_flow = self.delegate.window_resized(&window_id, &physical_size),
+
+                Event::WindowEvent {
+                    event: WindowEvent::DroppedFile(path_buffer),
+                    window_id,
+                } => *control_flow = self.delegate.file_dropped(&window_id, &path_buffer),
                 _ => (),
             }
 
