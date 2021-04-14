@@ -5,8 +5,8 @@ authors = ["Danny van Swieten <dannyvanswieten@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 ash = "*"
-ash-window = "0.4"
+ash-window = "*"
 winit = "*"
+skia-safe = { version = "*", features = ["vulkan", "gpu"] }

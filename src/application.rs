@@ -5,6 +5,7 @@ extern crate winit;
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::ffi::{CStr, CString};
+use ash::version::InstanceV1_0;
 
 use winit::{
     event::{Event, WindowEvent},
@@ -27,7 +28,7 @@ fn surface_extension_name() -> &'static CStr {
     Win32Surface::name()
 }
 
-pub use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
+pub use ash::version::{DeviceV1_0, EntryV1_0};
 use ash::{vk, Device, Entry, Instance};
 use vk::Queue;
 
@@ -65,10 +66,11 @@ unsafe extern "system" fn vulkan_debug_callback(
 }
 
 pub trait ApplicationDelegate {
-    fn application_will_start(&mut self, _: &EventLoopWindowTarget<()>){}
-    fn application_will_quit(&mut self, _: &EventLoopWindowTarget<()>){}
+    fn application_will_start(&mut self, application: &mut Application, _: &EventLoopWindowTarget<()>){}
+    fn application_will_quit(&mut self, application: &mut Application, _: &EventLoopWindowTarget<()>){}
 
-    fn window_will_close(&mut self, _: &winit::window::WindowId) -> ControlFlow{ControlFlow::Wait}
+    fn close_button_pressed(&mut self, _: &winit::window::WindowId) -> ControlFlow{ControlFlow::Wait}
+    fn window_destroyed(&mut self, _: &winit::window::WindowId) -> ControlFlow{ControlFlow::Wait}
     fn window_resized(
         &mut self,
         _: &winit::window::WindowId,
@@ -81,6 +83,9 @@ pub trait ApplicationDelegate {
         _: &winit::dpi::PhysicalPosition<i32>
     ) -> ControlFlow{ControlFlow::Wait}
 
+    fn window_got_focus(&mut self, _: &winit::window::WindowId) -> ControlFlow{ControlFlow::Wait}
+    fn window_lost_focus(&mut self, _: &winit::window::WindowId) -> ControlFlow{ControlFlow::Wait}
+
     fn file_dropped(
         &mut self, 
         _: &winit::window::WindowId,
@@ -89,15 +94,17 @@ pub trait ApplicationDelegate {
 }
 
 pub struct Application {
-    delegate: Box<dyn ApplicationDelegate>,
     debug_callback: vk::DebugUtilsMessengerEXT,
+    vulkan_entry: Entry,
     vulkan_instance: Instance,
-    primary_device: Device,
+    primary_gpu: vk::PhysicalDevice,
+    primary_device_context: Device,
     present_queue: Queue,
+    present_queue_index: u32,
 }
 
 impl Application {
-    pub fn new(name: &str, delegate: Box<dyn ApplicationDelegate>) -> Self {
+    pub fn new(name: &str) -> Self {
         let app_name = CString::new(name).unwrap();
         let layer_names = [CString::new("VK_LAYER_KHRONOS_validation").unwrap()];
         let layers_names_raw: Vec<*const i8> = layer_names
@@ -149,7 +156,7 @@ impl Application {
                 .enumerate_physical_devices()
                 .expect("Physical device error");
             let surface_loader = Surface::new(&entry, &instance);
-            let (pdevice, queue_family_index) = pdevices
+            let (primary_gpu, queue_family_index) = pdevices
                 .iter()
                 .map(|pdevice| {
                     instance
@@ -170,7 +177,7 @@ impl Application {
                 .filter_map(|v| v)
                 .next()
                 .expect("Couldn't find suitable device.");
-            let queue_family_index = queue_family_index as u32;
+            let present_queue_index = queue_family_index as u32;
             let device_extension_names_raw = [Swapchain::name().as_ptr()];
             let features = vk::PhysicalDeviceFeatures {
                 shader_clip_distance: 1,
@@ -179,7 +186,7 @@ impl Application {
             let priorities = [1.0];
 
             let queue_info = [vk::DeviceQueueCreateInfo::builder()
-                .queue_family_index(queue_family_index)
+                .queue_family_index(present_queue_index)
                 .queue_priorities(&priorities)
                 .build()];
 
@@ -188,26 +195,48 @@ impl Application {
                 .enabled_extension_names(&device_extension_names_raw)
                 .enabled_features(&features);
 
-            let device: Device = instance
-                .create_device(pdevice, &device_create_info, None)
+            let primary_device_context: Device = instance
+                .create_device(primary_gpu, &device_create_info, None)
                 .unwrap();
 
-            let present_queue = device.get_device_queue(queue_family_index as u32, 0);
+            let present_queue = primary_device_context.get_device_queue(present_queue_index as u32, 0);
 
             Self {
-                delegate,
                 debug_callback,
+                vulkan_entry: entry,
                 vulkan_instance: instance,
-                primary_device: device,
-                present_queue: present_queue,
+                primary_gpu,
+                primary_device_context,
+                present_queue,
+                present_queue_index,
             }
         }
     }
 
-    pub fn run(mut self) {
+    pub fn vulkan_entry(&self) -> &Entry {
+        &self.vulkan_entry
+    }
+
+    pub fn vulkan_instance(&self) -> &Instance{
+        &self.vulkan_instance
+    }
+
+    pub fn primary_gpu(&self) -> &vk::PhysicalDevice{
+        &self.primary_gpu
+    }
+
+    pub fn primary_device_context(&self) -> &Device{
+        &self.primary_device_context
+    }
+
+    pub fn present_queue_and_index(&self) -> (&Queue, usize) {
+        (&self.present_queue, self.present_queue_index as usize)
+    }
+
+    pub fn run(mut self, mut delegate: impl ApplicationDelegate + 'static) {
         let event_loop = EventLoop::new();
 
-        self.delegate.application_will_start(&event_loop);
+        delegate.application_will_start(&mut self, &event_loop);
 
         event_loop.run(move |e, event_loop, control_flow| {
             *control_flow = ControlFlow::Wait;
@@ -216,27 +245,37 @@ impl Application {
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
                     window_id,
-                } => *control_flow = self.delegate.window_will_close(&window_id),
+                } => *control_flow = delegate.close_button_pressed(&window_id),
+
+                Event::WindowEvent {
+                    event: WindowEvent::Destroyed,
+                    window_id,
+                } => *control_flow = delegate.window_destroyed(&window_id),
 
                 Event::WindowEvent {
                     event: WindowEvent::Moved(physical_position),
                     window_id,
-                } => *control_flow = self.delegate.window_moved(&window_id, &physical_position),
+                } => *control_flow = delegate.window_moved(&window_id, &physical_position),
 
                 Event::WindowEvent {
                     event: WindowEvent::Resized(physical_size),
                     window_id,
-                } => *control_flow = self.delegate.window_resized(&window_id, &physical_size),
+                } => *control_flow = delegate.window_resized(&window_id, &physical_size),
 
                 Event::WindowEvent {
                     event: WindowEvent::DroppedFile(path_buffer),
                     window_id,
-                } => *control_flow = self.delegate.file_dropped(&window_id, &path_buffer),
+                } => *control_flow = delegate.file_dropped(&window_id, &path_buffer),
+
+                Event::WindowEvent {
+                    event: WindowEvent::Focused(f),
+                    window_id,
+                } => *control_flow = if f {delegate.window_got_focus(&window_id)}else{delegate.window_lost_focus(&window_id)},
                 _ => (),
             }
 
             match control_flow {
-                ControlFlow::Exit => self.delegate.application_will_quit(&event_loop),
+                ControlFlow::Exit => delegate.application_will_quit(&mut self, &event_loop),
                 _ => (),
             }
         });
