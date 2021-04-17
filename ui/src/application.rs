@@ -2,10 +2,10 @@ extern crate ash;
 extern crate ash_window;
 extern crate winit;
 
-use std::borrow::Cow;
-use std::path::PathBuf;
-use std::ffi::{CStr, CString};
 use ash::version::InstanceV1_0;
+use std::borrow::Cow;
+use std::ffi::{CStr, CString};
+use std::path::PathBuf;
 
 use winit::{
     event::{Event, WindowEvent},
@@ -65,35 +65,56 @@ unsafe extern "system" fn vulkan_debug_callback(
     vk::FALSE
 }
 
-pub trait ApplicationDelegate {
-    fn application_will_start(&mut self, application: &mut Application, _: &EventLoopWindowTarget<()>){}
-    fn application_will_quit(&mut self, application: &mut Application, _: &EventLoopWindowTarget<()>){}
+pub trait ApplicationDelegate<AppState> {
+    fn application_will_start(
+        &mut self,
+        _: &mut Application<AppState>,
+        _: &mut AppState,
+        _: &EventLoopWindowTarget<()>,
+    ) {
+    }
+    fn application_will_quit(
+        &mut self,
+        _: &mut Application<AppState>,
+        _: &EventLoopWindowTarget<()>,
+    ) {
+    }
 
-    fn close_button_pressed(&mut self, _: &winit::window::WindowId) -> ControlFlow{ControlFlow::Wait}
-    fn window_destroyed(&mut self, _: &winit::window::WindowId) -> ControlFlow{ControlFlow::Wait}
+    fn close_button_pressed(&mut self, _: &winit::window::WindowId) -> ControlFlow {
+        ControlFlow::Wait
+    }
+    fn window_destroyed(&mut self, _: &winit::window::WindowId) -> ControlFlow {
+        ControlFlow::Wait
+    }
     fn window_resized(
         &mut self,
         _: &winit::window::WindowId,
         _: &winit::dpi::PhysicalSize<u32>,
-    ) -> ControlFlow{ControlFlow::Wait}
+    ) -> ControlFlow {
+        ControlFlow::Wait
+    }
 
     fn window_moved(
-        &mut self, 
-        _: &winit::window::WindowId, 
-        _: &winit::dpi::PhysicalPosition<i32>
-    ) -> ControlFlow{ControlFlow::Wait}
-
-    fn window_got_focus(&mut self, _: &winit::window::WindowId) -> ControlFlow{ControlFlow::Wait}
-    fn window_lost_focus(&mut self, _: &winit::window::WindowId) -> ControlFlow{ControlFlow::Wait}
-
-    fn file_dropped(
-        &mut self, 
+        &mut self,
         _: &winit::window::WindowId,
-        _: &PathBuf
-    ) -> ControlFlow{ControlFlow::Wait}
+        _: &winit::dpi::PhysicalPosition<i32>,
+    ) -> ControlFlow {
+        ControlFlow::Wait
+    }
+
+    fn window_got_focus(&mut self, _: &winit::window::WindowId) -> ControlFlow {
+        ControlFlow::Wait
+    }
+    fn window_lost_focus(&mut self, _: &winit::window::WindowId) -> ControlFlow {
+        ControlFlow::Wait
+    }
+
+    fn file_dropped(&mut self, _: &winit::window::WindowId, _: &PathBuf) -> ControlFlow {
+        ControlFlow::Wait
+    }
 }
 
-pub struct Application {
+pub struct Application<AppState> {
     debug_callback: vk::DebugUtilsMessengerEXT,
     vulkan_entry: Entry,
     vulkan_instance: Instance,
@@ -101,10 +122,13 @@ pub struct Application {
     primary_device_context: Device,
     present_queue: Queue,
     present_queue_index: u32,
+
+    windows: std::collections::HashMap<winit::window::WindowId, winit::window::Window>,
+    state: AppState,
 }
 
-impl Application {
-    pub fn new(name: &str) -> Self {
+impl<AppState: 'static> Application<AppState> {
+    pub fn new(name: &str, state: AppState) -> Self {
         let app_name = CString::new(name).unwrap();
         let layer_names = [CString::new("VK_LAYER_KHRONOS_validation").unwrap()];
         let layers_names_raw: Vec<*const i8> = layer_names
@@ -199,7 +223,8 @@ impl Application {
                 .create_device(primary_gpu, &device_create_info, None)
                 .unwrap();
 
-            let present_queue = primary_device_context.get_device_queue(present_queue_index as u32, 0);
+            let present_queue =
+                primary_device_context.get_device_queue(present_queue_index as u32, 0);
 
             Self {
                 debug_callback,
@@ -209,6 +234,8 @@ impl Application {
                 primary_device_context,
                 present_queue,
                 present_queue_index,
+                windows: std::collections::HashMap::new(),
+                state: state,
             }
         }
     }
@@ -217,15 +244,15 @@ impl Application {
         &self.vulkan_entry
     }
 
-    pub fn vulkan_instance(&self) -> &Instance{
+    pub fn vulkan_instance(&self) -> &Instance {
         &self.vulkan_instance
     }
 
-    pub fn primary_gpu(&self) -> &vk::PhysicalDevice{
+    pub fn primary_gpu(&self) -> &vk::PhysicalDevice {
         &self.primary_gpu
     }
 
-    pub fn primary_device_context(&self) -> &Device{
+    pub fn primary_device_context(&self) -> &Device {
         &self.primary_device_context
     }
 
@@ -233,10 +260,10 @@ impl Application {
         (&self.present_queue, self.present_queue_index as usize)
     }
 
-    pub fn run(mut self, mut delegate: impl ApplicationDelegate + 'static) {
+    pub fn run(mut self, mut delegate: impl ApplicationDelegate<AppState> + 'static) {
         let event_loop = EventLoop::new();
 
-        delegate.application_will_start(&mut self, &event_loop);
+        delegate.application_will_start(&mut self, &mut self.state, &event_loop);
 
         event_loop.run(move |e, event_loop, control_flow| {
             *control_flow = ControlFlow::Wait;
@@ -270,7 +297,13 @@ impl Application {
                 Event::WindowEvent {
                     event: WindowEvent::Focused(f),
                     window_id,
-                } => *control_flow = if f {delegate.window_got_focus(&window_id)}else{delegate.window_lost_focus(&window_id)},
+                } => {
+                    *control_flow = if f {
+                        delegate.window_got_focus(&window_id)
+                    } else {
+                        delegate.window_lost_focus(&window_id)
+                    }
+                }
                 _ => (),
             }
 
