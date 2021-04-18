@@ -6,6 +6,10 @@ use skia_safe::Point;
 use skia_safe::Rect;
 use skia_safe::Size;
 
+pub trait UIDelegate<AppState> {
+    fn build(&self, section: &str, state: &AppState) -> Node<AppState>;
+}
+
 #[repr(C)]
 pub struct UserInterface<DataModel> {
     pub root: Node<DataModel>,
@@ -69,7 +73,7 @@ impl<DataModel: 'static> UserInterface<DataModel> {
     pub fn mouse_down(&mut self, state: &mut DataModel, event: &MouseEvent) {
         let mut dismiss_popup = false;
         if let Some(popup) = self.pop_up.as_mut() {
-            if !popup.hit_test(&event.global_position) {
+            if !popup.hit_test(&event.global_position()) {
                 dismiss_popup = true;
             } else {
                 self.actions.push(popup.mouse_down(state, event));

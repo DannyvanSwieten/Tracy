@@ -1,6 +1,6 @@
 use skia_safe::Point;
-use skia_safe::Size;
 use skia_safe::Rect;
+use skia_safe::Size;
 
 use crate::widget::*;
 use crate::window::MouseEvent;
@@ -266,10 +266,10 @@ impl<DataModel> Node<DataModel> {
     pub fn mouse_down(&mut self, state: &mut DataModel, event: &MouseEvent) -> Action<DataModel> {
         let mut action = Action::None;
 
-        if self.hit_test(&event.global_position) {
+        if self.hit_test(&event.global_position()) {
             let mut consume = true;
             for child in self.children.iter_mut() {
-                if child.hit_test(&event.global_position) {
+                if child.hit_test(&event.global_position()) {
                     action = child.mouse_down(state, event);
                     consume = false;
                 }
@@ -294,10 +294,10 @@ impl<DataModel> Node<DataModel> {
     ) -> Action<DataModel> {
         let mut action = Action::None;
 
-        if self.hit_test(&event.global_position) {
+        if self.hit_test(&event.global_position()) {
             let mut consume = true;
             for child in self.children.iter_mut() {
-                if child.hit_test(&event.global_position) {
+                if child.hit_test(&event.global_position()) {
                     action = child.mouse_up(state, window_id, event);
                     consume = false;
                 }
@@ -315,10 +315,10 @@ impl<DataModel> Node<DataModel> {
     }
 
     pub fn double_click(&mut self, state: &mut DataModel, event: &MouseEvent) {
-        if self.hit_test(&event.global_position) {
+        if self.hit_test(&event.global_position()) {
             let mut consume = true;
             for child in self.children.iter_mut() {
-                if child.hit_test(&event.global_position) {
+                if child.hit_test(&event.global_position()) {
                     child.double_click(state, event);
                     consume = false;
                 }
@@ -331,10 +331,10 @@ impl<DataModel> Node<DataModel> {
     }
 
     pub fn mouse_drag(&mut self, state: &mut DataModel, event: &MouseEvent) -> Action<DataModel> {
-        if self.hit_test(&event.global_position) {
+        if self.hit_test(&event.global_position()) {
             let mut consume = true;
             for child in self.children.iter_mut() {
-                if child.hit_test(&event.global_position) {
+                if child.hit_test(&event.global_position()) {
                     child.mouse_drag(state, event);
                     consume = false;
                 }
@@ -350,7 +350,7 @@ impl<DataModel> Node<DataModel> {
 
     pub fn mouse_moved(&mut self, state: &mut DataModel, event: &MouseEvent) -> Option<u32> {
         for child in self.children.iter_mut() {
-            if child.hit_test(&event.global_position) {
+            if child.hit_test(&event.global_position()) {
                 return child.mouse_moved(state, event);
             }
         }

@@ -16,13 +16,20 @@ pub enum MouseEventType {
 
 #[repr(C)]
 pub struct MouseEvent {
-    pub modifiers: u32,
-    pub global_position: Point,
-    pub local_position: Point,
-    pub delta_position: Point,
+    modifiers: u32,
+    global_position: Point,
+    local_position: Point,
 }
 
 impl MouseEvent {
+    pub fn new(modifiers: u32, global_position: &Point, local_position: &Point) -> Self {
+        Self {
+            modifiers,
+            global_position: *global_position,
+            local_position: *local_position,
+        }
+    }
+
     pub fn is_control_down(&self) -> bool {
         (self.modifiers & 1) != 0
     }
@@ -34,11 +41,14 @@ impl MouseEvent {
     pub fn is_right_mouse(&self) -> bool {
         (self.modifiers & 4) != 0
     }
-}
 
-pub trait WindowDelegate<DataModel> {
-    fn wants_user_interface(&self) -> bool;
-    fn create_dom(&self, state: &DataModel) -> Node<DataModel>;
+    pub fn global_position(&self) -> &Point {
+        &self.global_position
+    }
+
+    pub fn local_position(&self) -> &Point {
+        &self.local_position
+    }
 }
 
 #[repr(C)]
@@ -47,7 +57,6 @@ pub struct Window<DataModel> {
     name: String,
     width: u32,
     height: u32,
-    delegate: Option<Box<dyn WindowDelegate<DataModel>>>,
     pub ui: Option<UserInterface<DataModel>>,
 }
 
@@ -61,7 +70,6 @@ impl<DataModel: 'static> Window<DataModel> {
                 name: name.to_string(),
                 width: 0,
                 height: 0,
-                delegate: None,
                 ui: None,
             }
         }

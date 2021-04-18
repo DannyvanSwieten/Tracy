@@ -112,6 +112,14 @@ pub trait ApplicationDelegate<AppState> {
     fn file_dropped(&mut self, _: &winit::window::WindowId, _: &PathBuf) -> ControlFlow {
         ControlFlow::Wait
     }
+
+    fn cursor_moved(
+        &mut self,
+        _: &winit::window::WindowId,
+        _: &winit::dpi::PhysicalPosition<f64>,
+    ) -> ControlFlow {
+        ControlFlow::Wait
+    }
 }
 
 pub struct Application<AppState> {
@@ -303,6 +311,16 @@ impl<AppState: 'static> Application<AppState> {
                         d.window_lost_focus(&window_id)
                     }
                 }
+
+                Event::WindowEvent {
+                    event:
+                        WindowEvent::CursorMoved {
+                            device_id,
+                            position,
+                            modifiers,
+                        },
+                    window_id,
+                } => *control_flow = d.cursor_moved(&window_id, &position),
                 _ => (),
             }
 
