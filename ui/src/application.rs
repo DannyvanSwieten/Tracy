@@ -68,7 +68,7 @@ unsafe extern "system" fn vulkan_debug_callback(
 pub trait ApplicationDelegate<AppState> {
     fn application_will_start(
         &mut self,
-        _: &mut Application<AppState>,
+        _: &Application<AppState>,
         _: &mut AppState,
         _: &EventLoopWindowTarget<()>,
     ) {
@@ -122,13 +122,11 @@ pub struct Application<AppState> {
     primary_device_context: Device,
     present_queue: Queue,
     present_queue_index: u32,
-
-    windows: std::collections::HashMap<winit::window::WindowId, winit::window::Window>,
-    state: AppState,
+    _state: std::marker::PhantomData<AppState>,
 }
 
-impl<AppState> Application<AppState> {
-    pub fn new(name: &str, state: AppState) -> Self {
+impl<AppState: 'static> Application<AppState> {
+    pub fn new(name: &str) -> Self {
         let app_name = CString::new(name).unwrap();
         let layer_names = [CString::new("VK_LAYER_KHRONOS_validation").unwrap()];
         let layers_names_raw: Vec<*const i8> = layer_names
@@ -234,8 +232,7 @@ impl<AppState> Application<AppState> {
                 primary_device_context,
                 present_queue,
                 present_queue_index,
-                windows: std::collections::HashMap::new(),
-                state,
+                _state: std::marker::PhantomData::<AppState>::default(),
             }
         }
     }
@@ -260,57 +257,57 @@ impl<AppState> Application<AppState> {
         (&self.present_queue, self.present_queue_index as usize)
     }
 
-    pub fn run(mut self, delegate: Box<dyn ApplicationDelegate<AppState>> {
-        let state = self.state;
+    pub fn run(mut self, delegate: Box<dyn ApplicationDelegate<AppState>>, state: AppState) {
+        let mut s = state;
         let event_loop = EventLoop::new();
-        let delegate = delegate;
+        let mut d = delegate;
 
-        delegate.application_will_start(&mut self, &mut self.state, &event_loop);
+        d.application_will_start(&self, &mut s, &event_loop);
 
-        event_loop.run( move |e, event_loop, control_flow| {
+        event_loop.run(move |e, event_loop, control_flow| {
             *control_flow = ControlFlow::Wait;
 
             match e {
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
                     window_id,
-                } => *control_flow = delegate.close_button_pressed(&window_id),
+                } => *control_flow = d.close_button_pressed(&window_id),
 
                 Event::WindowEvent {
                     event: WindowEvent::Destroyed,
                     window_id,
-                } => *control_flow = delegate.window_destroyed(&window_id),
+                } => *control_flow = d.window_destroyed(&window_id),
 
                 Event::WindowEvent {
                     event: WindowEvent::Moved(physical_position),
                     window_id,
-                } => *control_flow = delegate.window_moved(&window_id, &physical_position),
+                } => *control_flow = d.window_moved(&window_id, &physical_position),
 
                 Event::WindowEvent {
                     event: WindowEvent::Resized(physical_size),
                     window_id,
-                } => *control_flow = delegate.window_resized(&window_id, &physical_size),
+                } => *control_flow = d.window_resized(&window_id, &physical_size),
 
                 Event::WindowEvent {
                     event: WindowEvent::DroppedFile(path_buffer),
                     window_id,
-                } => *control_flow = delegate.file_dropped(&window_id, &path_buffer),
+                } => *control_flow = d.file_dropped(&window_id, &path_buffer),
 
                 Event::WindowEvent {
                     event: WindowEvent::Focused(f),
                     window_id,
                 } => {
                     *control_flow = if f {
-                        delegate.window_got_focus(&window_id)
+                        d.window_got_focus(&window_id)
                     } else {
-                        delegate.window_lost_focus(&window_id)
+                        d.window_lost_focus(&window_id)
                     }
                 }
                 _ => (),
             }
 
             match control_flow {
-                ControlFlow::Exit => delegate.application_will_quit(&mut self, &event_loop),
+                ControlFlow::Exit => d.application_will_quit(&mut self, &event_loop),
                 _ => (),
             }
         });

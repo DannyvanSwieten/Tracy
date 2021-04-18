@@ -33,7 +33,7 @@ impl Delegate {
 impl<AppState> ApplicationDelegate<AppState> for Delegate {
     fn application_will_start(
         &mut self,
-        app: &mut Application<AppState>,
+        app: &Application<AppState>,
         state: &mut AppState,
         target: &EventLoopWindowTarget<()>,
     ) {
@@ -43,13 +43,15 @@ impl<AppState> ApplicationDelegate<AppState> for Delegate {
             .build(&target)
             .unwrap();
 
+        self.windows.insert(window.id(), window);
+
         let window2 = WindowBuilder::new()
             .with_title("Second Window!")
             .with_inner_size(LogicalSize::new(400, 400))
             .build(&target)
             .unwrap();
 
-        //let ui_window = UIWindow::new(app, &window);
+        self.windows.insert(window2.id(), window2);
     }
 
     fn close_button_pressed(
@@ -66,7 +68,6 @@ impl<AppState> ApplicationDelegate<AppState> for Delegate {
 }
 
 fn main() {
-    let state = AppState {};
-    let app: Application<AppState> = Application::new("My Application", state);
-    app.run(Box::new(Delegate::new()));
+    let app: Application<AppState> = Application::new("My Application");
+    app.run(Box::new(Delegate::new()), AppState {});
 }
