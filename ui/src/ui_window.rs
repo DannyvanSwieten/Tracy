@@ -25,62 +25,62 @@ unsafe fn get_procedure(
     }
 }
 
-pub struct UIWindow<AppState> {
-    context: RecordingContext,
-    surface: Surface,
+// pub struct UIWindow<AppState> {
+//     context: RecordingContext,
+//     surface: Surface,
 
-    state: std::marker::PhantomData<AppState>,
-}
+//     state: std::marker::PhantomData<AppState>,
+// }
 
-impl<AppState: 'static> UIWindow<AppState> {
-    pub fn new(app: &Application<AppState>, window: &winit::window::Window) -> Self {
-        let (queue, index) = app.present_queue_and_index();
+// impl<AppState: 'static> UIWindow<AppState> {
+//     pub fn new(app: &Application<AppState>, window: &winit::window::Window) -> Self {
+//         let (queue, index) = app.present_queue_and_index();
 
-        let entry = app.vulkan_entry();
-        let instance = app.vulkan_instance();
-        let get_proc = move |of| unsafe {
-            if let Some(f) = get_procedure(&entry, &instance, of) {
-                f as *const std::ffi::c_void
-            } else {
-                std::ptr::null()
-            }
-        };
+//         let entry = app.vulkan_entry();
+//         let instance = app.vulkan_instance();
+//         let get_proc = move |of| unsafe {
+//             if let Some(f) = get_procedure(&entry, &instance, of) {
+//                 f as *const std::ffi::c_void
+//             } else {
+//                 std::ptr::null()
+//             }
+//         };
 
-        let mut context = {
-            let backend = unsafe {
-                vk::BackendContext::new(
-                    app.vulkan_instance().handle().as_raw() as _,
-                    app.primary_gpu().as_raw() as _,
-                    app.primary_device_context().handle().as_raw() as _,
-                    (queue.as_raw() as _, index),
-                    &get_proc as _,
-                )
-            };
-            RecordingContext::from(DirectContext::new_vulkan(&backend, None).unwrap())
-        };
+//         let mut context = {
+//             let backend = unsafe {
+//                 vk::BackendContext::new(
+//                     app.vulkan_instance().handle().as_raw() as _,
+//                     app.primary_gpu().as_raw() as _,
+//                     app.primary_device_context().handle().as_raw() as _,
+//                     (queue.as_raw() as _, index),
+//                     &get_proc as _,
+//                 )
+//             };
+//             RecordingContext::from(DirectContext::new_vulkan(&backend, None).unwrap())
+//         };
 
-        let image_info = ImageInfo::new_n32_premul(
-            (
-                window.inner_size().width as i32,
-                window.inner_size().height as i32,
-            ),
-            None,
-        );
-        let surface = Surface::new_render_target(
-            &mut context,
-            Budgeted::Yes,
-            &image_info,
-            None,
-            SurfaceOrigin::TopLeft,
-            None,
-            false,
-        )
-        .unwrap();
+//         let image_info = ImageInfo::new_n32_premul(
+//             (
+//                 window.inner_size().width as i32,
+//                 window.inner_size().height as i32,
+//             ),
+//             None,
+//         );
+//         let surface = Surface::new_render_target(
+//             &mut context,
+//             Budgeted::Yes,
+//             &image_info,
+//             None,
+//             SurfaceOrigin::TopLeft,
+//             None,
+//             false,
+//         )
+//         .unwrap();
 
-        Self {
-            context,
-            surface,
-            state: std::marker::PhantomData::<AppState>::default(),
-        }
-    }
-}
+//         Self {
+//             context,
+//             surface,
+//             state: std::marker::PhantomData::<AppState>::default(),
+//         }
+//     }
+// }

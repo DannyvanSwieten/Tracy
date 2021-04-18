@@ -6,8 +6,6 @@ pub mod user_interface;
 pub mod widget;
 pub mod window;
 
-use ui_window::*;
-
 use application::{Application, ApplicationDelegate};
 
 use winit::{
@@ -32,7 +30,7 @@ impl Delegate {
     }
 }
 
-impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate {
+impl<AppState> ApplicationDelegate<AppState> for Delegate {
     fn application_will_start(
         &mut self,
         app: &mut Application<AppState>,
@@ -51,7 +49,7 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate {
             .build(&target)
             .unwrap();
 
-        let ui_window = UIWindow::new(app, &window);
+        //let ui_window = UIWindow::new(app, &window);
     }
 
     fn close_button_pressed(
@@ -70,5 +68,5 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate {
 fn main() {
     let state = AppState {};
     let app: Application<AppState> = Application::new("My Application", state);
-    app.run(Delegate::new());
+    app.run(Box::new(Delegate::new()));
 }

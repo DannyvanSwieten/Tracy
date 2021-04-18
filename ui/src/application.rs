@@ -127,7 +127,7 @@ pub struct Application<AppState> {
     state: AppState,
 }
 
-impl<AppState: 'static> Application<AppState> {
+impl<AppState> Application<AppState> {
     pub fn new(name: &str, state: AppState) -> Self {
         let app_name = CString::new(name).unwrap();
         let layer_names = [CString::new("VK_LAYER_KHRONOS_validation").unwrap()];
@@ -235,7 +235,7 @@ impl<AppState: 'static> Application<AppState> {
                 present_queue,
                 present_queue_index,
                 windows: std::collections::HashMap::new(),
-                state: state,
+                state,
             }
         }
     }
@@ -260,12 +260,14 @@ impl<AppState: 'static> Application<AppState> {
         (&self.present_queue, self.present_queue_index as usize)
     }
 
-    pub fn run(mut self, mut delegate: impl ApplicationDelegate<AppState> + 'static) {
+    pub fn run(mut self, delegate: Box<dyn ApplicationDelegate<AppState>> {
+        let state = self.state;
         let event_loop = EventLoop::new();
+        let delegate = delegate;
 
         delegate.application_will_start(&mut self, &mut self.state, &event_loop);
 
-        event_loop.run(move |e, event_loop, control_flow| {
+        event_loop.run( move |e, event_loop, control_flow| {
             *control_flow = ControlFlow::Wait;
 
             match e {
