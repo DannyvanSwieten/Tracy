@@ -29,9 +29,10 @@ unsafe fn get_procedure(
 
 pub trait WindowDelegate<AppState> {
     fn mouse_moved(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
-    fn mouse_down(&mut self, event: &winit::dpi::PhysicalPosition<f64>) {}
-    fn mouse_up(&mut self, event: &winit::dpi::PhysicalPosition<f64>) {}
-    fn keyboard_event(&mut self, event: &winit::event::KeyboardInput) {}
+    fn mouse_down(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
+    fn mouse_up(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
+    fn resized(&mut self, state: &mut AppState, size: &winit::dpi::PhysicalSize<f64>) {}
+    fn keyboard_event(&mut self, state: &mut AppState, event: &winit::event::KeyboardInput) {}
 }
 
 pub struct UIWindow<AppState> {
@@ -102,5 +103,20 @@ impl<AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
             let p = skia_safe::Point::from((event.x as f32, event.y as f32));
             root.mouse_moved(state, &MouseEvent::new(0, &p, &p));
         }
+    }
+
+    fn resized(&mut self, _: &mut AppState, event: &winit::dpi::PhysicalSize<f64>) {
+        let image_info = ImageInfo::new_n32_premul((event.width as i32, event.height as i32), None);
+
+        self.surface = Surface::new_render_target(
+            &mut self.context,
+            Budgeted::Yes,
+            &image_info,
+            None,
+            SurfaceOrigin::TopLeft,
+            None,
+            false,
+        )
+        .unwrap()
     }
 }
