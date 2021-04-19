@@ -180,7 +180,14 @@ impl<'a, AppState: 'static> UIWindow<'a, AppState> {
             let render_pass_begin_info = ash::vk::RenderPassBeginInfo::builder()
                 .render_pass(*self.swapchain.render_pass())
                 .framebuffer(*framebuffer)
-                .clear_values(&clear_values);
+                .clear_values(&clear_values)
+                .render_area(ash::vk::Rect2D {
+                    offset: ash::vk::Offset2D { x: 0, y: 0 },
+                    extent: ash::vk::Extent2D {
+                        width: self.surface.width() as u32,
+                        height: self.surface.height() as u32,
+                    },
+                });
             let command_buffer_begin_info = ash::vk::CommandBufferBeginInfo::builder().build();
 
             let commands = &self.command_buffers[image_index as usize];
@@ -200,16 +207,18 @@ impl<'a, AppState: 'static> UIWindow<'a, AppState> {
                     .end_command_buffer(*commands)
                     .expect("End recording command buffer failed");
 
-                let wait = &[self.semaphores[image_index as usize]];
+                // wait for present complete for this image
+                let wait = &[*self.swapchain.semaphore(image_index as usize)];
+                // signal the render complete when it's done
+                let signal = &[self.semaphores[image_index as usize]];
                 let flags = &[ash::vk::PipelineStageFlags::ALL_GRAPHICS];
                 let buffers = &[*commands];
-                let signal = &[*self.swapchain.semaphore(image_index as usize)];
 
                 let submit_info = ash::vk::SubmitInfo::builder()
-                    .wait_semaphores(signal)
+                    .wait_semaphores(wait)
                     .wait_dst_stage_mask(flags)
                     .command_buffers(buffers)
-                    .signal_semaphores(wait);
+                    .signal_semaphores(signal);
                 self.device
                     .queue_submit(*self.queue, &[submit_info.build()], ash::vk::Fence::null())
                     .expect("queue submit failed.");
