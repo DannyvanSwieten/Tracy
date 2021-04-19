@@ -46,6 +46,7 @@ pub struct UIWindow<'a, AppState> {
     root: Option<Node<AppState>>,
     device: &'a ash::Device,
     swapchain: swapchain::Swapchain<'a>,
+    queue: &'a ash::vk::Queue,
     command_pool: ash::vk::CommandPool,
     command_buffers: Vec<ash::vk::CommandBuffer>,
     semaphores: Vec<ash::vk::Semaphore>,
@@ -155,6 +156,7 @@ impl<'a, AppState: 'static> UIWindow<'a, AppState> {
                     state: std::marker::PhantomData::<AppState>::default(),
                     root: None,
                     device: app.primary_device_context(),
+                    queue: app.present_queue_and_index().0,
                     swapchain: sc,
                     command_pool,
                     command_buffers,
@@ -168,7 +170,7 @@ impl<'a, AppState: 'static> UIWindow<'a, AppState> {
     pub fn draw(&self) {
         let clear_values = [ash::vk::ClearValue {
             color: ash::vk::ClearColorValue {
-                float32: [1.0, 0.0, 0.0, 0.0],
+                float32: [1.0, 0.0, 0.0, 1.0],
             },
         }];
 
@@ -204,17 +206,13 @@ impl<'a, AppState: 'static> UIWindow<'a, AppState> {
                 let signal = &[*self.swapchain.semaphore(image_index as usize)];
 
                 let submit_info = ash::vk::SubmitInfo::builder()
-                    .wait_semaphores(wait)
+                    .wait_semaphores(signal)
                     .wait_dst_stage_mask(flags)
                     .command_buffers(buffers)
-                    .signal_semaphores(signal);
-                // self.device
-                //     .queue_submit(
-                //         self.queue,
-                //         &[submit_info.build()],
-                //         command_buffer_reuse_fence,
-                //     )
-                //     .expect("queue submit failed.");
+                    .signal_semaphores(wait);
+                self.device
+                    .queue_submit(*self.queue, &[submit_info.build()], ash::vk::Fence::null())
+                    .expect("queue submit failed.");
 
                 self.swapchain
                     .swap(&self.semaphores[image_index as usize], image_index)
