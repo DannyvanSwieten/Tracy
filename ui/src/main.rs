@@ -50,6 +50,8 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate {
             Err(message) => panic!("{}", message),
         };
 
+        ui.draw();
+
         self.windows.insert(window.id(), window);
 
         let window2 = WindowBuilder::new()

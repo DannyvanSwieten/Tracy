@@ -62,16 +62,14 @@ pub struct Window<DataModel> {
 
 impl<DataModel: 'static> Window<DataModel> {
     pub fn new(name: &str) -> Window<DataModel> {
-        unsafe {
-            let ptr = CString::new(name).expect("Failed");
+        let ptr = CString::new(name).expect("Failed");
 
-            Window {
-                uid: 0,
-                name: name.to_string(),
-                width: 0,
-                height: 0,
-                ui: None,
-            }
+        Window {
+            uid: 0,
+            name: name.to_string(),
+            width: 0,
+            height: 0,
+            ui: None,
         }
     }
 

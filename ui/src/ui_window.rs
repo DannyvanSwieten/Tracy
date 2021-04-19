@@ -44,7 +44,11 @@ pub struct UIWindow<'a, AppState> {
 
     state: std::marker::PhantomData<AppState>,
     root: Option<Node<AppState>>,
+    device: &'a ash::Device,
     swapchain: swapchain::Swapchain<'a>,
+    command_pool: ash::vk::CommandPool,
+    command_buffers: Vec<ash::vk::CommandBuffer>,
+    semaphores: Vec<ash::vk::Semaphore>,
 }
 
 impl<'a, AppState: 'static> UIWindow<'a, AppState> {
@@ -110,6 +114,39 @@ impl<'a, AppState: 'static> UIWindow<'a, AppState> {
                     window.inner_size().width,
                     window.inner_size().height,
                 );
+
+                let pool_create_info = ash::vk::CommandPoolCreateInfo::builder()
+                    .flags(ash::vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
+                    .queue_family_index(app.present_queue_and_index().1 as u32);
+
+                let command_pool = unsafe {
+                    app.primary_device_context()
+                        .create_command_pool(&pool_create_info, None)
+                        .expect("Command pool creation failed for UIWindow")
+                };
+
+                let command_buffer_allocate_info = ash::vk::CommandBufferAllocateInfo::builder()
+                    .command_buffer_count(sc.image_count() as u32)
+                    .command_pool(command_pool)
+                    .level(ash::vk::CommandBufferLevel::PRIMARY);
+
+                let command_buffers = unsafe {
+                    app.primary_device_context()
+                        .allocate_command_buffers(&command_buffer_allocate_info)
+                        .expect("Command buffer allocation failed for UIWindow")
+                };
+
+                let mut semaphores = Vec::new();
+                for _ in 0..sc.image_count() {
+                    let semaphore_create_info = ash::vk::SemaphoreCreateInfo::default();
+
+                    semaphores.push(unsafe {
+                        app.primary_device_context()
+                            .create_semaphore(&semaphore_create_info, None)
+                            .unwrap()
+                    });
+                }
+
                 Ok(Self {
                     context,
                     surface,
@@ -117,10 +154,53 @@ impl<'a, AppState: 'static> UIWindow<'a, AppState> {
                     vulkan_surface: vs,
                     state: std::marker::PhantomData::<AppState>::default(),
                     root: None,
+                    device: app.primary_device_context(),
                     swapchain: sc,
+                    command_pool,
+                    command_buffers,
+                    semaphores,
                 })
             }
-            Err(message) => Err("Swapchain creation failed"),
+            Err(_result) => Err("Swapchain creation failed"),
+        }
+    }
+
+    pub fn draw(&self) {
+        let clear_values = [ash::vk::ClearValue {
+            color: ash::vk::ClearColorValue {
+                float32: [0.0, 0.0, 0.0, 0.0],
+            },
+        }];
+
+        let (success, image_index, framebuffer) = self.swapchain.next_frame_buffer();
+
+        if success {
+            let render_pass_begin_info = ash::vk::RenderPassBeginInfo::builder()
+                .render_pass(*self.swapchain.render_pass())
+                .framebuffer(*framebuffer)
+                .clear_values(&clear_values);
+            let command_buffer_begin_info = ash::vk::CommandBufferBeginInfo::builder().build();
+
+            let commands = &self.command_buffers[image_index as usize];
+            unsafe {
+                self.device
+                    .begin_command_buffer(*commands, &command_buffer_begin_info)
+                    .expect("Unable to start recording command buffer");
+
+                self.device.cmd_begin_render_pass(
+                    *commands,
+                    &render_pass_begin_info,
+                    ash::vk::SubpassContents::INLINE,
+                );
+
+                self.device.cmd_end_render_pass(*commands);
+                self.device
+                    .end_command_buffer(*commands)
+                    .expect("End recording command buffer failed");
+
+                self.swapchain
+                    .swap(&self.semaphores[image_index as usize], image_index)
+            }
         }
     }
 }

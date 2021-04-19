@@ -5,12 +5,14 @@ use ash::vk::Handle;
 
 pub struct Swapchain<'a> {
     queue: &'a ash::vk::Queue,
+    loader: ash::extensions::khr::Swapchain,
     handle: ash::vk::SwapchainKHR,
     images: Vec<ash::vk::Image>,
     image_views: Vec<ash::vk::ImageView>,
     present_semaphores: Vec<ash::vk::Semaphore>,
     renderpass: ash::vk::RenderPass,
     framebuffers: Vec<ash::vk::Framebuffer>,
+    current_index: u32,
 }
 
 impl<'a> Swapchain<'a> {
@@ -186,12 +188,57 @@ impl<'a> Swapchain<'a> {
 
         Self {
             handle: swapchain,
+            loader: swapchain_loader,
             images,
             image_views,
             present_semaphores,
             queue: &queue,
             renderpass,
             framebuffers,
+            current_index: 0,
+        }
+    }
+
+    pub fn next_frame_buffer(&self) -> (bool, u32, &ash::vk::Framebuffer) {
+        let (index, succeeded) = unsafe {
+            self.loader
+                .acquire_next_image(
+                    self.handle,
+                    std::u64::MAX,
+                    self.present_semaphores[self.current_index as usize],
+                    ash::vk::Fence::null(),
+                )
+                .expect("Failed to acquire next swapchain image")
+        };
+        //self.current_index = index;
+        (true, index, &self.framebuffers[index as usize])
+    }
+
+    pub fn render_pass(&self) -> &ash::vk::RenderPass {
+        &self.renderpass
+    }
+
+    pub fn semaphore(&self, index: usize) -> &ash::vk::Semaphore {
+        &self.present_semaphores[index]
+    }
+
+    pub fn image_count(&self) -> usize {
+        self.images.len()
+    }
+
+    pub fn swap(&self, semaphore: &ash::vk::Semaphore, index: u32) {
+        let s = &[*semaphore];
+        let sc = &[self.handle];
+        let i = &[index];
+        let present_info = ash::vk::PresentInfoKHR::builder()
+            .wait_semaphores(s)
+            .swapchains(sc)
+            .image_indices(i);
+
+        unsafe {
+            self.loader
+                .queue_present(*self.queue, &present_info)
+                .expect("Swapchain present failed");
         }
     }
 }
