@@ -183,8 +183,10 @@ impl<'a> Swapchain<'a> {
         let semaphore_create_info = ash::vk::SemaphoreCreateInfo::default();
 
         let mut present_semaphores = Vec::new();
-        present_semaphores
-            .push(unsafe { ctx.create_semaphore(&semaphore_create_info, None).unwrap() });
+        for _ in 0..images.len() {
+            present_semaphores
+                .push(unsafe { ctx.create_semaphore(&semaphore_create_info, None).unwrap() });
+        }
 
         Self {
             handle: swapchain,
@@ -200,7 +202,7 @@ impl<'a> Swapchain<'a> {
     }
 
     pub fn next_frame_buffer(&self) -> (bool, u32, &ash::vk::Framebuffer) {
-        let (index, succeeded) = unsafe {
+        let (index, sub_optimal) = unsafe {
             self.loader
                 .acquire_next_image(
                     self.handle,

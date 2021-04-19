@@ -168,7 +168,7 @@ impl<'a, AppState: 'static> UIWindow<'a, AppState> {
     pub fn draw(&self) {
         let clear_values = [ash::vk::ClearValue {
             color: ash::vk::ClearColorValue {
-                float32: [0.0, 0.0, 0.0, 0.0],
+                float32: [1.0, 0.0, 0.0, 0.0],
             },
         }];
 
@@ -197,6 +197,24 @@ impl<'a, AppState: 'static> UIWindow<'a, AppState> {
                 self.device
                     .end_command_buffer(*commands)
                     .expect("End recording command buffer failed");
+
+                let wait = &[self.semaphores[image_index as usize]];
+                let flags = &[ash::vk::PipelineStageFlags::ALL_GRAPHICS];
+                let buffers = &[*commands];
+                let signal = &[*self.swapchain.semaphore(image_index as usize)];
+
+                let submit_info = ash::vk::SubmitInfo::builder()
+                    .wait_semaphores(wait)
+                    .wait_dst_stage_mask(flags)
+                    .command_buffers(buffers)
+                    .signal_semaphores(signal);
+                // self.device
+                //     .queue_submit(
+                //         self.queue,
+                //         &[submit_info.build()],
+                //         command_buffer_reuse_fence,
+                //     )
+                //     .expect("queue submit failed.");
 
                 self.swapchain
                     .swap(&self.semaphores[image_index as usize], image_index)
