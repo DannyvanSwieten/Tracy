@@ -1,5 +1,6 @@
 use super::application::*;
 use super::node::Node;
+use super::swapchain;
 use super::window::MouseEvent;
 use ash::version::EntryV1_0;
 use ash::version::InstanceV1_0;
@@ -35,16 +36,22 @@ pub trait WindowDelegate<AppState> {
     fn keyboard_event(&mut self, state: &mut AppState, event: &winit::event::KeyboardInput) {}
 }
 
-pub struct UIWindow<AppState> {
+pub struct UIWindow<'a, AppState> {
     context: RecordingContext,
     surface: Surface,
+    vulkan_surface: ash::vk::SurfaceKHR,
+    vulkan_surface_fn: ash::extensions::khr::Surface,
 
     state: std::marker::PhantomData<AppState>,
     root: Option<Node<AppState>>,
+    swapchain: swapchain::Swapchain<'a>,
 }
 
-impl<AppState: 'static> UIWindow<AppState> {
-    pub fn new(app: &Application<AppState>, window: &winit::window::Window) -> Self {
+impl<'a, AppState: 'static> UIWindow<'a, AppState> {
+    pub fn new(
+        app: &'a Application<AppState>,
+        window: &winit::window::Window,
+    ) -> Result<Self, &'static str> {
         let (queue, index) = app.present_queue_and_index();
 
         let entry = app.vulkan_entry();
@@ -88,16 +95,37 @@ impl<AppState: 'static> UIWindow<AppState> {
         )
         .unwrap();
 
-        Self {
-            context,
-            surface,
-            state: std::marker::PhantomData::<AppState>::default(),
-            root: None,
+        let vulkan_surface = unsafe { ash_window::create_surface(entry, instance, window, None) };
+        match vulkan_surface {
+            Ok(vs) => {
+                let vulkan_surface_fn = ash::extensions::khr::Surface::new(entry, instance);
+                let sc = swapchain::Swapchain::new(
+                    instance,
+                    app.primary_gpu(),
+                    app.primary_device_context(),
+                    app.present_queue_and_index().0,
+                    &vulkan_surface_fn,
+                    &vs,
+                    app.present_queue_and_index().1 as u32,
+                    window.inner_size().width,
+                    window.inner_size().height,
+                );
+                Ok(Self {
+                    context,
+                    surface,
+                    vulkan_surface_fn,
+                    vulkan_surface: vs,
+                    state: std::marker::PhantomData::<AppState>::default(),
+                    root: None,
+                    swapchain: sc,
+                })
+            }
+            Err(message) => Err("Swapchain creation failed"),
         }
     }
 }
 
-impl<AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
+impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<'a, AppState> {
     fn mouse_moved(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
         if let Some(root) = &mut self.root {
             let p = skia_safe::Point::from((event.x as f32, event.y as f32));

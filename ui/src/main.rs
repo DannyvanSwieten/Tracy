@@ -1,12 +1,14 @@
 pub mod application;
 pub mod canvas;
 pub mod node;
+pub mod swapchain;
 pub mod ui_window;
 pub mod user_interface;
 pub mod widget;
 pub mod window;
 
 use application::{Application, ApplicationDelegate};
+use ui_window::UIWindow;
 
 use winit::{
     dpi::LogicalSize,
@@ -30,7 +32,7 @@ impl Delegate {
     }
 }
 
-impl<AppState> ApplicationDelegate<AppState> for Delegate {
+impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate {
     fn application_will_start(
         &mut self,
         app: &Application<AppState>,
@@ -42,6 +44,11 @@ impl<AppState> ApplicationDelegate<AppState> for Delegate {
             .with_inner_size(LogicalSize::new(1200, 800))
             .build(&target)
             .unwrap();
+
+        let ui = match UIWindow::<AppState>::new(app, &window) {
+            Ok(ui_window) => ui_window,
+            Err(message) => panic!("{}", message),
+        };
 
         self.windows.insert(window.id(), window);
 
