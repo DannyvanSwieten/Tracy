@@ -8,7 +8,9 @@ pub struct Swapchain<'a> {
     handle: ash::vk::SwapchainKHR,
     images: Vec<ash::vk::Image>,
     image_views: Vec<ash::vk::ImageView>,
-    present_semaphore: ash::vk::Semaphore,
+    present_semaphores: Vec<ash::vk::Semaphore>,
+    renderpass: ash::vk::RenderPass,
+    framebuffers: Vec<ash::vk::Framebuffer>,
 }
 
 impl<'a> Swapchain<'a> {
@@ -121,17 +123,75 @@ impl<'a> Swapchain<'a> {
             })
             .collect();
 
+        let attachments = [ash::vk::AttachmentDescription {
+            format: format.format,
+            samples: ash::vk::SampleCountFlags::TYPE_1,
+            load_op: ash::vk::AttachmentLoadOp::CLEAR,
+            store_op: ash::vk::AttachmentStoreOp::STORE,
+            final_layout: ash::vk::ImageLayout::PRESENT_SRC_KHR,
+            ..Default::default()
+        }];
+
+        let attachment_refs = [ash::vk::AttachmentReference {
+            attachment: 0,
+            layout: ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+        }];
+
+        let dependencies = [ash::vk::SubpassDependency {
+            src_subpass: ash::vk::SUBPASS_EXTERNAL,
+            src_stage_mask: ash::vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            dst_access_mask: ash::vk::AccessFlags::COLOR_ATTACHMENT_READ
+                | ash::vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+            dst_stage_mask: ash::vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            ..Default::default()
+        }];
+
+        let subpasses = [ash::vk::SubpassDescription::builder()
+            .color_attachments(&attachment_refs)
+            .pipeline_bind_point(ash::vk::PipelineBindPoint::GRAPHICS)
+            .build()];
+
+        let renderpass_create_info = ash::vk::RenderPassCreateInfo::builder()
+            .attachments(&attachments)
+            .subpasses(&subpasses)
+            .dependencies(&dependencies);
+
+        let renderpass = unsafe {
+            ctx.create_render_pass(&renderpass_create_info, None)
+                .expect("Renderpass creation failed for swapchain")
+        };
+
+        let framebuffers: Vec<ash::vk::Framebuffer> = image_views
+            .iter()
+            .map(|&image_view| {
+                let attachments = [image_view];
+                let create_info = ash::vk::FramebufferCreateInfo::builder()
+                    .render_pass(renderpass)
+                    .attachments(&attachments)
+                    .width(width)
+                    .height(height)
+                    .layers(1);
+                unsafe {
+                    ctx.create_framebuffer(&create_info, None)
+                        .expect("Framebuffer creation failed for swapchain images")
+                }
+            })
+            .collect();
+
         let semaphore_create_info = ash::vk::SemaphoreCreateInfo::default();
 
-        let present_semaphore =
-            unsafe { ctx.create_semaphore(&semaphore_create_info, None).unwrap() };
+        let mut present_semaphores = Vec::new();
+        present_semaphores
+            .push(unsafe { ctx.create_semaphore(&semaphore_create_info, None).unwrap() });
 
         Self {
             handle: swapchain,
             images,
             image_views,
-            present_semaphore,
+            present_semaphores,
             queue: &queue,
+            renderpass,
+            framebuffers,
         }
     }
 }
