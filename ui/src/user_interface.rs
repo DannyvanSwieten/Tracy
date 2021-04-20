@@ -148,7 +148,7 @@ impl<DataModel: 'static> UserInterface<DataModel> {
         self.root.layout_child_with_name(child_name, state)
     }
 
-    pub fn paint(&mut self, state: &mut DataModel, canvas: &mut Canvas) {
+    pub fn paint(&mut self, state: &DataModel, canvas: &mut Canvas) {
         self.root.draw(state, canvas, &self.material);
         if let Some(popup) = self.pop_up.as_mut() {
             popup.layout(state);

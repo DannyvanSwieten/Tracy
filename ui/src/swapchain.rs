@@ -3,8 +3,7 @@ use ash::version::EntryV1_0;
 use ash::version::InstanceV1_0;
 use ash::vk::Handle;
 
-pub struct Swapchain<'a> {
-    queue: &'a ash::vk::Queue,
+pub struct Swapchain {
     loader: ash::extensions::khr::Swapchain,
     handle: ash::vk::SwapchainKHR,
     images: Vec<ash::vk::Image>,
@@ -15,12 +14,11 @@ pub struct Swapchain<'a> {
     current_index: u32,
 }
 
-impl<'a> Swapchain<'a> {
+impl Swapchain {
     pub fn new(
         instance: &ash::Instance,
         gpu: &ash::vk::PhysicalDevice,
         ctx: &ash::Device,
-        queue: &'a ash::vk::Queue,
         surface_loader: &ash::extensions::khr::Surface,
         surface: &ash::vk::SurfaceKHR,
         queue_index: u32,
@@ -194,7 +192,6 @@ impl<'a> Swapchain<'a> {
             images,
             image_views,
             present_semaphores,
-            queue: &queue,
             renderpass,
             framebuffers,
             current_index: 0,
@@ -228,7 +225,7 @@ impl<'a> Swapchain<'a> {
         self.images.len()
     }
 
-    pub fn swap(&self, semaphore: &ash::vk::Semaphore, index: u32) {
+    pub fn swap(&self, queue: &ash::vk::Queue, semaphore: &ash::vk::Semaphore, index: u32) {
         let s = &[*semaphore];
         let sc = &[self.handle];
         let i = &[index];
@@ -239,7 +236,7 @@ impl<'a> Swapchain<'a> {
 
         unsafe {
             self.loader
-                .queue_present(*self.queue, &present_info)
+                .queue_present(*queue, &present_info)
                 .expect("Swapchain present failed");
         }
     }

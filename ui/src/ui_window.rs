@@ -1,6 +1,7 @@
 use super::application::*;
 use super::node::Node;
 use super::swapchain;
+use super::user_interface::{UIDelegate, UserInterface};
 use super::window::MouseEvent;
 use ash::version::EntryV1_0;
 use ash::version::InstanceV1_0;
@@ -36,26 +37,27 @@ pub trait WindowDelegate<AppState> {
     fn keyboard_event(&mut self, state: &mut AppState, event: &winit::event::KeyboardInput) {}
 }
 
-pub struct UIWindow<'a, AppState> {
+pub struct UIWindow<AppState> {
     context: RecordingContext,
     surface: Surface,
+    user_interface: UserInterface<AppState>,
     vulkan_surface: ash::vk::SurfaceKHR,
     vulkan_surface_fn: ash::extensions::khr::Surface,
 
     state: std::marker::PhantomData<AppState>,
     root: Option<Node<AppState>>,
-    device: &'a ash::Device,
-    swapchain: swapchain::Swapchain<'a>,
-    queue: &'a ash::vk::Queue,
+    swapchain: swapchain::Swapchain,
     command_pool: ash::vk::CommandPool,
     command_buffers: Vec<ash::vk::CommandBuffer>,
     semaphores: Vec<ash::vk::Semaphore>,
 }
 
-impl<'a, AppState: 'static> UIWindow<'a, AppState> {
+impl<'a, AppState: 'static> UIWindow<AppState> {
     pub fn new(
         app: &'a Application<AppState>,
+        state: &AppState,
         window: &winit::window::Window,
+        ui_delegate: Box<dyn UIDelegate<AppState>>,
     ) -> Result<Self, &'static str> {
         let (queue, index) = app.present_queue_and_index();
 
@@ -108,7 +110,6 @@ impl<'a, AppState: 'static> UIWindow<'a, AppState> {
                     instance,
                     app.primary_gpu(),
                     app.primary_device_context(),
-                    app.present_queue_and_index().0,
                     &vulkan_surface_fn,
                     &vs,
                     app.present_queue_and_index().1 as u32,
@@ -148,15 +149,16 @@ impl<'a, AppState: 'static> UIWindow<'a, AppState> {
                     });
                 }
 
+                let user_interface = UserInterface::new(ui_delegate.build("root", state));
+
                 Ok(Self {
                     context,
                     surface,
+                    user_interface,
                     vulkan_surface_fn,
                     vulkan_surface: vs,
                     state: std::marker::PhantomData::<AppState>::default(),
                     root: None,
-                    device: app.primary_device_context(),
-                    queue: app.present_queue_and_index().0,
                     swapchain: sc,
                     command_pool,
                     command_buffers,
@@ -167,10 +169,12 @@ impl<'a, AppState: 'static> UIWindow<'a, AppState> {
         }
     }
 
-    pub fn draw(&self) {
+    pub fn draw(&mut self, app: &Application<AppState>, state: &AppState) {
+        self.user_interface.paint(state, self.surface.canvas());
+
         let clear_values = [ash::vk::ClearValue {
             color: ash::vk::ClearColorValue {
-                float32: [1.0, 0.0, 0.0, 1.0],
+                float32: [0.0, 0.0, 0.0, 0.0],
             },
         }];
 
@@ -189,21 +193,21 @@ impl<'a, AppState: 'static> UIWindow<'a, AppState> {
                     },
                 });
             let command_buffer_begin_info = ash::vk::CommandBufferBeginInfo::builder().build();
-
+            let device = app.primary_device_context();
             let commands = &self.command_buffers[image_index as usize];
             unsafe {
-                self.device
+                device
                     .begin_command_buffer(*commands, &command_buffer_begin_info)
                     .expect("Unable to start recording command buffer");
 
-                self.device.cmd_begin_render_pass(
+                device.cmd_begin_render_pass(
                     *commands,
                     &render_pass_begin_info,
                     ash::vk::SubpassContents::INLINE,
                 );
 
-                self.device.cmd_end_render_pass(*commands);
-                self.device
+                device.cmd_end_render_pass(*commands);
+                device
                     .end_command_buffer(*commands)
                     .expect("End recording command buffer failed");
 
@@ -215,22 +219,29 @@ impl<'a, AppState: 'static> UIWindow<'a, AppState> {
                 let buffers = &[*commands];
 
                 let submit_info = ash::vk::SubmitInfo::builder()
+                    .command_buffers(buffers)
                     .wait_semaphores(wait)
                     .wait_dst_stage_mask(flags)
-                    .command_buffers(buffers)
                     .signal_semaphores(signal);
-                self.device
-                    .queue_submit(*self.queue, &[submit_info.build()], ash::vk::Fence::null())
+                device
+                    .queue_submit(
+                        *app.present_queue_and_index().0,
+                        &[submit_info.build()],
+                        ash::vk::Fence::null(),
+                    )
                     .expect("queue submit failed.");
 
-                self.swapchain
-                    .swap(&self.semaphores[image_index as usize], image_index)
+                self.swapchain.swap(
+                    app.present_queue_and_index().0,
+                    &self.semaphores[image_index as usize],
+                    image_index,
+                )
             }
         }
     }
 }
 
-impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<'a, AppState> {
+impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
     fn mouse_moved(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
         if let Some(root) = &mut self.root {
             let p = skia_safe::Point::from((event.x as f32, event.y as f32));

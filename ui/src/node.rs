@@ -191,7 +191,7 @@ impl<DataModel> Node<DataModel> {
         }
     }
 
-    pub fn layout(&mut self, state: &mut DataModel) {
+    pub fn layout(&mut self, state: &DataModel) {
         self.build(state);
 
         self.widget.layout(
@@ -206,7 +206,7 @@ impl<DataModel> Node<DataModel> {
         }
     }
 
-    pub fn layout_child_with_name(&mut self, name: &str, state: &mut DataModel) {
+    pub fn layout_child_with_name(&mut self, name: &str, state: &DataModel) {
         if self.name == name {
             self.layout(state)
         } else {
@@ -216,7 +216,7 @@ impl<DataModel> Node<DataModel> {
         }
     }
 
-    pub fn build(&mut self, state: &mut DataModel) {
+    pub fn build(&mut self, state: &DataModel) {
         if let Some(cb) = self.build_callback.as_mut() {
             if let Some(children) = cb(state) {
                 self.children = children;
@@ -234,7 +234,7 @@ impl<DataModel> Node<DataModel> {
         self.rect.set_wh(size.width, size.height);
     }
 
-    pub fn draw(&mut self, state: &mut DataModel, canvas: &mut Canvas, material: &Material) {
+    pub fn draw(&mut self, state: &DataModel, canvas: &mut Canvas, material: &Material) {
         self.widget.paint(
             state,
             &self.rect,

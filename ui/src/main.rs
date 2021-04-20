@@ -8,7 +8,8 @@ pub mod widget;
 pub mod window;
 
 use application::{Application, ApplicationDelegate};
-use ui_window::UIWindow;
+use ui_window::{UIWindow, WindowDelegate};
+use user_interface::UIDelegate;
 
 use winit::{
     dpi::LogicalSize,
@@ -20,19 +21,28 @@ use std::collections::HashMap;
 
 struct AppState {}
 
-struct Delegate {
+struct Delegate<AppState> {
     windows: HashMap<WindowId, Window>,
+    ui_windows: HashMap<WindowId, Box<dyn WindowDelegate<AppState>>>,
 }
 
-impl Delegate {
+impl Delegate<AppState> {
     fn new() -> Self {
         Self {
             windows: HashMap::new(),
+            ui_windows: HashMap::new(),
         }
     }
 }
 
-impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate {
+struct MyUIDelegate {}
+impl<AppState> UIDelegate<AppState> for MyUIDelegate {
+    fn build(&self, _: &str, _: &AppState) -> node::Node<AppState> {
+        node::Node::new("body").with_widget(widget::Container::new(5.))
+    }
+}
+
+impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
     fn application_will_start(
         &mut self,
         app: &Application<AppState>,
@@ -45,12 +55,12 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate {
             .build(&target)
             .unwrap();
 
-        let ui = match UIWindow::<AppState>::new(app, &window) {
-            Ok(ui_window) => ui_window,
+        let ui = match UIWindow::<AppState>::new(app, state, &window, Box::new(MyUIDelegate {})) {
+            Ok(ui_window) => Box::new(ui_window),
             Err(message) => panic!("{}", message),
         };
 
-        ui.draw();
+        self.ui_windows.insert(window.id(), ui);
 
         self.windows.insert(window.id(), window);
 

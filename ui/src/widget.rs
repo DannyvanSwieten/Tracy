@@ -223,7 +223,7 @@ pub trait AppAction<DataModel> {
 pub trait Widget<DataModel> {
     fn paint(
         &mut self,
-        _state: &mut DataModel,
+        _state: &DataModel,
         _rect: &Rect,
         _canvas: &mut Canvas,
         _style: &StyleSheet,
@@ -231,7 +231,7 @@ pub trait Widget<DataModel> {
     }
     fn layout(
         &mut self,
-        _state: &mut DataModel,
+        _state: &DataModel,
         _rect: &Rect,
         _spacing: f32,
         _padding: f32,
@@ -294,7 +294,7 @@ impl Container {
 }
 
 impl<DataModel> Widget<DataModel> for Container {
-    fn paint(&mut self, _: &mut DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+    fn paint(&mut self, _: &DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
         self.paint.set_color(Color::WHITE);
         let rect = skia_safe::Rect::from_xywh(
             rect.left() + self.margin,
