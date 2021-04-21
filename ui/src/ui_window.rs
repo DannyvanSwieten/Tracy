@@ -33,14 +33,14 @@ pub trait WindowDelegate<AppState> {
     fn mouse_moved(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
     fn mouse_down(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
     fn mouse_up(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
-    fn resized(&mut self, state: &mut AppState, size: &winit::dpi::PhysicalSize<f64>) {}
+    fn resized(&mut self, state: &mut AppState, size: &winit::dpi::PhysicalSize<u32>) {}
     fn keyboard_event(&mut self, state: &mut AppState, event: &winit::event::KeyboardInput) {}
     fn draw(&mut self, app: &Application<AppState>, state: &AppState) {}
 }
 
 pub struct UIWindow<AppState> {
     context: RecordingContext,
-    surface: Surface,
+    surfaces: Vec<Surface>,
     user_interface: UserInterface<AppState>,
     vulkan_surface: ash::vk::SurfaceKHR,
     vulkan_surface_fn: ash::extensions::khr::Surface,
@@ -92,16 +92,7 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
             ),
             None,
         );
-        let surface = Surface::new_render_target(
-            &mut context,
-            Budgeted::Yes,
-            &image_info,
-            None,
-            SurfaceOrigin::TopLeft,
-            None,
-            false,
-        )
-        .unwrap();
+
         let required_extensions = ash_window::enumerate_required_extensions(window);
         let vulkan_surface = unsafe { ash_window::create_surface(entry, instance, window, None) };
         match vulkan_surface {
@@ -117,6 +108,20 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     window.inner_size().width,
                     window.inner_size().height,
                 );
+
+                let mut surfaces = Vec::new();
+                for _ in 0..sc.image_count(){
+                    surfaces.push( Surface::new_render_target(
+                        &mut context,
+                        Budgeted::Yes,
+                        &image_info,
+                        None,
+                        SurfaceOrigin::TopLeft,
+                        None,
+                        false,
+                    )
+                    .unwrap());
+                }
 
                 //skia_safe::gpu::BackendTexture::new_vulkan();
                 let pool_create_info = ash::vk::CommandPoolCreateInfo::builder()
@@ -156,7 +161,7 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
 
                 Ok(Self {
                     context,
-                    surface,
+                    surfaces,
                     user_interface,
                     vulkan_surface_fn,
                     vulkan_surface: vs,
@@ -181,31 +186,34 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
         }
     }
 
-    fn resized(&mut self, _: &mut AppState, event: &winit::dpi::PhysicalSize<f64>) {
+    fn resized(&mut self, _: &mut AppState, event: &winit::dpi::PhysicalSize<u32>) {
         let image_info = ImageInfo::new_n32_premul((event.width as i32, event.height as i32), None);
 
-        self.surface = Surface::new_render_target(
-            &mut self.context,
-            Budgeted::Yes,
-            &image_info,
-            None,
-            SurfaceOrigin::TopLeft,
-            None,
-            false,
-        )
-        .unwrap()
+        for s in 0..self.swapchain.image_count(){
+            self.surfaces[s] = Surface::new_render_target(
+                &mut self.context,
+                Budgeted::Yes,
+                &image_info,
+                None,
+                SurfaceOrigin::TopLeft,
+                None,
+                false,
+            )
+            .unwrap()
+        }
+
     }
     fn draw(&mut self, app: &Application<AppState>, state: &AppState) {
         // Next swapchain image
         let (success, image_index, framebuffer) = self.swapchain.next_frame_buffer();
 
         // draw user interface
-        self.user_interface.paint(state, self.surface.canvas());
-        self.surface.flush_and_submit();
+        self.user_interface.paint(state, self.surfaces[image_index as usize].canvas());
+        self.surfaces[image_index as usize].flush_and_submit();
 
         // get the texture from skia back to transition into sampled image
         if let Some(t) = self
-            .surface
+            .surfaces[image_index as usize]
             .get_backend_texture(skia_safe::surface::BackendHandleAccess::FlushRead)
         {
             if let Some(info) = t.vulkan_image_info() {
@@ -255,8 +263,8 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
                         .render_area(ash::vk::Rect2D {
                             offset: ash::vk::Offset2D { x: 0, y: 0 },
                             extent: ash::vk::Extent2D {
-                                width: self.surface.width() as u32,
-                                height: self.surface.height() as u32,
+                                width: self.surfaces[0].width() as u32,
+                                height: self.surfaces[0].height() as u32,
                             },
                         });
                     device.cmd_begin_render_pass(

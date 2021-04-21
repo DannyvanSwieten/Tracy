@@ -73,6 +73,19 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
         self.windows.insert(window2.id(), window2);
     }
 
+    fn window_resized(&mut self,
+        app: &Application<AppState>,
+        state: &mut AppState,
+        id: &winit::window::WindowId,
+         size: &winit::dpi::PhysicalSize<u32>
+        ) -> winit::event_loop::ControlFlow {
+        if let Some(window) = self.ui_windows.get_mut(id) {
+            window.resized(state, size)
+        }
+
+        winit::event_loop::ControlFlow::Wait
+    }
+
     fn window_requested_redraw(
         &mut self,
         app: &Application<AppState>,

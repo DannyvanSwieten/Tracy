@@ -90,6 +90,8 @@ pub trait ApplicationDelegate<AppState> {
     }
     fn window_resized(
         &mut self,
+        app: &Application<AppState>,
+        state: &mut AppState,
         _: &winit::window::WindowId,
         _: &winit::dpi::PhysicalSize<u32>,
     ) -> ControlFlow {
@@ -303,7 +305,7 @@ impl<AppState: 'static> Application<AppState> {
                 Event::WindowEvent {
                     event: WindowEvent::Resized(physical_size),
                     window_id,
-                } => *control_flow = d.window_resized(&window_id, &physical_size),
+                } => *control_flow = d.window_resized(&self, &mut s, &window_id, &physical_size),
 
                 Event::WindowEvent {
                     event: WindowEvent::DroppedFile(path_buffer),
