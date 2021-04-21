@@ -41,6 +41,7 @@ pub trait WindowDelegate<AppState> {
 pub struct UIWindow<AppState> {
     context: RecordingContext,
     surfaces: Vec<Surface>,
+    surface_images: Vec<vk::Image>,
     user_interface: UserInterface<AppState>,
     vulkan_surface: ash::vk::SurfaceKHR,
     vulkan_surface_fn: ash::extensions::khr::Surface,
@@ -123,6 +124,17 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     .unwrap());
                 }
 
+                let surface_images = surfaces.iter_mut().map(|surface|{
+                    if let Some(t) = surface.get_backend_texture(skia_safe::surface::BackendHandleAccess::FlushRead){
+                        if let Some(info) = t.vulkan_image_info() {
+                            let image: vk::Image = unsafe{std::mem::transmute(info.image)};
+                            return image
+                        }
+                    }
+
+                    panic!()
+                }).collect();
+
                 //skia_safe::gpu::BackendTexture::new_vulkan();
                 let pool_create_info = ash::vk::CommandPoolCreateInfo::builder()
                     .flags(ash::vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
@@ -162,6 +174,7 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                 Ok(Self {
                     context,
                     surfaces,
+                    surface_images,
                     user_interface,
                     vulkan_surface_fn,
                     vulkan_surface: vs,
