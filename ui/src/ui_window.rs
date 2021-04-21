@@ -183,6 +183,28 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                 let mut user_interface = UserInterface::new(ui_delegate.build("root", state));
                 user_interface.resize(state, window.inner_size().width, window.inner_size().height);
 
+                let image_sampler_binding = 
+                ash::vk::DescriptorSetLayoutBinding::builder()
+                .binding(0)
+                .descriptor_type(ash::vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .descriptor_count(0)
+                .stage_flags(ash::vk::ShaderStageFlags::FRAGMENT)
+                .build();
+
+                let bindings = &[image_sampler_binding];
+                let descriptor_set_layout_create_info = 
+                ash::vk::DescriptorSetLayoutCreateInfo::builder()
+                .bindings(bindings);
+
+                let descriptor_set_layout = unsafe {
+                    app
+                    .primary_device_context()
+                    .create_descriptor_set_layout(&descriptor_set_layout_create_info, None)
+                    .expect("Failed to create descriptor set layout");
+                };
+
+                let layouts = &[descriptor_set_layout];
+
                 Ok(Self {
                     context,
                     surfaces,
