@@ -41,7 +41,8 @@ pub trait WindowDelegate<AppState> {
 pub struct UIWindow<AppState> {
     context: RecordingContext,
     surfaces: Vec<Surface>,
-    surface_images: Vec<vk::Image>,
+    surface_images: Vec<ash::vk::Image>,
+    surface_image_views: Vec<ash::vk::ImageView>,
     user_interface: UserInterface<AppState>,
     vulkan_surface: ash::vk::SurfaceKHR,
     vulkan_surface_fn: ash::extensions::khr::Surface,
@@ -94,7 +95,6 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
             None,
         );
 
-        let required_extensions = ash_window::enumerate_required_extensions(window);
         let vulkan_surface = unsafe { ash_window::create_surface(entry, instance, window, None) };
         match vulkan_surface {
             Ok(vs) => {
@@ -124,10 +124,10 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     .unwrap());
                 }
 
-                let surface_images = surfaces.iter_mut().map(|surface|{
+                let surface_images: Vec<ash::vk::Image> = surfaces.iter_mut().map(|surface|{
                     if let Some(t) = surface.get_backend_texture(skia_safe::surface::BackendHandleAccess::FlushRead){
                         if let Some(info) = t.vulkan_image_info() {
-                            let image: vk::Image = unsafe{std::mem::transmute(info.image)};
+                            let image: ash::vk::Image = unsafe{std::mem::transmute(info.image)};
                             return image
                         }
                     }
@@ -135,11 +135,23 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     panic!()
                 }).collect();
 
-                //skia_safe::gpu::BackendTexture::new_vulkan();
+                let surface_image_views = surface_images.iter().map(|&image|{
+                    let create_info = ash::vk::ImageViewCreateInfo::builder()
+                    .image(image)
+                    .view_type(ash::vk::ImageViewType::TYPE_2D)
+                    .format(ash::vk::Format::R8G8B8A8_UNORM)
+                    .subresource_range(ash::vk::ImageSubresourceRange::builder()
+                                        .aspect_mask(ash::vk::ImageAspectFlags::COLOR)
+                                    .level_count(1)
+                                    .layer_count(1).build()).build();
+
+                    unsafe{app.primary_device_context().create_image_view(&create_info, None).expect("ImageView creation failed")}
+                }).collect();
+
                 let pool_create_info = ash::vk::CommandPoolCreateInfo::builder()
                     .flags(ash::vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
                     .queue_family_index(app.present_queue_and_index().1 as u32);
-
+ 
                 let command_pool = unsafe {
                     app.primary_device_context()
                         .create_command_pool(&pool_create_info, None)
@@ -175,6 +187,7 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     context,
                     surfaces,
                     surface_images,
+                    surface_image_views,
                     user_interface,
                     vulkan_surface_fn,
                     vulkan_surface: vs,
