@@ -28,10 +28,10 @@ pub struct Material {
 impl Material {
     pub fn new() -> Self {
         let mut body = StyleSheet::new();
-        body.insert(String::from("bg-color"), Color4f::new(0.0, 0.0, 0.0, 1.0));
+        body.insert(String::from("bg-color"), Color4f::new(1.0, 1.0, 1.0, 1.0));
         body.insert(
             String::from("border-color"),
-            Color4f::new(0.0, 0.0, 0.0, 1.0),
+            Color4f::new(1.0, 1.0, 1.0, 1.0),
         );
 
         let mut div = StyleSheet::new();

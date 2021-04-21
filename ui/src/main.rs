@@ -73,6 +73,19 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
         self.windows.insert(window2.id(), window2);
     }
 
+    fn window_requested_redraw(
+        &mut self,
+        app: &Application<AppState>,
+        state: &AppState,
+        window_id: &WindowId,
+    ) -> winit::event_loop::ControlFlow {
+        if let Some(delegate) = self.ui_windows.get_mut(window_id) {
+            delegate.draw(app, state)
+        }
+
+        winit::event_loop::ControlFlow::Wait
+    }
+
     fn close_button_pressed(
         &mut self,
         id: &winit::window::WindowId,

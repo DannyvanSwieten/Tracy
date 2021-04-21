@@ -12,6 +12,7 @@ pub struct Swapchain {
     renderpass: ash::vk::RenderPass,
     framebuffers: Vec<ash::vk::Framebuffer>,
     current_index: u32,
+    format: ash::vk::Format,
 }
 
 impl Swapchain {
@@ -195,6 +196,7 @@ impl Swapchain {
             renderpass,
             framebuffers,
             current_index: 0,
+            format: format.format,
         }
     }
 
@@ -223,6 +225,14 @@ impl Swapchain {
 
     pub fn image_count(&self) -> usize {
         self.images.len()
+    }
+
+    pub fn images(&self) -> &Vec<ash::vk::Image> {
+        &self.images
+    }
+
+    pub fn format(&self) -> &ash::vk::Format {
+        &self.format
     }
 
     pub fn swap(&self, queue: &ash::vk::Queue, semaphore: &ash::vk::Semaphore, index: u32) {

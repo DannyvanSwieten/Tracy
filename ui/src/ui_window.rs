@@ -35,6 +35,7 @@ pub trait WindowDelegate<AppState> {
     fn mouse_up(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
     fn resized(&mut self, state: &mut AppState, size: &winit::dpi::PhysicalSize<f64>) {}
     fn keyboard_event(&mut self, state: &mut AppState, event: &winit::event::KeyboardInput) {}
+    fn draw(&mut self, app: &Application<AppState>, state: &AppState) {}
 }
 
 pub struct UIWindow<AppState> {
@@ -117,6 +118,7 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     window.inner_size().height,
                 );
 
+                //skia_safe::gpu::BackendTexture::new_vulkan();
                 let pool_create_info = ash::vk::CommandPoolCreateInfo::builder()
                     .flags(ash::vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
                     .queue_family_index(app.present_queue_and_index().1 as u32);
@@ -149,7 +151,8 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     });
                 }
 
-                let user_interface = UserInterface::new(ui_delegate.build("root", state));
+                let mut user_interface = UserInterface::new(ui_delegate.build("root", state));
+                user_interface.resize(state, window.inner_size().width, window.inner_size().height);
 
                 Ok(Self {
                     context,
@@ -166,77 +169,6 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                 })
             }
             Err(_result) => Err("Swapchain creation failed"),
-        }
-    }
-
-    pub fn draw(&mut self, app: &Application<AppState>, state: &AppState) {
-        self.user_interface.paint(state, self.surface.canvas());
-
-        let clear_values = [ash::vk::ClearValue {
-            color: ash::vk::ClearColorValue {
-                float32: [0.0, 0.0, 0.0, 0.0],
-            },
-        }];
-
-        let (success, image_index, framebuffer) = self.swapchain.next_frame_buffer();
-
-        if success {
-            let render_pass_begin_info = ash::vk::RenderPassBeginInfo::builder()
-                .render_pass(*self.swapchain.render_pass())
-                .framebuffer(*framebuffer)
-                .clear_values(&clear_values)
-                .render_area(ash::vk::Rect2D {
-                    offset: ash::vk::Offset2D { x: 0, y: 0 },
-                    extent: ash::vk::Extent2D {
-                        width: self.surface.width() as u32,
-                        height: self.surface.height() as u32,
-                    },
-                });
-            let command_buffer_begin_info = ash::vk::CommandBufferBeginInfo::builder().build();
-            let device = app.primary_device_context();
-            let commands = &self.command_buffers[image_index as usize];
-            unsafe {
-                device
-                    .begin_command_buffer(*commands, &command_buffer_begin_info)
-                    .expect("Unable to start recording command buffer");
-
-                device.cmd_begin_render_pass(
-                    *commands,
-                    &render_pass_begin_info,
-                    ash::vk::SubpassContents::INLINE,
-                );
-
-                device.cmd_end_render_pass(*commands);
-                device
-                    .end_command_buffer(*commands)
-                    .expect("End recording command buffer failed");
-
-                // wait for present complete for this image
-                let wait = &[*self.swapchain.semaphore(image_index as usize)];
-                // signal the render complete when it's done
-                let signal = &[self.semaphores[image_index as usize]];
-                let flags = &[ash::vk::PipelineStageFlags::ALL_GRAPHICS];
-                let buffers = &[*commands];
-
-                let submit_info = ash::vk::SubmitInfo::builder()
-                    .command_buffers(buffers)
-                    .wait_semaphores(wait)
-                    .wait_dst_stage_mask(flags)
-                    .signal_semaphores(signal);
-                device
-                    .queue_submit(
-                        *app.present_queue_and_index().0,
-                        &[submit_info.build()],
-                        ash::vk::Fence::null(),
-                    )
-                    .expect("queue submit failed.");
-
-                self.swapchain.swap(
-                    app.present_queue_and_index().0,
-                    &self.semaphores[image_index as usize],
-                    image_index,
-                )
-            }
         }
     }
 }
@@ -262,5 +194,103 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
             false,
         )
         .unwrap()
+    }
+    fn draw(&mut self, app: &Application<AppState>, state: &AppState) {
+        // Next swapchain image
+        let (success, image_index, framebuffer) = self.swapchain.next_frame_buffer();
+
+        // draw user interface
+        self.user_interface.paint(state, self.surface.canvas());
+        self.surface.flush_and_submit();
+
+        // get the texture from skia back to transition into sampled image
+        if let Some(t) = self
+            .surface
+            .get_backend_texture(skia_safe::surface::BackendHandleAccess::FlushRead)
+        {
+            if let Some(info) = t.vulkan_image_info() {
+                let barrier = ash::vk::ImageMemoryBarrier::builder()
+                    .old_layout(ash::vk::ImageLayout::UNDEFINED)
+                    .new_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                    .image(unsafe { std::mem::transmute(info.image) })
+                    .src_queue_family_index(info.current_queue_family)
+                    .dst_queue_family_index(info.current_queue_family)
+                    .subresource_range(
+                        ash::vk::ImageSubresourceRange::builder()
+                            .aspect_mask(ash::vk::ImageAspectFlags::COLOR)
+                            .layer_count(1)
+                            .level_count(1)
+                            .build(),
+                    )
+                    .build();
+                let device = app.primary_device_context();
+                let commands = &self.command_buffers[image_index as usize];
+                let command_buffer_begin_info = ash::vk::CommandBufferBeginInfo::builder().build();
+                unsafe {
+                    device
+                        .begin_command_buffer(*commands, &command_buffer_begin_info)
+                        .expect("Unable to start recording command buffer");
+
+                    device.cmd_pipeline_barrier(
+                        *commands,
+                        ash::vk::PipelineStageFlags::ALL_COMMANDS,
+                        ash::vk::PipelineStageFlags::ALL_COMMANDS,
+                        ash::vk::DependencyFlags::BY_REGION,
+                        &[],
+                        &[],
+                        &[barrier],
+                    );
+
+                    let clear_values = [ash::vk::ClearValue {
+                        color: ash::vk::ClearColorValue {
+                            float32: [0.0, 1.0, 0.0, 1.0],
+                        },
+                    }];
+
+                    // Begin renderpass to transition swapchain image into color attachment and output as Present Source
+                    let render_pass_begin_info = ash::vk::RenderPassBeginInfo::builder()
+                        .render_pass(*self.swapchain.render_pass())
+                        .framebuffer(*framebuffer)
+                        .clear_values(&clear_values)
+                        .render_area(ash::vk::Rect2D {
+                            offset: ash::vk::Offset2D { x: 0, y: 0 },
+                            extent: ash::vk::Extent2D {
+                                width: self.surface.width() as u32,
+                                height: self.surface.height() as u32,
+                            },
+                        });
+                    device.cmd_begin_render_pass(
+                        *commands,
+                        &render_pass_begin_info,
+                        ash::vk::SubpassContents::INLINE,
+                    );
+                    device.cmd_end_render_pass(*commands);
+                    device
+                        .end_command_buffer(*commands)
+                        .expect("End recording command buffer failed");
+
+                    let buffers = &[*commands];
+                    let submit_info = ash::vk::SubmitInfo::builder()
+                        .command_buffers(buffers)
+                        .signal_semaphores(&[self.semaphores[image_index as usize]])
+                        .wait_dst_stage_mask(&[ash::vk::PipelineStageFlags::ALL_GRAPHICS])
+                        .wait_semaphores(&[])
+                        .build();
+                    device
+                        .queue_submit(
+                            *app.present_queue_and_index().0,
+                            &[submit_info],
+                            ash::vk::Fence::null(),
+                        )
+                        .expect("queue submit failed.");
+                }
+            }
+        }
+
+        self.swapchain.swap(
+            app.present_queue_and_index().0,
+            &self.semaphores[image_index as usize],
+            image_index,
+        )
     }
 }

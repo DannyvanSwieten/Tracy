@@ -65,7 +65,7 @@ impl<DataModel: 'static> UserInterface<DataModel> {
         node.rect.top = position.y;
     }
 
-    pub fn resize(&mut self, state: &mut DataModel, width: u32, height: u32) {
+    pub fn resize(&mut self, state: &DataModel, width: u32, height: u32) {
         self.root.rect.set_wh(width as f32, height as f32);
         self.layout(state);
     }
@@ -140,7 +140,7 @@ impl<DataModel: 'static> UserInterface<DataModel> {
     pub fn mouse_leave(&mut self, state: &mut DataModel, event: &MouseEvent) {
         self.root.mouse_leave(state, event);
     }
-    pub fn layout(&mut self, state: &mut DataModel) {
+    pub fn layout(&mut self, state: &DataModel) {
         self.root.layout(state);
     }
 
@@ -149,6 +149,7 @@ impl<DataModel: 'static> UserInterface<DataModel> {
     }
 
     pub fn paint(&mut self, state: &DataModel, canvas: &mut Canvas) {
+        canvas.clear(skia_safe::Color::WHITE);
         self.root.draw(state, canvas, &self.material);
         if let Some(popup) = self.pop_up.as_mut() {
             popup.layout(state);

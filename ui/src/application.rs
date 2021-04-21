@@ -109,6 +109,15 @@ pub trait ApplicationDelegate<AppState> {
         ControlFlow::Wait
     }
 
+    fn window_requested_redraw(
+        &mut self,
+        app: &Application<AppState>,
+        state: &AppState,
+        _: &winit::window::WindowId,
+    ) -> ControlFlow {
+        ControlFlow::Wait
+    }
+
     fn file_dropped(&mut self, _: &winit::window::WindowId, _: &PathBuf) -> ControlFlow {
         ControlFlow::Wait
     }
@@ -310,6 +319,10 @@ impl<AppState: 'static> Application<AppState> {
                     } else {
                         d.window_lost_focus(&window_id)
                     }
+                }
+
+                Event::RedrawRequested(window_id) => {
+                    *control_flow = d.window_requested_redraw(&self, &s, &window_id)
                 }
 
                 Event::WindowEvent {
