@@ -102,7 +102,7 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
             false,
         )
         .unwrap();
-
+        let required_extensions = ash_window::enumerate_required_extensions(window);
         let vulkan_surface = unsafe { ash_window::create_surface(entry, instance, window, None) };
         match vulkan_surface {
             Ok(vs) => {

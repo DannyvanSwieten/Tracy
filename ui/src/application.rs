@@ -18,9 +18,11 @@ use ash::extensions::{
     mvk::MacOSSurface,
 };
 
+use ash::vk::ExtMetalSurfaceFn;
+
 #[cfg(target_os = "macos")]
 fn surface_extension_name() -> &'static CStr {
-    MacOSSurface::name()
+    ExtMetalSurfaceFn::name()
 }
 
 #[cfg(target_os = "windows")]
@@ -190,11 +192,9 @@ impl<AppState: 'static> Application<AppState> {
                 .create_debug_utils_messenger(&debug_info, None)
                 .unwrap();
 
-            //let surface = ash_window::create_surface(&entry, &instance, &window, None).unwrap();
             let pdevices = instance
                 .enumerate_physical_devices()
                 .expect("Physical device error");
-            let surface_loader = Surface::new(&entry, &instance);
             let (primary_gpu, queue_family_index) = pdevices
                 .iter()
                 .map(|pdevice| {
