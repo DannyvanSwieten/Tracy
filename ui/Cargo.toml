@@ -11,3 +11,4 @@ ash = "*"
 ash-window = "*"
 winit = "*"
 skia-safe = { version = "*", features = ["vulkan", "gpu"] }
+byteorder = "*"

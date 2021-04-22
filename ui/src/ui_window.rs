@@ -11,6 +11,8 @@ use skia_safe::{Budgeted, Canvas, ImageInfo, Surface};
 use std::ffi::c_void;
 use std::ptr;
 
+use byteorder::ReadBytesExt;
+
 unsafe fn get_procedure(
     entry: &ash::Entry,
     instance: &ash::Instance,
@@ -111,47 +113,65 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                 );
 
                 let mut surfaces = Vec::new();
-                for _ in 0..sc.image_count(){
-                    surfaces.push( Surface::new_render_target(
-                        &mut context,
-                        Budgeted::Yes,
-                        &image_info,
-                        None,
-                        SurfaceOrigin::TopLeft,
-                        None,
-                        false,
-                    )
-                    .unwrap());
+                for _ in 0..sc.image_count() {
+                    surfaces.push(
+                        Surface::new_render_target(
+                            &mut context,
+                            Budgeted::Yes,
+                            &image_info,
+                            None,
+                            SurfaceOrigin::TopLeft,
+                            None,
+                            false,
+                        )
+                        .unwrap(),
+                    );
                 }
 
-                let surface_images: Vec<ash::vk::Image> = surfaces.iter_mut().map(|surface|{
-                    if let Some(t) = surface.get_backend_texture(skia_safe::surface::BackendHandleAccess::FlushRead){
-                        if let Some(info) = t.vulkan_image_info() {
-                            let image: ash::vk::Image = unsafe{std::mem::transmute(info.image)};
-                            return image
+                let surface_images: Vec<ash::vk::Image> = surfaces
+                    .iter_mut()
+                    .map(|surface| {
+                        if let Some(t) = surface
+                            .get_backend_texture(skia_safe::surface::BackendHandleAccess::FlushRead)
+                        {
+                            if let Some(info) = t.vulkan_image_info() {
+                                let image: ash::vk::Image =
+                                    unsafe { std::mem::transmute(info.image) };
+                                return image;
+                            }
                         }
-                    }
 
-                    panic!()
-                }).collect();
+                        panic!()
+                    })
+                    .collect();
 
-                let surface_image_views = surface_images.iter().map(|&image|{
-                    let create_info = ash::vk::ImageViewCreateInfo::builder()
-                    .image(image)
-                    .view_type(ash::vk::ImageViewType::TYPE_2D)
-                    .format(ash::vk::Format::R8G8B8A8_UNORM)
-                    .subresource_range(ash::vk::ImageSubresourceRange::builder()
-                                        .aspect_mask(ash::vk::ImageAspectFlags::COLOR)
+                let surface_image_views: Vec<ash::vk::ImageView> = surface_images
+                    .iter()
+                    .map(|&image| {
+                        let create_info = ash::vk::ImageViewCreateInfo::builder()
+                            .image(image)
+                            .view_type(ash::vk::ImageViewType::TYPE_2D)
+                            .format(ash::vk::Format::R8G8B8A8_UNORM)
+                            .subresource_range(
+                                ash::vk::ImageSubresourceRange::builder()
+                                    .aspect_mask(ash::vk::ImageAspectFlags::COLOR)
                                     .level_count(1)
-                                    .layer_count(1).build()).build();
+                                    .layer_count(1)
+                                    .build(),
+                            )
+                            .build();
 
-                    unsafe{app.primary_device_context().create_image_view(&create_info, None).expect("ImageView creation failed")}
-                }).collect();
+                        unsafe {
+                            app.primary_device_context()
+                                .create_image_view(&create_info, None)
+                                .expect("ImageView creation failed")
+                        }
+                    })
+                    .collect();
 
                 let pool_create_info = ash::vk::CommandPoolCreateInfo::builder()
                     .flags(ash::vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
                     .queue_family_index(app.present_queue_and_index().1 as u32);
- 
                 let command_pool = unsafe {
                     app.primary_device_context()
                         .create_command_pool(&pool_create_info, None)
@@ -183,27 +203,232 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                 let mut user_interface = UserInterface::new(ui_delegate.build("root", state));
                 user_interface.resize(state, window.inner_size().width, window.inner_size().height);
 
-                let image_sampler_binding = 
-                ash::vk::DescriptorSetLayoutBinding::builder()
-                .binding(0)
-                .descriptor_type(ash::vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                .descriptor_count(0)
-                .stage_flags(ash::vk::ShaderStageFlags::FRAGMENT)
-                .build();
+                let file = std::fs::File::open("shaders/sampled_image.vert.spv")
+                    .expect("Shader file not found");
+                let meta = std::fs::metadata("shaders/sampled_image.vert.spv")
+                    .expect("No metadata found for file");
+                let mut buf_reader = std::io::BufReader::new(file);
+
+                let mut buffer = vec![0; (meta.len() / 4) as usize];
+                buf_reader
+                    .read_u32_into::<byteorder::NativeEndian>(&mut buffer[..])
+                    .expect("Failed reading spirv");
+
+                let vertex_shader_module_create_info = ash::vk::ShaderModuleCreateInfo::builder()
+                    .code(&buffer)
+                    .build();
+
+                let vertex_shader_module = unsafe {
+                    app.primary_device_context()
+                        .create_shader_module(&vertex_shader_module_create_info, None)
+                        .expect("Vertex Shader module creation failed")
+                };
+
+                let file = std::fs::File::open("shaders/sampled_image.frag.spv")
+                    .expect("Shader file not found");
+                let meta = std::fs::metadata("shaders/sampled_image.frag.spv")
+                    .expect("No metadata found for file");
+                buf_reader = std::io::BufReader::new(file);
+
+                buffer = vec![0; (meta.len() / 4) as usize];
+                buf_reader
+                    .read_u32_into::<byteorder::NativeEndian>(&mut buffer[..])
+                    .expect("Failed reading spirv");
+
+                let fragment_shader_module_create_info = ash::vk::ShaderModuleCreateInfo::builder()
+                    .code(&buffer)
+                    .build();
+
+                let fragment_shader_module = unsafe {
+                    app.primary_device_context()
+                        .create_shader_module(&fragment_shader_module_create_info, None)
+                        .expect("Vertex Shader module creation failed")
+                };
+
+                let vertex_shader_stage_create_info =
+                    ash::vk::PipelineShaderStageCreateInfo::builder()
+                        .stage(ash::vk::ShaderStageFlags::VERTEX)
+                        .module(vertex_shader_module)
+                        .name(std::ffi::CStr::from_bytes_with_nul(b"main\0").unwrap())
+                        .build();
+
+                let fragment_shader_stage_create_info =
+                    ash::vk::PipelineShaderStageCreateInfo::builder()
+                        .stage(ash::vk::ShaderStageFlags::FRAGMENT)
+                        .module(fragment_shader_module)
+                        .name(std::ffi::CStr::from_bytes_with_nul(b"main\0").unwrap())
+                        .build();
+
+                let stages = &[
+                    vertex_shader_stage_create_info,
+                    fragment_shader_stage_create_info,
+                ];
+
+                let image_sampler_binding = ash::vk::DescriptorSetLayoutBinding::builder()
+                    .binding(0)
+                    .descriptor_type(ash::vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .descriptor_count(1)
+                    .stage_flags(ash::vk::ShaderStageFlags::FRAGMENT)
+                    .build();
 
                 let bindings = &[image_sampler_binding];
-                let descriptor_set_layout_create_info = 
-                ash::vk::DescriptorSetLayoutCreateInfo::builder()
-                .bindings(bindings);
+                let descriptor_set_layout_create_info =
+                    ash::vk::DescriptorSetLayoutCreateInfo::builder().bindings(bindings);
 
                 let descriptor_set_layout = unsafe {
-                    app
-                    .primary_device_context()
-                    .create_descriptor_set_layout(&descriptor_set_layout_create_info, None)
-                    .expect("Failed to create descriptor set layout");
+                    app.primary_device_context()
+                        .create_descriptor_set_layout(&descriptor_set_layout_create_info, None)
+                        .expect("Failed to create descriptor set layout")
                 };
 
                 let layouts = &[descriptor_set_layout];
+
+                let pipeline_layout_create_info = ash::vk::PipelineLayoutCreateInfo::builder()
+                    .set_layouts(layouts)
+                    .build();
+
+                let pipeline_layout = unsafe {
+                    app.primary_device_context()
+                        .create_pipeline_layout(&pipeline_layout_create_info, None)
+                        .expect("Pipeline layout creation failed")
+                };
+
+                let rasterization_state_create_info =
+                    ash::vk::PipelineRasterizationStateCreateInfo::builder()
+                        .polygon_mode(ash::vk::PolygonMode::FILL)
+                        .line_width(1.)
+                        .build();
+
+                let viewports = [ash::vk::Viewport::builder()
+                    .width(window.inner_size().width as f32)
+                    .height(window.inner_size().height as f32)
+                    .build()];
+
+                let scissors = [ash::vk::Rect2D::builder()
+                    .offset(ash::vk::Offset2D { x: 0, y: 0 })
+                    .extent(ash::vk::Extent2D {
+                        width: window.inner_size().width,
+                        height: window.inner_size().height,
+                    })
+                    .build()];
+
+                let viewport_state_create_info =
+                    ash::vk::PipelineViewportStateCreateInfo::builder()
+                        .viewports(&viewports)
+                        .scissors(&scissors)
+                        .build();
+
+                let multisample_state_create_info =
+                    ash::vk::PipelineMultisampleStateCreateInfo::builder()
+                        .rasterization_samples(ash::vk::SampleCountFlags::TYPE_1);
+
+                let input_assembly_state_create_info =
+                    ash::vk::PipelineInputAssemblyStateCreateInfo::builder()
+                        .topology(ash::vk::PrimitiveTopology::TRIANGLE_LIST)
+                        .build();
+
+                let vertex_input_state_create_info =
+                    ash::vk::PipelineVertexInputStateCreateInfo::builder().build();
+
+                let blend_attachment =
+                    [ash::vk::PipelineColorBlendAttachmentState::builder().build()];
+                let blend_state_create_info = ash::vk::PipelineColorBlendStateCreateInfo::builder()
+                    .attachments(&blend_attachment)
+                    .build();
+
+                let pipeline_cache_create_info =
+                    ash::vk::PipelineCacheCreateInfo::builder().build();
+
+                let cache = unsafe {
+                    app.primary_device_context()
+                        .create_pipeline_cache(&pipeline_cache_create_info, None)
+                        .expect("Pipeline cache creation failed")
+                };
+
+                let graphics_pipeline_create_info = ash::vk::GraphicsPipelineCreateInfo::builder()
+                    .layout(pipeline_layout)
+                    .render_pass(*sc.render_pass())
+                    .rasterization_state(&rasterization_state_create_info)
+                    .viewport_state(&viewport_state_create_info)
+                    .multisample_state(&multisample_state_create_info)
+                    .input_assembly_state(&input_assembly_state_create_info)
+                    .vertex_input_state(&vertex_input_state_create_info)
+                    .color_blend_state(&blend_state_create_info)
+                    .stages(stages)
+                    .build();
+                let infos = &[graphics_pipeline_create_info];
+
+                let pipeline = unsafe {
+                    app.primary_device_context()
+                        .create_graphics_pipelines(cache, infos, None)
+                        .expect("Pipline creation failed")
+                };
+
+                let pool_sizes = [ash::vk::DescriptorPoolSize::builder()
+                    .descriptor_count(1)
+                    .ty(ash::vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .build()];
+
+                let descriptor_pool_create_info = ash::vk::DescriptorPoolCreateInfo::builder()
+                    .pool_sizes(&pool_sizes)
+                    .max_sets(sc.image_count() as u32)
+                    .build();
+
+                let descriptor_pool = unsafe {
+                    app.primary_device_context()
+                        .create_descriptor_pool(&descriptor_pool_create_info, None)
+                        .expect("Descriptor pool creations failed")
+                };
+
+                let descriptor_set_allocate_info = ash::vk::DescriptorSetAllocateInfo::builder()
+                    .descriptor_pool(descriptor_pool)
+                    .set_layouts(layouts);
+                let sets = unsafe {
+                    app.primary_device_context()
+                        .allocate_descriptor_sets(&descriptor_set_allocate_info)
+                        .expect("descriptor set allocation failed")
+                };
+
+                let sampler_info = ash::vk::SamplerCreateInfo::builder()
+                    .min_filter(ash::vk::Filter::LINEAR)
+                    .mag_filter(ash::vk::Filter::LINEAR)
+                    .address_mode_u(ash::vk::SamplerAddressMode::CLAMP_TO_EDGE)
+                    .address_mode_v(ash::vk::SamplerAddressMode::CLAMP_TO_EDGE)
+                    .build();
+
+                let sampler = unsafe {
+                    app.primary_device_context()
+                        .create_sampler(&sampler_info, None)
+                        .expect("Sampler creation failed")
+                };
+
+                let image_descriptors_infos: Vec<ash::vk::DescriptorImageInfo> =
+                    surface_image_views
+                        .iter()
+                        .map(|&image_view| {
+                            ash::vk::DescriptorImageInfo::builder()
+                                .image_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                                .image_view(image_view)
+                                .sampler(sampler)
+                                .build()
+                        })
+                        .collect();
+
+                let writes: Vec<ash::vk::WriteDescriptorSet> = image_descriptors_infos
+                    .iter()
+                    .map(|&info| {
+                        let image_info = [info];
+                        ash::vk::WriteDescriptorSet::builder()
+                            .descriptor_type(ash::vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                            .image_info(&image_info)
+                            .build()
+                    })
+                    .collect();
+
+                unsafe {
+                    app.primary_device_context()
+                        .update_descriptor_sets(&writes, &[])
+                };
 
                 Ok(Self {
                     context,
@@ -237,7 +462,7 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
     fn resized(&mut self, _: &mut AppState, event: &winit::dpi::PhysicalSize<u32>) {
         let image_info = ImageInfo::new_n32_premul((event.width as i32, event.height as i32), None);
 
-        for s in 0..self.swapchain.image_count(){
+        for s in 0..self.swapchain.image_count() {
             self.surfaces[s] = Surface::new_render_target(
                 &mut self.context,
                 Budgeted::Yes,
@@ -249,19 +474,18 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
             )
             .unwrap()
         }
-
     }
     fn draw(&mut self, app: &Application<AppState>, state: &AppState) {
         // Next swapchain image
         let (success, image_index, framebuffer) = self.swapchain.next_frame_buffer();
 
         // draw user interface
-        self.user_interface.paint(state, self.surfaces[image_index as usize].canvas());
+        self.user_interface
+            .paint(state, self.surfaces[image_index as usize].canvas());
         self.surfaces[image_index as usize].flush_and_submit();
 
         // get the texture from skia back to transition into sampled image
-        if let Some(t) = self
-            .surfaces[image_index as usize]
+        if let Some(t) = self.surfaces[image_index as usize]
             .get_backend_texture(skia_safe::surface::BackendHandleAccess::FlushRead)
         {
             if let Some(info) = t.vulkan_image_info() {
