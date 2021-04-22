@@ -104,7 +104,7 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
         id: &winit::window::WindowId,
     ) -> winit::event_loop::ControlFlow {
         self.windows.remove(id);
-        if self.windows.len() == 0 {
+        if self.windows.is_empty() {
             winit::event_loop::ControlFlow::Exit
         } else {
             winit::event_loop::ControlFlow::Wait

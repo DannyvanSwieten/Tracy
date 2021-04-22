@@ -200,7 +200,7 @@ impl Swapchain {
         }
     }
 
-    pub fn next_frame_buffer(&self) -> (bool, u32, &ash::vk::Framebuffer) {
+    pub fn next_frame_buffer(&self) -> (bool, u32, &ash::vk::Framebuffer, &ash::vk::Semaphore) {
         let (index, sub_optimal) = unsafe {
             self.loader
                 .acquire_next_image(
@@ -212,7 +212,12 @@ impl Swapchain {
                 .expect("Failed to acquire next swapchain image")
         };
         //self.current_index = index;
-        (true, index, &self.framebuffers[index as usize])
+        (
+            true,
+            index,
+            &self.framebuffers[index as usize],
+            &self.present_semaphores[index as usize],
+        )
     }
 
     pub fn render_pass(&self) -> &ash::vk::RenderPass {
