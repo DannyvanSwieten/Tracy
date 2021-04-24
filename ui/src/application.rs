@@ -115,8 +115,8 @@ pub trait ApplicationDelegate<AppState> {
 
     fn window_requested_redraw(
         &mut self,
-        app: &Application<AppState>,
-        state: &AppState,
+        _: &Application<AppState>,
+        _: &AppState,
         _: &winit::window::WindowId,
     ) -> ControlFlow {
         ControlFlow::Wait
@@ -128,6 +128,7 @@ pub trait ApplicationDelegate<AppState> {
 
     fn mouse_moved(
         &mut self,
+        _: &mut AppState,
         _: &winit::window::WindowId,
         _: &winit::dpi::PhysicalPosition<f64>,
     ) -> ControlFlow {
@@ -136,7 +137,7 @@ pub trait ApplicationDelegate<AppState> {
 
     fn mouse_down(
         &mut self,
-        state: &mut AppState,
+        _: &mut AppState,
         _: &winit::window::WindowId,
         _: &winit::dpi::PhysicalPosition<f64>,
     ) -> ControlFlow {
@@ -299,9 +300,9 @@ impl<AppState: 'static> Application<AppState> {
         let mut d = delegate;
 
         d.application_will_start(&self, &mut s, &event_loop);
-
+        let mut last_mouse_position = winit::dpi::PhysicalPosition::<f64>::new(0., 0.);
         event_loop.run(move |e, event_loop, control_flow| {
-            let mut last_mouse_position = winit::dpi::PhysicalPosition::<f64>::new(0., 0.);
+            
             *control_flow = ControlFlow::Wait;
 
             match e {
@@ -355,7 +356,7 @@ impl<AppState: 'static> Application<AppState> {
                     window_id,
                 } => {
                     last_mouse_position = position;
-                    *control_flow = d.mouse_moved(&window_id, &position)
+                    *control_flow = d.mouse_moved(&mut s, &window_id, &position)
                 }
 
                 Event::WindowEvent {

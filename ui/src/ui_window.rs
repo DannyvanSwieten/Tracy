@@ -50,7 +50,6 @@ pub struct UIWindow<AppState> {
     vulkan_surface_fn: ash::extensions::khr::Surface,
 
     state: std::marker::PhantomData<AppState>,
-    root: Option<Node<AppState>>,
     swapchain: swapchain::Swapchain,
     command_pool: ash::vk::CommandPool,
     command_buffers: Vec<ash::vk::CommandBuffer>,
@@ -508,7 +507,6 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     vulkan_surface_fn,
                     vulkan_surface: vs,
                     state: std::marker::PhantomData::<AppState>::default(),
-                    root: None,
                     swapchain: sc,
                     command_pool,
                     command_buffers,
@@ -530,10 +528,13 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
 
 impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
     fn mouse_moved(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
-        if let Some(root) = &mut self.root {
-            let p = skia_safe::Point::from((event.x as f32, event.y as f32));
-            root.mouse_moved(state, &MouseEvent::new(0, &p, &p));
-        }
+        let p = skia_safe::Point::from((event.x as f32, event.y as f32));
+        self.user_interface.mouse_moved(state, &MouseEvent::new(0, &p, &p));
+    }
+
+    fn mouse_down(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
+        let p = skia_safe::Point::from((event.x as f32, event.y as f32));
+        self.user_interface.mouse_down(state, &MouseEvent::new(0, &p, &p));
     }
 
     fn resized(&mut self, _: &mut AppState, event: &winit::dpi::PhysicalSize<u32>) {

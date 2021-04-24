@@ -258,8 +258,8 @@ impl<DataModel> Node<DataModel> {
     // }
 
     pub fn hit_test(&self, pos: &Point) -> bool {
-        let bx = pos.x >= self.rect.left && pos.x < self.rect.left + self.rect.size().width;
-        let by = pos.y >= self.rect.bottom && pos.y < self.rect.bottom + self.rect.size().height;
+        let bx = pos.x >= self.rect.left && pos.x < self.rect.right;
+        let by = pos.y >= self.rect.top && pos.y < self.rect.bottom;
         bx && by
     }
 
