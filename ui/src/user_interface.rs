@@ -149,7 +149,7 @@ impl<DataModel: 'static> UserInterface<DataModel> {
     }
 
     pub fn paint(&mut self, state: &DataModel, canvas: &mut Canvas) {
-        canvas.clear(skia_safe::Color::WHITE);
+        canvas.clear(*self.material.get_child("body").unwrap().get("bg-color").unwrap());
         self.root.draw(state, canvas, &self.material);
         if let Some(popup) = self.pop_up.as_mut() {
             popup.layout(state);

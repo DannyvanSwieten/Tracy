@@ -36,9 +36,33 @@ impl Delegate<AppState> {
 }
 
 struct MyUIDelegate {}
-impl<AppState> UIDelegate<AppState> for MyUIDelegate {
+impl<AppState: 'static> UIDelegate<AppState> for MyUIDelegate {
     fn build(&self, _: &str, _: &AppState) -> node::Node<AppState> {
-        node::Node::new("body").with_widget(widget::Container::new(5.))
+        node::Node::new("body")
+        .with_widget
+        (
+            widget::Container::new()
+        )
+        .with_padding(25.)
+        .with_child
+        (
+            node::Node::new("div")
+            .with_widget
+            (
+                widget::Stack::new(widget::Orientation::Horizontal)
+            )
+            .with_relative_max_constraints(None, Some(33.))
+            .with_rebuild_callback(|_|{
+                Some(std::vec![
+                    node::Node::new("label").with_widget(widget::Label::new("Label 1")),
+                    node::Node::new("label").with_widget(widget::Label::new("Label 2")),
+                    node::Node::new("label").with_widget(widget::Label::new("Label 3")),
+                    node::Node::new("label").with_widget(widget::Label::new("Label 4")),
+                ])
+            })
+            .with_padding(25.)
+            .with_spacing(5.)
+        )
     }
 }
 
@@ -63,14 +87,6 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
         self.ui_windows.insert(window.id(), ui);
 
         self.windows.insert(window.id(), window);
-
-        let window2 = WindowBuilder::new()
-            .with_title("Second Window!")
-            .with_inner_size(LogicalSize::new(400, 400))
-            .build(&target)
-            .unwrap();
-
-        self.windows.insert(window2.id(), window2);
     }
 
     fn window_resized(&mut self,

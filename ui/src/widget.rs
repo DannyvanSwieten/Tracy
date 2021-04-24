@@ -3,13 +3,13 @@ use crate::window::MouseEvent;
 use crate::window::MouseEventType;
 use skia_safe::canvas::Canvas;
 use skia_safe::Color;
-use skia_safe::Color4f;
 use skia_safe::Font;
 use skia_safe::Paint;
 use skia_safe::PaintStyle;
 use skia_safe::Point;
 use skia_safe::Rect;
 use skia_safe::Size;
+use skia_safe::colors;
 
 use std::collections::HashMap;
 
@@ -18,7 +18,7 @@ pub fn map_range(x: f32, a: f32, b: f32, c: f32, d: f32) -> f32 {
     c + slope * (x - a)
 }
 
-pub type StyleSheet = HashMap<String, Color4f>;
+pub type StyleSheet = HashMap<String, Color>;
 
 #[derive(Clone)]
 pub struct Material {
@@ -28,47 +28,51 @@ pub struct Material {
 impl Material {
     pub fn new() -> Self {
         let mut body = StyleSheet::new();
-        body.insert(String::from("bg-color"), Color4f::new(1.0, 1.0, 1.0, 1.0));
+        body.insert(
+            String::from("bg-color"), 
+            Color::BLACK
+        ); 
+
         body.insert(
             String::from("border-color"),
-            Color4f::new(1.0, 1.0, 1.0, 1.0),
+            Color::WHITE,
         );
 
         let mut div = StyleSheet::new();
         div.insert(
             String::from("bg-color"),
-            Color4f::new(0.08, 0.08, 0.08, 1.0),
+            Color::DARK_GRAY,
         );
         div.insert(
             String::from("border-color"),
-            Color4f::new(0.35, 0.35, 0.35, 1.),
+            Color::LIGHT_GRAY,
         );
 
         let mut btn = StyleSheet::new();
-        btn.insert(String::from("bg-color"), Color4f::new(0.2, 0.2, 0.2, 1.));
-        btn.insert(String::from("hovered"), Color4f::new(0.35, 0.35, 0.35, 1.));
-        btn.insert(String::from("pressed"), Color4f::new(0.3, 0.3, 0.3, 1.));
+        btn.insert(String::from("bg-color"), Color::from_rgb(51, 51, 51));
+        btn.insert(String::from("hovered"), Color::from_rgb(89, 89, 89));
+        btn.insert(String::from("pressed"), Color::from_rgb(77, 77, 77));
 
         let mut label = StyleSheet::new();
-        label.insert(String::from("bg-color"), Color4f::new(0.15, 0.15, 0.15, 1.));
+        label.insert(String::from("bg-color"), Color::from_rgb(38, 38, 38));
         label.insert(
             String::from("border-color"),
-            Color4f::new(0.0, 0.0, 0.0, 0.0),
+            Color::TRANSPARENT,
         );
 
         let mut slider = StyleSheet::new();
-        slider.insert(String::from("bg-color"), Color4f::new(0.2, 0.2, 0.2, 1.0));
-        slider.insert(String::from("fill-color"), Color4f::new(0.4, 0.4, 0.4, 1.0));
+        slider.insert(String::from("bg-color"), Color::from_rgb(51, 51, 51));
+        slider.insert(String::from("fill-color"), Color::from_rgb(102, 102, 102));
         slider.insert(
             String::from("border-color"),
-            Color4f::new(0.35, 0.35, 0.35, 1.),
+            Color::from_rgb(89, 89, 89),
         );
 
         let mut menu = StyleSheet::new();
-        menu.insert(String::from("bg-color"), Color4f::new(0.0, 0.0, 0.0, 1.0));
+        menu.insert(String::from("bg-color"), Color::BLACK);
         menu.insert(
             String::from("border-color"),
-            Color4f::new(0.0, 0.0, 0.0, 1.0),
+            Color::BLACK,
         );
 
         let mut data = HashMap::new();
@@ -279,14 +283,12 @@ pub trait Widget<DataModel> {
 
 #[derive(Default)]
 pub struct Container {
-    margin: f32,
     paint: Paint,
 }
 
 impl Container {
-    pub fn new(margin: f32) -> Self {
+    pub fn new() -> Self {
         let c = Container {
-            margin,
             paint: Paint::default(),
         };
         c
@@ -295,212 +297,212 @@ impl Container {
 
 impl<DataModel> Widget<DataModel> for Container {
     fn paint(&mut self, _: &DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
-        self.paint.set_color(Color::WHITE);
-        let rect = skia_safe::Rect::from_xywh(
-            rect.left() + self.margin,
-            rect.bottom() + self.margin,
-            rect.width() - self.margin * 2.,
-            rect.height() - self.margin * 2.,
-        );
-
+        let bg = style.get("bg-color").unwrap();
+        self.paint.set_color(*bg);
         canvas.draw_round_rect(rect, 5., 5., &self.paint);
+    }
+
+    fn layout(
+        &mut self,
+        _state: &DataModel,
+        rect: &Rect,
+        _spacing: f32,
+        padding: f32,
+        children: &mut [Node<DataModel>],
+    ) {
+        for child in children.iter_mut(){
+            let s = child.constraints.size(&rect.size());
+            child.rect = Rect::from_wh(s.width, s.height);
+            child.rect.inset((padding, padding));
+        }
     }
 }
 
-// pub struct Stack<DataModel> {
-//     orientation: Orientation,
-//     horizontal_justification: HorizontalJustification,
-//     vertical_justification: VerticalJustification,
-//     paint: Paint,
-//     border_paint: Paint,
-//     phantom: std::marker::PhantomData<DataModel>,
-// }
+pub struct Stack<DataModel> {
+    orientation: Orientation,
+    horizontal_justification: HorizontalJustification,
+    vertical_justification: VerticalJustification,
+    paint: Paint,
+    border_paint: Paint,
+    phantom: std::marker::PhantomData<DataModel>,
+}
 
-// impl<DataModel> Stack<DataModel> {
-//     pub fn new(orientation: Orientation) -> Self {
-//         Stack {
-//             orientation,
-//             horizontal_justification: HorizontalJustification::Center,
-//             vertical_justification: VerticalJustification::Center,
-//             paint: Paint::default(),
-//             border_paint: Paint::default(),
-//             phantom: std::marker::PhantomData {},
-//         }
-//     }
+impl<DataModel> Stack<DataModel> {
+    pub fn new(orientation: Orientation) -> Self {
+        Stack {
+            orientation,
+            horizontal_justification: HorizontalJustification::Center,
+            vertical_justification: VerticalJustification::Center,
+            paint: Paint::default(),
+            border_paint: Paint::default(),
+            phantom: std::marker::PhantomData {},
+        }
+    }
 
-//     pub fn layout_horizontally(
-//         &self,
-//         rect: &Rect,
-//         children: &mut [Node<DataModel>],
-//         spacing: f32,
-//         padding: f32,
-//     ) {
-//         let mut available_width =
-//             rect.width() - spacing * (children.len() as f32 - 1.) - (padding * 2.);
+    pub fn layout_horizontally(
+        &self,
+        rect: &Rect,
+        children: &mut [Node<DataModel>],
+        spacing: f32,
+        padding: f32,
+    ) {
+        let total_spacing = spacing * (children.len() as f32 - 1.);
+        let total_padding = padding * 2.;
+        let mut available_width = 
+            rect.width() - total_spacing - total_padding;
 
-//         let padding_compensation = (padding * 2.) / children.len() as f32;
+        let padding_compensation = (padding * 2.) / children.len() as f32;
 
-//         let mut unconstrained_children = children.len();
-//         for child in children.iter_mut() {
-//             if child.constraints.is_width_constraint() {
-//                 let s = child.constraints.size(&rect.size());
-//                 available_width -= s.width + padding_compensation;
-//                 child.rect.size = s;
-//                 child.rect.bottom -= padding;
-//                 unconstrained_children = unconstrained_children - 1;
-//             }
-//         }
+        let mut unconstrained_children = children.len();
+        for child in children.iter_mut() {
+            if child.constraints.is_width_constraint() {
+                let s = child.constraints.size(&rect.size());
+                available_width -= s.width + padding_compensation;
+                child.rect.set_xywh(rect.left, rect.top, s.width, s.height);
+                child.rect.inset((0., padding));
+                unconstrained_children = unconstrained_children - 1;
+            }
+        }
 
-//         let child_width = available_width / unconstrained_children as f32;
-//         let mut child_pos = rect.left() + padding;
+        let child_width = available_width / unconstrained_children as f32;
+        let mut child_pos = padding;
 
-//         for child in children.iter_mut() {
-//             if !child.constraints.is_width_constraint() {
-//                 child.rect.width() = child_width - padding_compensation;
-//                 child.rect.height() = rect.height() - padding * 2.;
-//             }
+        for child in children.iter_mut() {
+            if !child.constraints.is_width_constraint() {
+                let w = child_width;// - padding_compensation;
+                let h = rect.height() - total_padding;
+                child.rect.set_xywh(rect.left, rect.top, w, h);
+            }
 
-//             child.rect.left = child_pos;
-//             child.rect.bottom = rect.bottom() + padding;
-//             let s = child.rect.size();
+            child.rect.offset((child_pos, padding));
+            let s = child.rect.size();
 
-//             // match self.vertical_justification {
-//             //     VerticalJustification::Center => {
-//             //         child.rect.bottom() += (rect.height() - self.margin * 2. - s.height) / 2.;
-//             //     },
-//             //     VerticalJustification::Bottom => {
-//             //         child.rect.bottom() += rect.height() - s.height;
-//             //     },
-//             //     VerticalJustification::Top => {
+            // match self.vertical_justification {
+            //     VerticalJustification::Center => {
+            //         child.rect.bottom() += (rect.height() - self.margin * 2. - s.height) / 2.;
+            //     },
+            //     VerticalJustification::Bottom => {
+            //         child.rect.bottom() += rect.height() - s.height;
+            //     },
+            //     VerticalJustification::Top => {
 
-//             //     }
-//             // }
+            //     }
+            // }
 
-//             child_pos += s.width + spacing;
-//         }
-//     }
+            child_pos += s.width + spacing;
+        }
+    }
 
-//     pub fn layout_vertically(
-//         &self,
-//         rect: &Rect,
-//         children: &mut [Node<DataModel>],
-//         spacing: f32,
-//         padding: f32,
-//     ) {
-//         let mut available_height =
-//             rect.height() - spacing * (children.len() as f32 - 1.) - (padding * 2.);
-//         let mut unconstrained_children = children.len();
+    pub fn layout_vertically(
+        &self,
+        rect: &Rect,
+        children: &mut [Node<DataModel>],
+        spacing: f32,
+        padding: f32,
+    ) {
+        let mut available_height =
+            rect.height() - spacing * (children.len() as f32 - 1.) - (padding * 2.);
+        let mut unconstrained_children = children.len();
 
-//         let padding_compensation = (padding * 2.) / children.len() as f32;
+        let padding_compensation = (padding * 2.) / children.len() as f32;
 
-//         for child in children.iter_mut() {
-//             if child.constraints.is_height_constraint() {
-//                 let s = child.constraints.size(&rect.size());
-//                 available_height -= s.height + padding_compensation;
-//                 child.rect.size = s;
-//                 child.rect.width() -= padding * 2.;
-//                 unconstrained_children = unconstrained_children - 1;
-//             }
-//         }
+        for child in children.iter_mut() {
+            if child.constraints.is_height_constraint() {
+                let s = child.constraints.size(&rect.size());
+                available_height -= s.height + padding_compensation;
+                child.rect.set_wh(s.width - padding * 2., s.height);
+                unconstrained_children = unconstrained_children - 1;
+            }
+        }
 
-//         let child_height = available_height / unconstrained_children as f32;
-//         let mut child_pos = rect.bottom() + padding;
+        let child_height = available_height / unconstrained_children as f32;
+        let mut child_pos = rect.bottom() + padding;
 
-//         for child in children.iter_mut() {
-//             if !child.constraints.is_height_constraint() {
-//                 child.rect.height() = child_height - padding_compensation;
-//                 child.rect.width() = rect.width() - padding * 2.;
-//             }
+        for child in children.iter_mut() {
+            if !child.constraints.is_height_constraint() {
+                let w = child_height - padding_compensation;
+                let h = rect.width() - padding * 2.;
+                child.rect.set_wh(w, h);
+            }
 
-//             child.rect.bottom = child_pos;
-//             child.rect.left = rect.left() + padding;
-//             child_pos += child.rect.height() + spacing;
-//         }
-//     }
-// }
+            child.rect.bottom = child_pos;
+            child.rect.left = rect.left() + padding;
+            child_pos += child.rect.height() + spacing;
+        }
+    }
+}
 
-// impl<DataModel> Widget<DataModel> for Stack<DataModel> {
-//     fn paint(&mut self, _: &mut DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
-//         self.paint.set_color(style.get("bg-color").unwrap());
-//         self.border_paint
-//             .set_color(style.get("border-color").unwrap());
-//         self.border_paint.set_style(PaintStyle::Stroke);
-//         canvas.draw_rounded_rect(
-//             rect.left(),
-//             rect.bottom(),
-//             rect.width(),
-//             rect.height(),
-//             0.,
-//             0.,
-//             &self.paint,
-//         );
+impl<DataModel> Widget<DataModel> for Stack<DataModel> {
+    fn paint(&mut self, _: &DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+        self.paint.set_color(*style.get("bg-color").unwrap());
+        self.border_paint
+            .set_color(*style.get("border-color").unwrap());
+        self.border_paint.set_style(PaintStyle::Stroke);
+        canvas.draw_round_rect(
+            rect,
+            15.,
+            15.,
+            &self.paint,
+        );
 
-//         canvas.draw_rounded_rect(
-//             rect.left(),
-//             rect.bottom(),
-//             rect.width(),
-//             rect.height(),
-//             0.,
-//             0.,
-//             &self.border_paint,
-//         );
-//     }
+        canvas.draw_round_rect(
+            rect,
+            15.,
+            15.,
+            &self.border_paint,
+        );
+    }
 
-//     fn layout(
-//         &mut self,
-//         _: &mut DataModel,
-//         rect: &Rect,
-//         spacing: f32,
-//         padding: f32,
-//         children: &mut [Node<DataModel>],
-//     ) {
-//         match self.orientation {
-//             Orientation::Horizontal => self.layout_horizontally(rect, children, spacing, padding),
-//             Orientation::Vertical => self.layout_vertically(rect, children, spacing, padding),
-//         }
-//     }
-// }
+    fn layout(
+        &mut self,
+        _: &DataModel,
+        rect: &Rect,
+        spacing: f32,
+        padding: f32,
+        children: &mut [Node<DataModel>],
+    ) {
+        match self.orientation {
+            Orientation::Horizontal => self.layout_horizontally(rect, children, spacing, padding),
+            Orientation::Vertical => self.layout_vertically(rect, children, spacing, padding),
+        }
+    }
+}
 
-// pub struct Label {
-//     text: String,
-//     font: Font,
-//     paint: Paint,
-// }
+pub struct Label {
+    text: String,
+    font: Font,
+    paint: Paint,
+}
 
-// impl Label {
-//     pub fn new(text: &str) -> Self {
-//         Label {
-//             text: String::from(text),
-//             paint: Paint::default(),
-//             font: Font::new(12., "Arial"),
-//         }
-//     }
-// }
+impl Label {
+    pub fn new(text: &str) -> Self {
+        Label {
+            text: String::from(text),
+            paint: Paint::default(),
+            font: Font::default(),
+        }
+    }
+}
 
-// impl<DataModel> Widget<DataModel> for Label {
-//     fn paint(&mut self, _: &mut DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
-//         self.paint.set_color(style.get("bg-color").unwrap());
-//         canvas.draw_rounded_rect(
-//             rect.left(),
-//             rect.bottom(),
-//             rect.width(),
-//             rect.height(),
-//             1.,
-//             1.,
-//             &self.paint,
-//         );
-//         self.paint.set_color(&Color4f::new(1., 1., 1., 1.));
-//         canvas.draw_text(
-//             &self.text,
-//             rect.left(),
-//             rect.bottom(),
-//             rect.width(),
-//             rect.height(),
-//             &self.paint,
-//             &self.font,
-//         );
-//     }
-// }
+impl<DataModel> Widget<DataModel> for Label {
+    fn paint(&mut self, _: &DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+        self.paint.set_color(*style.get("bg-color").unwrap());
+        self.font.set_size(28.);
+        canvas.draw_round_rect(
+            rect,
+            15.,
+            15.,
+            &self.paint,
+        );
+        self.paint.set_color(Color::WHITE);
+        canvas.draw_str(
+            &self.text,
+            rect.center(),
+            &self.font,
+            &self.paint,
+        );
+    }
+}
 
 // pub struct Button<DataModel> {
 //     pressed: bool,
@@ -585,7 +587,7 @@ impl<DataModel> Widget<DataModel> for Container {
 //             1.,
 //             &self.paint,
 //         );
-//         self.paint.set_color(&Color4f::new(1., 1., 1., 1.));
+//         self.paint.set_color(&Color::new(1., 1., 1., 1.));
 //         canvas.draw_text(
 //             &self.text,
 //             rect,
@@ -719,13 +721,13 @@ impl<DataModel> Widget<DataModel> for Container {
 //         let border_color = style.get("border-color");
 
 //         self.bg_paint
-//             .set_color(bg_color.unwrap_or(&Color4f::new(1., 0., 0., 1.)));
+//             .set_color(bg_color.unwrap_or(&Color::new(1., 0., 0., 1.)));
 //         self.border_paint
-//             .set_color(border_color.unwrap_or(&Color4f::new(1., 0., 0., 1.)));
+//             .set_color(border_color.unwrap_or(&Color::new(1., 0., 0., 1.)));
 //         self.border_paint.set_style(PaintStyle::Stroke);
 //         self.fill_paint
-//             .set_color(fill_color.unwrap_or(&Color4f::new(0.2, 0.2, 0.2, 1.)));
-//         self.text_paint.set_color(&Color4f::new(1., 1., 1., 1.));
+//             .set_color(fill_color.unwrap_or(&Color::new(0.2, 0.2, 0.2, 1.)));
+//         self.text_paint.set_color(&Color::new(1., 1., 1., 1.));
 //         canvas.draw_rounded_rect(
 //             rect.left(),
 //             rect.bottom(),
@@ -855,13 +857,13 @@ impl<DataModel> Widget<DataModel> for Container {
 //         let border_color = style.get("border-color");
 
 //         self.bg_paint
-//             .set_color(bg_color.unwrap_or(&Color4f::new(1., 0., 0., 1.)));
+//             .set_color(bg_color.unwrap_or(&Color::new(1., 0., 0., 1.)));
 //         self.border_paint
-//             .set_color(border_color.unwrap_or(&Color4f::new(1., 0., 0., 1.)));
+//             .set_color(border_color.unwrap_or(&Color::new(1., 0., 0., 1.)));
 //         self.border_paint.set_style(PaintStyle::Stroke);
 //         self.fill_paint
-//             .set_color(fill_color.unwrap_or(&Color4f::new(0.2, 0.2, 0.2, 1.)));
-//         self.text_paint.set_color(&Color4f::new(1., 1., 1., 1.));
+//             .set_color(fill_color.unwrap_or(&Color::new(0.2, 0.2, 0.2, 1.)));
+//         self.text_paint.set_color(&Color::new(1., 1., 1., 1.));
 //         canvas.draw_rounded_rect(
 //             rect.left(),
 //             rect.bottom(),
@@ -966,15 +968,15 @@ impl<DataModel> Widget<DataModel> for Container {
 //         canvas: &mut Canvas,
 //         _style: &StyleSheet,
 //     ) {
-//         self.paint.set_color(&Color4f::from((0., 0., 0.));
+//         self.paint.set_color(&Color::from((0., 0., 0.));
 //         canvas.draw_rect(rect, &self.paint);
 
 //         self.scroll_bar_paint
-//             .set_color(&Color4f::new(0.3, 0.3, 0.3, 1.));
+//             .set_color(&Color::new(0.3, 0.3, 0.3, 1.));
 //         canvas.draw_rect(self.scroll_bar_rect, &self.scroll_bar_paint);
 
 //         self.scroll_bar_paint
-//             .set_color(&Color4f::new(0.2, 0.2, 0.2, 1.));
+//             .set_color(&Color::new(0.2, 0.2, 0.2, 1.));
 
 //         let r = Rect::from_xywh(
 //             self.scroll_bar_rect.left() + 1. + self.scroll_bar_position,

@@ -127,7 +127,7 @@ impl Swapchain {
         let attachments = [ash::vk::AttachmentDescription {
             format: format.format,
             samples: ash::vk::SampleCountFlags::TYPE_1,
-            load_op: ash::vk::AttachmentLoadOp::CLEAR,
+            load_op: ash::vk::AttachmentLoadOp::DONT_CARE,
             store_op: ash::vk::AttachmentStoreOp::STORE,
             final_layout: ash::vk::ImageLayout::PRESENT_SRC_KHR,
             ..Default::default()
@@ -200,7 +200,7 @@ impl Swapchain {
         }
     }
 
-    pub fn next_frame_buffer(&self) -> (bool, u32, &ash::vk::Framebuffer, &ash::vk::Semaphore) {
+    pub fn next_frame_buffer(&mut self) -> (bool, u32, ash::vk::Framebuffer, ash::vk::Semaphore) {
         let (index, sub_optimal) = unsafe {
             self.loader
                 .acquire_next_image(
@@ -211,13 +211,16 @@ impl Swapchain {
                 )
                 .expect("Failed to acquire next swapchain image")
         };
-        //self.current_index = index;
+        let result =         
         (
             true,
             index,
-            &self.framebuffers[index as usize],
-            &self.present_semaphores[index as usize],
-        )
+            self.framebuffers[index as usize],
+            self.present_semaphores[index as usize],
+        );
+        self.current_index = self.current_index + 1;
+        self.current_index = self.current_index % self.image_count() as u32;
+        result
     }
 
     pub fn render_pass(&self) -> &ash::vk::RenderPass {

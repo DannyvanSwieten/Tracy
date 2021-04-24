@@ -10,7 +10,7 @@ use skia_safe::gpu::*;
 use skia_safe::{Budgeted, Canvas, ImageInfo, Surface};
 use std::ffi::c_void;
 use std::ptr;
-
+use std::io::Write;
 use byteorder::ReadBytesExt;
 
 unsafe fn get_procedure(
@@ -61,6 +61,9 @@ pub struct UIWindow<AppState> {
     pipeline_layout: ash::vk::PipelineLayout,
     graphics_pipeline: ash::vk::Pipeline,
     sampler: ash::vk::Sampler,
+
+    to_shader_read_barriers: Vec<ash::vk::ImageMemoryBarrier>,
+    to_attachment_barriers: Vec<ash::vk::ImageMemoryBarrier>
 }
 
 impl<'a, AppState: 'static> UIWindow<AppState> {
@@ -217,6 +220,38 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     });
                 }
 
+                let to_shader_read_barriers = surface_images.iter().map(|&image|{
+                    ash::vk::ImageMemoryBarrier::builder()
+                    .old_layout(ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                    .new_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                    .image(image)
+                    .src_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
+                    .dst_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
+                    .subresource_range(
+                        ash::vk::ImageSubresourceRange::builder()
+                            .aspect_mask(ash::vk::ImageAspectFlags::COLOR)
+                            .layer_count(1)
+                            .level_count(1)
+                            .build(),
+                    ).build()
+                }).collect();
+
+                let to_attachment_barriers = surface_images.iter().map(|&image|{
+                    ash::vk::ImageMemoryBarrier::builder()
+                    .old_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                    .new_layout(ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                    .image(image)
+                    .src_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
+                    .dst_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
+                    .subresource_range(
+                        ash::vk::ImageSubresourceRange::builder()
+                            .aspect_mask(ash::vk::ImageAspectFlags::COLOR)
+                            .layer_count(1)
+                            .level_count(1)
+                            .build(),
+                    ).build()
+                }).collect();
+
                 let mut user_interface = UserInterface::new(ui_delegate.build("root", state));
                 user_interface.resize(state, window.inner_size().width, window.inner_size().height);
 
@@ -318,11 +353,15 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     ash::vk::PipelineRasterizationStateCreateInfo::builder()
                         .polygon_mode(ash::vk::PolygonMode::FILL)
                         .line_width(1.)
+                        .cull_mode(ash::vk::CullModeFlags::BACK)
+                        .front_face(ash::vk::FrontFace::COUNTER_CLOCKWISE)
                         .build();
 
                 let viewports = [ash::vk::Viewport::builder()
                     .width(window.inner_size().width as f32)
                     .height(window.inner_size().height as f32)
+                    .min_depth(0.)
+                    .max_depth(1.)
                     .build()];
 
                 let scissors = [ash::vk::Rect2D::builder()
@@ -352,7 +391,11 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     ash::vk::PipelineVertexInputStateCreateInfo::builder().build();
 
                 let blend_attachment =
-                    [ash::vk::PipelineColorBlendAttachmentState::builder().build()];
+                    [
+                        ash::vk::PipelineColorBlendAttachmentState::builder()
+                        .color_write_mask(ash::vk::ColorComponentFlags::R | ash::vk::ColorComponentFlags::G | ash::vk::ColorComponentFlags::B | ash::vk::ColorComponentFlags::A)
+                        .build()
+                    ];
                 let blend_state_create_info = ash::vk::PipelineColorBlendStateCreateInfo::builder()
                     .attachments(&blend_attachment)
                     .build();
@@ -441,8 +484,8 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     for i in 0..image_descriptors_infos.len() {
                         let write = ash::vk::WriteDescriptorSet::builder()
                             .descriptor_type(ash::vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                            .image_info(&image_descriptors_infos[i..i + 1])
-                            .dst_set(descriptor_sets[index])
+                            .image_info(&image_descriptors_infos[i..i+1])
+                            .dst_set(descriptor_sets[i])
                             .build();
 
                         result.push(write);
@@ -470,6 +513,8 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     command_pool,
                     command_buffers,
                     semaphores,
+                    to_attachment_barriers,
+                    to_shader_read_barriers,
                     fences,
                     descriptor_pool,
                     descriptor_sets,
@@ -514,7 +559,7 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
 
         unsafe {
             app.primary_device_context()
-                .wait_for_fences(&[self.fences[image_index as usize]], true, 10000)
+                .wait_for_fences(&[self.fences[image_index as usize]], true, u64::MAX)
                 .expect("Wait for fence failed");
 
             app.primary_device_context()
@@ -526,25 +571,17 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
         self.user_interface
             .paint(state, self.surfaces[image_index as usize].canvas());
         self.surfaces[image_index as usize].flush_and_submit();
+        // let image = self.surfaces[image_index as usize].image_snapshot();
+        // let d = image.encode_to_data(skia_safe::EncodedImageFormat::PNG).unwrap();
+        // let mut file = std::fs::File::create("test.png").unwrap();
+        // let bytes = d.as_bytes();
+        // file.write_all(bytes).unwrap();
 
-        let barrier = ash::vk::ImageMemoryBarrier::builder()
-            .old_layout(ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-            .new_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-            .image(self.surface_images[image_index as usize])
-            .src_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
-            .dst_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
-            .subresource_range(
-                ash::vk::ImageSubresourceRange::builder()
-                    .aspect_mask(ash::vk::ImageAspectFlags::COLOR)
-                    .layer_count(1)
-                    .level_count(1)
-                    .build(),
-            )
-            .build();
         let device = app.primary_device_context();
         let commands = &self.command_buffers[image_index as usize];
         let command_buffer_begin_info = ash::vk::CommandBufferBeginInfo::builder().build();
         unsafe {
+            device.reset_command_buffer(*commands, ash::vk::CommandBufferResetFlags::RELEASE_RESOURCES).expect("Reset command buffer failed");
             device
                 .begin_command_buffer(*commands, &command_buffer_begin_info)
                 .expect("Unable to start recording command buffer");
@@ -556,7 +593,7 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
                 ash::vk::DependencyFlags::BY_REGION,
                 &[],
                 &[],
-                &[barrier],
+                &[self.to_shader_read_barriers[image_index as usize]],
             );
 
             let clear_values = [ash::vk::ClearValue {
@@ -568,7 +605,7 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
             // Begin renderpass to transition swapchain image into color attachment and output as Present Source
             let render_pass_begin_info = ash::vk::RenderPassBeginInfo::builder()
                 .render_pass(*self.swapchain.render_pass())
-                .framebuffer(*framebuffer)
+                .framebuffer(framebuffer)
                 .clear_values(&clear_values)
                 .render_area(ash::vk::Rect2D {
                     offset: ash::vk::Offset2D { x: 0, y: 0 },
@@ -594,23 +631,35 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
                 ash::vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline_layout,
                 0,
-                &self.descriptor_sets,
+                &[self.descriptor_sets[image_index as usize]],
                 &[],
             );
 
             device.cmd_draw(*commands, 6, 1, 0, 0);
 
             device.cmd_end_render_pass(*commands);
+            device.cmd_pipeline_barrier(
+                *commands,
+                ash::vk::PipelineStageFlags::ALL_COMMANDS,
+                ash::vk::PipelineStageFlags::ALL_COMMANDS,
+                ash::vk::DependencyFlags::BY_REGION,
+                &[],
+                &[],
+                &[self.to_attachment_barriers[image_index as usize]],
+            );
+
             device
                 .end_command_buffer(*commands)
                 .expect("End recording command buffer failed");
 
             let buffers = &[*commands];
+            let wait_semaphores = [semaphore];
+            let signal_semaphores = [self.semaphores[image_index as usize]];
             let submit_info = ash::vk::SubmitInfo::builder()
                 .command_buffers(buffers)
-                .signal_semaphores(&[self.semaphores[image_index as usize]])
-                .wait_dst_stage_mask(&[ash::vk::PipelineStageFlags::ALL_GRAPHICS])
-                .wait_semaphores(&[*semaphore])
+                .signal_semaphores(&signal_semaphores)
+                .wait_dst_stage_mask(&[ash::vk::PipelineStageFlags::ALL_COMMANDS])
+                .wait_semaphores(&wait_semaphores)
                 .build();
             device
                 .queue_submit(

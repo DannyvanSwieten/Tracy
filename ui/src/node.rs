@@ -61,7 +61,7 @@ impl<DataModel> Node<DataModel> {
             padding: 0.,
             spacing: 0.,
             constraints: Constraints::default(),
-            widget: Box::new(Container::new(0.)),
+            widget: Box::new(Container::new()),
             children: Vec::new(),
             uid: next_node_id(),
             mouse_callbacks: HashMap::new(),
