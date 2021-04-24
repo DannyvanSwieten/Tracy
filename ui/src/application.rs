@@ -126,7 +126,24 @@ pub trait ApplicationDelegate<AppState> {
         ControlFlow::Wait
     }
 
-    fn cursor_moved(
+    fn mouse_moved(
+        &mut self,
+        _: &winit::window::WindowId,
+        _: &winit::dpi::PhysicalPosition<f64>,
+    ) -> ControlFlow {
+        ControlFlow::Wait
+    }
+
+    fn mouse_down(
+        &mut self,
+        state: &mut AppState,
+        _: &winit::window::WindowId,
+        _: &winit::dpi::PhysicalPosition<f64>,
+    ) -> ControlFlow {
+        ControlFlow::Wait
+    }
+
+    fn mouse_up(
         &mut self,
         _: &winit::window::WindowId,
         _: &winit::dpi::PhysicalPosition<f64>,
@@ -284,6 +301,7 @@ impl<AppState: 'static> Application<AppState> {
         d.application_will_start(&self, &mut s, &event_loop);
 
         event_loop.run(move |e, event_loop, control_flow| {
+            let mut last_mouse_position = winit::dpi::PhysicalPosition::<f64>::new(0., 0.);
             *control_flow = ControlFlow::Wait;
 
             match e {
@@ -335,8 +353,28 @@ impl<AppState: 'static> Application<AppState> {
                             modifiers,
                         },
                     window_id,
-                } => *control_flow = d.cursor_moved(&window_id, &position),
-                _ => (),
+                } => {
+                    last_mouse_position = position;
+                    *control_flow = d.mouse_moved(&window_id, &position)
+                }
+
+                Event::WindowEvent {
+                    event:
+                        WindowEvent::MouseInput {
+                            device_id,
+                            state,
+                            button,
+                            modifiers,
+                        },
+                    window_id,
+                } => {
+                    match state {
+                        winit::event::ElementState::Pressed => *control_flow = d.mouse_down(&mut s, &window_id, &last_mouse_position),
+                        winit::event::ElementState::Released=> *control_flow = d.mouse_up(&window_id, &last_mouse_position)
+                    }   
+                }
+
+                _ => ()
             }
 
             match control_flow {

@@ -90,7 +90,7 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
     }
 
     fn window_resized(&mut self,
-        app: &Application<AppState>,
+        _: &Application<AppState>,
         state: &mut AppState,
         id: &winit::window::WindowId,
          size: &winit::dpi::PhysicalSize<u32>
@@ -125,6 +125,34 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
         } else {
             winit::event_loop::ControlFlow::Wait
         }
+    }
+
+    fn mouse_moved(
+        &mut self,
+        _: &winit::window::WindowId,
+        _: &winit::dpi::PhysicalPosition<f64>,
+    ) -> winit::event_loop::ControlFlow {
+        winit::event_loop::ControlFlow::Wait
+    }
+
+    fn mouse_down(
+        &mut self,
+        state: &mut AppState,
+        id: &winit::window::WindowId,
+        position: &winit::dpi::PhysicalPosition<f64>,
+    ) -> winit::event_loop::ControlFlow {
+        if let Some(window) = self.ui_windows.get_mut(id){
+            window.mouse_down(state, position)
+        }
+        winit::event_loop::ControlFlow::Wait
+    }
+
+    fn mouse_up(
+        &mut self,
+        _: &winit::window::WindowId,
+        _: &winit::dpi::PhysicalPosition<f64>,
+    ) -> winit::event_loop::ControlFlow {
+        winit::event_loop::ControlFlow::Wait
     }
 }
 
