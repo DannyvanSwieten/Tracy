@@ -88,14 +88,14 @@ impl<DataModel: 'static> UserInterface<DataModel> {
         self.actions.push(self.root.mouse_down(state, event))
     }
 
-    pub fn mouse_up(&mut self, state: &mut DataModel, window_id: usize, event: &MouseEvent) {
+    pub fn mouse_up(&mut self, state: &mut DataModel, event: &MouseEvent) {
         if let Some(popup) = self.pop_up.as_mut() {
-            self.actions.push(popup.mouse_up(state, window_id, event));
+            self.actions.push(popup.mouse_up(state, event));
             return;
         }
 
         self.actions
-            .push(self.root.mouse_up(state, window_id, event))
+            .push(self.root.mouse_up(state, event))
     }
 
     pub fn double_click(&mut self, state: &mut DataModel, event: &MouseEvent) {

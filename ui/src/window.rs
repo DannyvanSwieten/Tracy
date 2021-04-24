@@ -114,7 +114,7 @@ impl<DataModel: 'static> Window<DataModel> {
 
     pub fn mouse_up(&mut self, state: &mut DataModel, event: &MouseEvent) {
         if let Some(ui) = self.ui.as_mut() {
-            ui.mouse_up(state, self.uid, event)
+            ui.mouse_up(state, event)
         }
     }
 

@@ -153,9 +153,13 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
 
     fn mouse_up(
         &mut self,
-        _: &winit::window::WindowId,
-        _: &winit::dpi::PhysicalPosition<f64>,
+        state: &mut AppState,
+        id: &winit::window::WindowId,
+        position: &winit::dpi::PhysicalPosition<f64>,
     ) -> winit::event_loop::ControlFlow {
+        if let Some(window) = self.ui_windows.get_mut(id){
+            window.mouse_up(state, position)
+        }
         winit::event_loop::ControlFlow::Wait
     }
 }

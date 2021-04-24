@@ -537,6 +537,11 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
         self.user_interface.mouse_down(state, &MouseEvent::new(0, &p, &p));
     }
 
+    fn mouse_up(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
+        let p = skia_safe::Point::from((event.x as f32, event.y as f32));
+        self.user_interface.mouse_up(state, &MouseEvent::new(0, &p, &p));
+    }
+
     fn resized(&mut self, _: &mut AppState, event: &winit::dpi::PhysicalSize<u32>) {
         let image_info = ImageInfo::new_n32_premul((event.width as i32, event.height as i32), None);
 

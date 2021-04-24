@@ -289,7 +289,6 @@ impl<DataModel> Node<DataModel> {
     pub fn mouse_up(
         &mut self,
         state: &mut DataModel,
-        window_id: usize,
         event: &MouseEvent,
     ) -> Action<DataModel> {
         let mut action = Action::None;
@@ -298,13 +297,13 @@ impl<DataModel> Node<DataModel> {
             let mut consume = true;
             for child in self.children.iter_mut() {
                 if child.hit_test(&event.global_position()) {
-                    action = child.mouse_up(state, window_id, event);
+                    action = child.mouse_up(state, event);
                     consume = false;
                 }
             }
 
             if consume {
-                action = self.widget.mouse_up(state, window_id, &self.rect, event);
+                action = self.widget.mouse_up(state, &self.rect, event);
                 if let Some(cb) = self.mouse_callbacks.get_mut(&MouseEventType::MouseUp) {
                     action = cb(event, state);
                 }

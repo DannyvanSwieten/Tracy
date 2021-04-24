@@ -146,6 +146,7 @@ pub trait ApplicationDelegate<AppState> {
 
     fn mouse_up(
         &mut self,
+        _: &mut AppState,
         _: &winit::window::WindowId,
         _: &winit::dpi::PhysicalPosition<f64>,
     ) -> ControlFlow {
@@ -371,7 +372,7 @@ impl<AppState: 'static> Application<AppState> {
                 } => {
                     match state {
                         winit::event::ElementState::Pressed => *control_flow = d.mouse_down(&mut s, &window_id, &last_mouse_position),
-                        winit::event::ElementState::Released=> *control_flow = d.mouse_up(&window_id, &last_mouse_position)
+                        winit::event::ElementState::Released=> *control_flow = d.mouse_up(&mut s, &window_id, &last_mouse_position)
                     }   
                 }
 

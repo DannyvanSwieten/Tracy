@@ -248,7 +248,6 @@ pub trait Widget<DataModel> {
     fn mouse_up(
         &mut self,
         _state: &mut DataModel,
-        _window_id: usize,
         _rect: &Rect,
         _event: &MouseEvent,
     ) -> Action<DataModel> {
