@@ -1,5 +1,4 @@
 use super::application::*;
-use super::node::Node;
 use super::swapchain;
 use super::user_interface::{UIDelegate, UserInterface};
 use super::window::MouseEvent;
@@ -7,10 +6,7 @@ use ash::version::EntryV1_0;
 use ash::version::InstanceV1_0;
 use ash::vk::Handle;
 use skia_safe::gpu::*;
-use skia_safe::{Budgeted, Canvas, ImageInfo, Surface};
-use std::ffi::c_void;
-use std::ptr;
-use std::io::Write;
+use skia_safe::{Budgeted, ImageInfo, Surface};
 use byteorder::ReadBytesExt;
 
 unsafe fn get_procedure(

@@ -503,98 +503,94 @@ impl<DataModel> Widget<DataModel> for Label {
     }
 }
 
-// pub struct Button<DataModel> {
-//     pressed: bool,
-//     hovered: bool,
-//     text: String,
-//     paint: Paint,
-//     font: Font,
-//     on_click: Option<Box<dyn FnMut(usize, &mut DataModel) -> Action<DataModel>>>,
-//     phantom: std::marker::PhantomData<DataModel>,
-// }
+pub struct Button<DataModel> {
+    pressed: bool,
+    hovered: bool,
+    text: String,
+    paint: Paint,
+    font: Font,
+    on_click: Option<Box<dyn FnMut(&mut DataModel) -> Action<DataModel>>>,
+    phantom: std::marker::PhantomData<DataModel>,
+}
 
-// impl<DataModel> Button<DataModel> {
-//     pub fn new(text: &str) -> Self {
-//         let b = Button {
-//             pressed: false,
-//             hovered: false,
-//             text: String::from(text),
-//             paint: Paint::default(),
-//             font: Font::default(),
-//             on_click: None,
-//             phantom: std::marker::PhantomData,
-//         };
-//         b
-//     }
+impl<DataModel> Button<DataModel> {
+    pub fn new(text: &str) -> Self {
+        let b = Button {
+            pressed: false,
+            hovered: false,
+            text: String::from(text),
+            paint: Paint::default(),
+            font: Font::default(),
+            on_click: None,
+            phantom: std::marker::PhantomData,
+        };
+        b
+    }
 
-//     pub fn get_text(&self) -> &str {
-//         &self.text
-//     }
-// }
+    pub fn get_text(&self) -> &str {
+        &self.text
+    }
+}
 
-// impl<DataModel> Widget<DataModel> for Button<DataModel> {
-//     fn mouse_down(&mut self, _: &mut DataModel, _: &Rect, _: &MouseEvent) {
-//         self.pressed = true;
-//     }
+impl<DataModel> Widget<DataModel> for Button<DataModel> {
+    fn mouse_down(&mut self, _: &mut DataModel, _: &Rect, _: &MouseEvent) {
+        self.pressed = true;
+    }
 
-//     fn mouse_up(
-//         &mut self,
-//         state: &mut DataModel,
-//         window_id: usize,
-//         _: &Rect,
-//         _: &MouseEvent,
-//     ) -> Action<DataModel> {
-//         self.pressed = false;
-//         if let Some(handler) = self.on_click.as_mut() {
-//             return (*handler)(window_id, state);
-//         } else {
-//             Action::None
-//         }
-//     }
+    fn mouse_up(
+        &mut self,
+        state: &mut DataModel,
+        _: &Rect,
+        _: &MouseEvent,
+    ) -> Action<DataModel> {
+        self.pressed = false;
+        if let Some(handler) = self.on_click.as_mut() {
+            return (*handler)(state);
+        } else {
+            Action::None
+        }
+    }
 
-//     fn mouse_enter(&mut self, _: &mut DataModel, _: &Rect, _: &MouseEvent) {
-//         self.hovered = true;
-//     }
+    fn mouse_enter(&mut self, _: &mut DataModel, _: &Rect, _: &MouseEvent) {
+        self.hovered = true;
+    }
 
-//     fn mouse_leave(&mut self, _: &mut DataModel, _: &Rect, _: &MouseEvent) {
-//         self.hovered = false;
-//     }
+    fn mouse_leave(&mut self, _: &mut DataModel, _: &Rect, _: &MouseEvent) {
+        self.hovered = false;
+    }
 
-//     fn paint(&mut self, _: &mut DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
-//         if self.hovered {
-//             if let Some(color) = style.get("hovered") {
-//                 self.paint.set_color(color);
-//             }
-//         } else {
-//             if let Some(color) = style.get("bg-color") {
-//                 self.paint.set_color(color);
-//             }
-//         }
+    fn paint(&mut self, _: &DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+        if self.hovered {
+            if let Some(color) = style.get("hovered") {
+                self.paint.set_color(*color);
+            }
+        } else {
+            if let Some(color) = style.get("bg-color") {
+                self.paint.set_color(*color);
+            }
+        }
 
-//         if self.pressed {
-//             if let Some(color) = style.get("pressed") {
-//                 self.paint.set_color(color);
-//             }
-//         }
+        if self.pressed {
+            if let Some(color) = style.get("pressed") {
+                self.paint.set_color(*color);
+            }
+        }
 
-//         canvas.draw_rounded_rect(
-//             rect.left(),
-//             rect.bottom(),
-//             rect.width(),
-//             rect.height(),
-//             1.,
-//             1.,
-//             &self.paint,
-//         );
-//         self.paint.set_color(&Color::new(1., 1., 1., 1.));
-//         canvas.draw_text(
-//             &self.text,
-//             rect,
-//             &self.paint,
-//             &self.font,
-//         );
-//     }
-// }
+        canvas.draw_round_rect(
+            rect,
+            1.,
+            1.,
+            &self.paint,
+        );
+        self.paint.set_color(Color::WHITE);
+        canvas.draw_str(
+            &self.text,
+            rect.center(),
+            &self.font,
+            &self.paint,
+        );
+    }
+}
 
 // pub trait TableDelegate {
 //     fn row_selected(&mut self, id: u32);
@@ -1051,22 +1047,22 @@ impl<DataModel: 'static> PopupRequest<DataModel> {
     }
 
     pub fn build(&self) -> Node<DataModel> {
-        let mut b = Node::new("menu");
-        // .with_widget(Stack::new(Orientation::Vertical))
-        // .with_spacing(1.);
+        let mut b = Node::new("menu")
+        .with_widget(Stack::new(Orientation::Vertical))
+        .with_spacing(1.);
 
         for item in self.menu.items.iter() {
             let s = item.id;
-            // b.add_child(
-            //     Node::new("btn")
-            //         .with_widget(Button::new(&item.name))
-            //         .with_event_callback(MouseEventType::MouseUp, move |_, _| {
-            //             Action::TriggerPopupMenu {
-            //                 menu: 0,
-            //                 sub_menu: s,
-            //             }
-            //         }),
-            // );
+            b.add_child(
+                Node::new("btn")
+                    .with_widget(Button::new(&item.name))
+                    .with_event_callback(MouseEventType::MouseUp, move |_, _| {
+                        Action::TriggerPopupMenu {
+                            menu: 0,
+                            sub_menu: s,
+                        }
+                    }),
+            );
         }
 
         b.rect.set_wh(150., self.menu.items.len() as f32 * 28.);

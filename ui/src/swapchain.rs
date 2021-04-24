@@ -1,7 +1,4 @@
 use ash::version::DeviceV1_0;
-use ash::version::EntryV1_0;
-use ash::version::InstanceV1_0;
-use ash::vk::Handle;
 
 pub struct Swapchain {
     loader: ash::extensions::khr::Swapchain,

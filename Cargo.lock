@@ -234,10 +234,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "core"
-version = "0.1.0"
-
-[[package]]
 name = "core-foundation"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1265,7 +1261,6 @@ dependencies = [
  "ash",
  "ash-window",
  "byteorder",
- "core",
  "skia-safe",
  "winit",
 ]
