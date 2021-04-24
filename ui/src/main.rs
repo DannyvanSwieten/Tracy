@@ -139,6 +139,18 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
         winit::event_loop::ControlFlow::Wait
     }
 
+    fn mouse_dragged(
+        &mut self,
+        state: &mut AppState,
+        id: &winit::window::WindowId,
+        position: &winit::dpi::PhysicalPosition<f64>,
+    ) -> winit::event_loop::ControlFlow {
+        if let Some(window) = self.ui_windows.get_mut(id){
+            window.mouse_dragged(state, position)
+        }
+        winit::event_loop::ControlFlow::Wait
+    }
+
     fn mouse_down(
         &mut self,
         state: &mut AppState,

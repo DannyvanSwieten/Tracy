@@ -29,6 +29,7 @@ unsafe fn get_procedure(
 
 pub trait WindowDelegate<AppState> {
     fn mouse_moved(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
+    fn mouse_dragged(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
     fn mouse_down(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
     fn mouse_up(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
     fn resized(&mut self, state: &mut AppState, size: &winit::dpi::PhysicalSize<u32>) {}
@@ -526,6 +527,11 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
     fn mouse_moved(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
         let p = skia_safe::Point::from((event.x as f32, event.y as f32));
         self.user_interface.mouse_moved(state, &MouseEvent::new(0, &p, &p));
+    }
+
+    fn mouse_dragged(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
+        let p = skia_safe::Point::from((event.x as f32, event.y as f32));
+        self.user_interface.mouse_drag(state, &MouseEvent::new(0, &p, &p));
     }
 
     fn mouse_down(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {

@@ -135,6 +135,15 @@ pub trait ApplicationDelegate<AppState> {
         ControlFlow::Wait
     }
 
+    fn mouse_dragged(
+        &mut self,
+        _: &mut AppState,
+        _: &winit::window::WindowId,
+        _: &winit::dpi::PhysicalPosition<f64>,
+    ) -> ControlFlow {
+        ControlFlow::Wait
+    }
+
     fn mouse_down(
         &mut self,
         _: &mut AppState,
@@ -302,6 +311,8 @@ impl<AppState: 'static> Application<AppState> {
 
         d.application_will_start(&self, &mut s, &event_loop);
         let mut last_mouse_position = winit::dpi::PhysicalPosition::<f64>::new(0., 0.);
+        let mut mouse_is_down = false;
+        
         event_loop.run(move |e, event_loop, control_flow| {
             
             *control_flow = ControlFlow::Wait;
@@ -357,7 +368,11 @@ impl<AppState: 'static> Application<AppState> {
                     window_id,
                 } => {
                     last_mouse_position = position;
-                    *control_flow = d.mouse_moved(&mut s, &window_id, &position)
+                    if mouse_is_down {
+                        *control_flow = d.mouse_dragged(&mut s, &window_id, &position)
+                    } else {
+                        *control_flow = d.mouse_moved(&mut s, &window_id, &position)
+                    }
                 }
 
                 Event::WindowEvent {
@@ -371,8 +386,14 @@ impl<AppState: 'static> Application<AppState> {
                     window_id,
                 } => {
                     match state {
-                        winit::event::ElementState::Pressed => *control_flow = d.mouse_down(&mut s, &window_id, &last_mouse_position),
-                        winit::event::ElementState::Released=> *control_flow = d.mouse_up(&mut s, &window_id, &last_mouse_position)
+                        winit::event::ElementState::Pressed => {
+                            mouse_is_down = true;
+                            *control_flow = d.mouse_down(&mut s, &window_id, &last_mouse_position)
+                        },
+                        winit::event::ElementState::Released=> {
+                            mouse_is_down = false;
+                            *control_flow = d.mouse_up(&mut s, &window_id, &last_mouse_position)
+                        }
                     }   
                 }
 
