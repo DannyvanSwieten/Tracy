@@ -82,6 +82,11 @@ pub trait ApplicationDelegate<AppState> {
     ) {
     }
 
+    fn application_will_update(&mut self, _: &Application<AppState>, _: &mut AppState) {}
+    fn application_updated(&mut self, _: &Application<AppState>, _: &mut AppState) -> ControlFlow {
+        ControlFlow::Wait
+    }
+
     fn close_button_pressed(&mut self, _: &winit::window::WindowId) -> ControlFlow {
         ControlFlow::Wait
     }
@@ -312,10 +317,10 @@ impl<AppState: 'static> Application<AppState> {
         d.application_will_start(&self, &mut s, &event_loop);
         let mut last_mouse_position = winit::dpi::PhysicalPosition::<f64>::new(0., 0.);
         let mut mouse_is_down = false;
-        
         event_loop.run(move |e, event_loop, control_flow| {
-            
             *control_flow = ControlFlow::Wait;
+
+            d.application_will_update(&mut self, &mut s);
 
             match e {
                 Event::WindowEvent {
@@ -384,26 +389,26 @@ impl<AppState: 'static> Application<AppState> {
                             modifiers,
                         },
                     window_id,
-                } => {
-                    match state {
-                        winit::event::ElementState::Pressed => {
-                            mouse_is_down = true;
-                            *control_flow = d.mouse_down(&mut s, &window_id, &last_mouse_position)
-                        },
-                        winit::event::ElementState::Released=> {
-                            mouse_is_down = false;
-                            *control_flow = d.mouse_up(&mut s, &window_id, &last_mouse_position)
-                        }
-                    }   
-                }
+                } => match state {
+                    winit::event::ElementState::Pressed => {
+                        mouse_is_down = true;
+                        *control_flow = d.mouse_down(&mut s, &window_id, &last_mouse_position)
+                    }
+                    winit::event::ElementState::Released => {
+                        mouse_is_down = false;
+                        *control_flow = d.mouse_up(&mut s, &window_id, &last_mouse_position)
+                    }
+                },
 
-                _ => ()
+                _ => (),
             }
 
             match control_flow {
                 ControlFlow::Exit => d.application_will_quit(&mut self, &event_loop),
                 _ => (),
             }
+
+            *control_flow = d.application_updated(&mut self, &mut s);
         });
     }
 }

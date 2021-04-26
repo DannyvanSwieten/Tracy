@@ -39,30 +39,23 @@ struct MyUIDelegate {}
 impl<AppState: 'static> UIDelegate<AppState> for MyUIDelegate {
     fn build(&self, _: &str, _: &AppState) -> node::Node<AppState> {
         node::Node::new("body")
-        .with_widget
-        (
-            widget::Container::new()
-        )
-        .with_padding(25.)
-        .with_child
-        (
-            node::Node::new("div")
-            .with_widget
-            (
-                widget::Stack::new(widget::Orientation::Horizontal)
-            )
-            .with_relative_max_constraints(None, Some(33.))
-            .with_rebuild_callback(|_|{
-                Some(std::vec![
-                    node::Node::new("label").with_widget(widget::Label::new("Label 1")),
-                    node::Node::new("label").with_widget(widget::Label::new("Label 2")),
-                    node::Node::new("label").with_widget(widget::Label::new("Label 3")),
-                    node::Node::new("label").with_widget(widget::Label::new("Label 4")),
-                ])
-            })
+            .with_widget(widget::Container::new())
             .with_padding(25.)
-            .with_spacing(5.)
-        )
+            .with_child(
+                node::Node::new("div")
+                    .with_widget(widget::Stack::new(widget::Orientation::Horizontal))
+                    .with_relative_max_constraints(None, Some(33.))
+                    .with_rebuild_callback(|_| {
+                        Some(std::vec![
+                            node::Node::new("btn").with_widget(widget::Button::new("Label 1")),
+                            node::Node::new("btn").with_widget(widget::Button::new("Label 2")),
+                            node::Node::new("btn").with_widget(widget::Button::new("Label 3")),
+                            node::Node::new("btn").with_widget(widget::Button::new("Label 4")),
+                        ])
+                    })
+                    .with_padding(25.)
+                    .with_spacing(5.),
+            )
     }
 }
 
@@ -89,12 +82,24 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
         self.windows.insert(window.id(), window);
     }
 
-    fn window_resized(&mut self,
+    fn application_updated(
+        &mut self,
+        app: &Application<AppState>,
+        state: &mut AppState,
+    ) -> winit::event_loop::ControlFlow {
+        for (_, delegate) in self.ui_windows.iter_mut() {
+            delegate.draw(app, state)
+        }
+        winit::event_loop::ControlFlow::Poll
+    }
+
+    fn window_resized(
+        &mut self,
         _: &Application<AppState>,
         state: &mut AppState,
         id: &winit::window::WindowId,
-         size: &winit::dpi::PhysicalSize<u32>
-        ) -> winit::event_loop::ControlFlow {
+        size: &winit::dpi::PhysicalSize<u32>,
+    ) -> winit::event_loop::ControlFlow {
         if let Some(window) = self.ui_windows.get_mut(id) {
             window.resized(state, size)
         }
@@ -133,7 +138,7 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) -> winit::event_loop::ControlFlow {
-        if let Some(window) = self.ui_windows.get_mut(id){
+        if let Some(window) = self.ui_windows.get_mut(id) {
             window.mouse_moved(state, position)
         }
         winit::event_loop::ControlFlow::Wait
@@ -145,7 +150,7 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) -> winit::event_loop::ControlFlow {
-        if let Some(window) = self.ui_windows.get_mut(id){
+        if let Some(window) = self.ui_windows.get_mut(id) {
             window.mouse_dragged(state, position)
         }
         winit::event_loop::ControlFlow::Wait
@@ -157,7 +162,7 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) -> winit::event_loop::ControlFlow {
-        if let Some(window) = self.ui_windows.get_mut(id){
+        if let Some(window) = self.ui_windows.get_mut(id) {
             window.mouse_down(state, position)
         }
         winit::event_loop::ControlFlow::Wait
@@ -169,7 +174,7 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) -> winit::event_loop::ControlFlow {
-        if let Some(window) = self.ui_windows.get_mut(id){
+        if let Some(window) = self.ui_windows.get_mut(id) {
             window.mouse_up(state, position)
         }
         winit::event_loop::ControlFlow::Wait

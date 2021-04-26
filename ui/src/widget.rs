@@ -2,6 +2,7 @@ use crate::node::*;
 use crate::window::MouseEvent;
 use crate::window::MouseEventType;
 use skia_safe::canvas::Canvas;
+use skia_safe::colors;
 use skia_safe::Color;
 use skia_safe::Font;
 use skia_safe::Paint;
@@ -9,7 +10,6 @@ use skia_safe::PaintStyle;
 use skia_safe::Point;
 use skia_safe::Rect;
 use skia_safe::Size;
-use skia_safe::colors;
 
 use std::collections::HashMap;
 
@@ -28,25 +28,13 @@ pub struct Material {
 impl Material {
     pub fn new() -> Self {
         let mut body = StyleSheet::new();
-        body.insert(
-            String::from("bg-color"), 
-            Color::BLACK
-        ); 
+        body.insert(String::from("bg-color"), Color::BLACK);
 
-        body.insert(
-            String::from("border-color"),
-            Color::WHITE,
-        );
+        body.insert(String::from("border-color"), Color::WHITE);
 
         let mut div = StyleSheet::new();
-        div.insert(
-            String::from("bg-color"),
-            Color::DARK_GRAY,
-        );
-        div.insert(
-            String::from("border-color"),
-            Color::LIGHT_GRAY,
-        );
+        div.insert(String::from("bg-color"), Color::DARK_GRAY);
+        div.insert(String::from("border-color"), Color::LIGHT_GRAY);
 
         let mut btn = StyleSheet::new();
         btn.insert(String::from("bg-color"), Color::from_rgb(51, 51, 51));
@@ -55,25 +43,16 @@ impl Material {
 
         let mut label = StyleSheet::new();
         label.insert(String::from("bg-color"), Color::from_rgb(38, 38, 38));
-        label.insert(
-            String::from("border-color"),
-            Color::TRANSPARENT,
-        );
+        label.insert(String::from("border-color"), Color::TRANSPARENT);
 
         let mut slider = StyleSheet::new();
         slider.insert(String::from("bg-color"), Color::from_rgb(51, 51, 51));
         slider.insert(String::from("fill-color"), Color::from_rgb(102, 102, 102));
-        slider.insert(
-            String::from("border-color"),
-            Color::from_rgb(89, 89, 89),
-        );
+        slider.insert(String::from("border-color"), Color::from_rgb(89, 89, 89));
 
         let mut menu = StyleSheet::new();
         menu.insert(String::from("bg-color"), Color::BLACK);
-        menu.insert(
-            String::from("border-color"),
-            Color::BLACK,
-        );
+        menu.insert(String::from("border-color"), Color::BLACK);
 
         let mut data = HashMap::new();
         data.insert(String::from("body"), body);
@@ -287,9 +266,10 @@ pub struct Container {
 
 impl Container {
     pub fn new() -> Self {
-        let c = Container {
+        let mut c = Container {
             paint: Paint::default(),
         };
+        c.paint.set_anti_alias(true);
         c
     }
 }
@@ -309,7 +289,7 @@ impl<DataModel> Widget<DataModel> for Container {
         padding: f32,
         children: &mut [Node<DataModel>],
     ) {
-        for child in children.iter_mut(){
+        for child in children.iter_mut() {
             let s = child.constraints.size(&rect.size());
             child.rect = Rect::from_wh(s.width, s.height);
             child.rect.inset((padding, padding));
@@ -347,8 +327,7 @@ impl<DataModel> Stack<DataModel> {
     ) {
         let total_spacing = spacing * (children.len() as f32 - 1.);
         let total_padding = padding * 2.;
-        let mut available_width = 
-            rect.width() - total_spacing - total_padding;
+        let mut available_width = rect.width() - total_spacing - total_padding;
 
         let padding_compensation = (padding * 2.) / children.len() as f32;
 
@@ -368,7 +347,7 @@ impl<DataModel> Stack<DataModel> {
 
         for child in children.iter_mut() {
             if !child.constraints.is_width_constraint() {
-                let w = child_width;// - padding_compensation;
+                let w = child_width; // - padding_compensation;
                 let h = rect.height() - total_padding;
                 child.rect.set_xywh(rect.left, rect.top, w, h);
             }
@@ -433,23 +412,14 @@ impl<DataModel> Stack<DataModel> {
 
 impl<DataModel> Widget<DataModel> for Stack<DataModel> {
     fn paint(&mut self, _: &DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+        self.paint.set_anti_alias(true);
         self.paint.set_color(*style.get("bg-color").unwrap());
         self.border_paint
             .set_color(*style.get("border-color").unwrap());
         self.border_paint.set_style(PaintStyle::Stroke);
-        canvas.draw_round_rect(
-            rect,
-            15.,
-            15.,
-            &self.paint,
-        );
+        canvas.draw_round_rect(rect, 15., 15., &self.paint);
 
-        canvas.draw_round_rect(
-            rect,
-            15.,
-            15.,
-            &self.border_paint,
-        );
+        canvas.draw_round_rect(rect, 15., 15., &self.border_paint);
     }
 
     fn layout(
@@ -486,20 +456,11 @@ impl Label {
 impl<DataModel> Widget<DataModel> for Label {
     fn paint(&mut self, _: &DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
         self.paint.set_color(*style.get("bg-color").unwrap());
+        self.paint.set_anti_alias(true);
         self.font.set_size(28.);
-        canvas.draw_round_rect(
-            rect,
-            15.,
-            15.,
-            &self.paint,
-        );
+        canvas.draw_round_rect(rect, 15., 15., &self.paint);
         self.paint.set_color(Color::WHITE);
-        canvas.draw_str(
-            &self.text,
-            rect.center(),
-            &self.font,
-            &self.paint,
-        );
+        canvas.draw_str(&self.text, rect.center(), &self.font, &self.paint);
     }
 }
 
@@ -537,12 +498,7 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
         self.pressed = true;
     }
 
-    fn mouse_up(
-        &mut self,
-        state: &mut DataModel,
-        _: &Rect,
-        _: &MouseEvent,
-    ) -> Action<DataModel> {
+    fn mouse_up(&mut self, state: &mut DataModel, _: &Rect, _: &MouseEvent) -> Action<DataModel> {
         self.pressed = false;
         if let Some(handler) = self.on_click.as_mut() {
             return (*handler)(state);
@@ -560,6 +516,7 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
     }
 
     fn paint(&mut self, _: &DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+        self.paint.set_anti_alias(true);
         if self.hovered {
             if let Some(color) = style.get("hovered") {
                 self.paint.set_color(*color);
@@ -576,19 +533,9 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
             }
         }
 
-        canvas.draw_round_rect(
-            rect,
-            1.,
-            1.,
-            &self.paint,
-        );
+        canvas.draw_round_rect(rect, 1., 1., &self.paint);
         self.paint.set_color(Color::WHITE);
-        canvas.draw_str(
-            &self.text,
-            rect.center(),
-            &self.font,
-            &self.paint,
-        );
+        canvas.draw_str(&self.text, rect.center(), &self.font, &self.paint);
     }
 }
 
@@ -1048,8 +995,8 @@ impl<DataModel: 'static> PopupRequest<DataModel> {
 
     pub fn build(&self) -> Node<DataModel> {
         let mut b = Node::new("menu")
-        .with_widget(Stack::new(Orientation::Vertical))
-        .with_spacing(1.);
+            .with_widget(Stack::new(Orientation::Vertical))
+            .with_spacing(1.);
 
         for item in self.menu.items.iter() {
             let s = item.id;
