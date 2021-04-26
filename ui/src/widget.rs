@@ -182,13 +182,13 @@ pub enum VerticalJustification {
     Bottom,
 }
 
-pub enum Action<DataModel> {
+pub enum Action<AppState> {
     None,
     Layout {
         nodes: Vec<&'static str>,
     },
     PopupRequest {
-        request: PopupRequest<DataModel>,
+        request: PopupRequest<AppState>,
         position: Point,
     },
     TriggerPopupMenu {
@@ -197,16 +197,16 @@ pub enum Action<DataModel> {
     },
 }
 
-pub trait AppAction<DataModel> {
-    fn perform(&self, _state: &mut DataModel);
-    fn undo(&self, _state: &mut DataModel);
-    fn redo(&self, _state: &mut DataModel);
+pub trait AppAction<AppState> {
+    fn perform(&self, _state: &mut AppState);
+    fn undo(&self, _state: &mut AppState);
+    fn redo(&self, _state: &mut AppState);
 }
 
-pub trait Widget<DataModel> {
+pub trait Widget<AppState> {
     fn paint(
         &mut self,
-        _state: &DataModel,
+        _state: &AppState,
         _rect: &Rect,
         _canvas: &mut Canvas,
         _style: &StyleSheet,
@@ -214,44 +214,44 @@ pub trait Widget<DataModel> {
     }
     fn layout(
         &mut self,
-        _state: &DataModel,
+        _state: &AppState,
         _rect: &Rect,
         _spacing: f32,
         _padding: f32,
-        _children: &mut [Node<DataModel>],
+        _children: &mut [Node<AppState>],
     ) {
     }
-    fn mouse_down(&mut self, _state: &mut DataModel, _rect: &Rect, _event: &MouseEvent) {
+    fn mouse_down(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {
         println!("Mouse Down");
     }
     fn mouse_up(
         &mut self,
-        _state: &mut DataModel,
+        _state: &mut AppState,
         _rect: &Rect,
         _event: &MouseEvent,
-    ) -> Action<DataModel> {
+    ) -> Action<AppState> {
         println!("Mouse Up");
         return Action::None;
     }
     fn double_click(
         &mut self,
-        _state: &mut DataModel,
+        _state: &mut AppState,
         _rect: &Rect,
         _event: &MouseEvent,
-    ) -> Action<DataModel> {
+    ) -> Action<AppState> {
         println!("Mouse Double Click");
         return Action::None;
     }
-    fn mouse_drag(&mut self, _state: &mut DataModel, _rect: &Rect, _event: &MouseEvent) {
+    fn mouse_drag(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {
         println!("Mouse Drag");
     }
-    fn mouse_moved(&mut self, _state: &mut DataModel, _rect: &Rect, _event: &MouseEvent) {
+    fn mouse_moved(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {
         println!("Mouse Moved");
     }
-    fn mouse_enter(&mut self, _state: &mut DataModel, _rect: &Rect, _event: &MouseEvent) {
+    fn mouse_enter(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {
         println!("Mouse Enter");
     }
-    fn mouse_leave(&mut self, _state: &mut DataModel, _rect: &Rect, _event: &MouseEvent) {
+    fn mouse_leave(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {
         println!("Mouse Leave");
     }
     fn needs_gpu(&self) -> bool {
@@ -274,8 +274,8 @@ impl Container {
     }
 }
 
-impl<DataModel> Widget<DataModel> for Container {
-    fn paint(&mut self, _: &DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+impl<AppState> Widget<AppState> for Container {
+    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
         let bg = style.get("bg-color").unwrap();
         self.paint.set_color(*bg);
         canvas.draw_round_rect(rect, 5., 5., &self.paint);
@@ -283,11 +283,11 @@ impl<DataModel> Widget<DataModel> for Container {
 
     fn layout(
         &mut self,
-        _state: &DataModel,
+        _state: &AppState,
         rect: &Rect,
         _spacing: f32,
         padding: f32,
-        children: &mut [Node<DataModel>],
+        children: &mut [Node<AppState>],
     ) {
         for child in children.iter_mut() {
             let s = child.constraints.size(&rect.size());
@@ -297,16 +297,16 @@ impl<DataModel> Widget<DataModel> for Container {
     }
 }
 
-pub struct Stack<DataModel> {
+pub struct Stack<AppState> {
     orientation: Orientation,
     horizontal_justification: HorizontalJustification,
     vertical_justification: VerticalJustification,
     paint: Paint,
     border_paint: Paint,
-    phantom: std::marker::PhantomData<DataModel>,
+    phantom: std::marker::PhantomData<AppState>,
 }
 
-impl<DataModel> Stack<DataModel> {
+impl<AppState> Stack<AppState> {
     pub fn new(orientation: Orientation) -> Self {
         Stack {
             orientation,
@@ -321,7 +321,7 @@ impl<DataModel> Stack<DataModel> {
     pub fn layout_horizontally(
         &self,
         rect: &Rect,
-        children: &mut [Node<DataModel>],
+        children: &mut [Node<AppState>],
         spacing: f32,
         padding: f32,
     ) {
@@ -374,7 +374,7 @@ impl<DataModel> Stack<DataModel> {
     pub fn layout_vertically(
         &self,
         rect: &Rect,
-        children: &mut [Node<DataModel>],
+        children: &mut [Node<AppState>],
         spacing: f32,
         padding: f32,
     ) {
@@ -410,8 +410,8 @@ impl<DataModel> Stack<DataModel> {
     }
 }
 
-impl<DataModel> Widget<DataModel> for Stack<DataModel> {
-    fn paint(&mut self, _: &DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+impl<AppState> Widget<AppState> for Stack<AppState> {
+    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
         self.paint.set_anti_alias(true);
         self.paint.set_color(*style.get("bg-color").unwrap());
         self.border_paint
@@ -424,11 +424,11 @@ impl<DataModel> Widget<DataModel> for Stack<DataModel> {
 
     fn layout(
         &mut self,
-        _: &DataModel,
+        _: &AppState,
         rect: &Rect,
         spacing: f32,
         padding: f32,
-        children: &mut [Node<DataModel>],
+        children: &mut [Node<AppState>],
     ) {
         match self.orientation {
             Orientation::Horizontal => self.layout_horizontally(rect, children, spacing, padding),
@@ -453,28 +453,27 @@ impl Label {
     }
 }
 
-impl<DataModel> Widget<DataModel> for Label {
-    fn paint(&mut self, _: &DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+impl<AppState> Widget<AppState> for Label {
+    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
         self.paint.set_color(*style.get("bg-color").unwrap());
         self.paint.set_anti_alias(true);
-        self.font.set_size(28.);
         canvas.draw_round_rect(rect, 15., 15., &self.paint);
         self.paint.set_color(Color::WHITE);
         canvas.draw_str(&self.text, rect.center(), &self.font, &self.paint);
     }
 }
 
-pub struct Button<DataModel> {
+pub struct Button<AppState> {
     pressed: bool,
     hovered: bool,
     text: String,
     paint: Paint,
     font: Font,
-    on_click: Option<Box<dyn FnMut(&mut DataModel) -> Action<DataModel>>>,
-    phantom: std::marker::PhantomData<DataModel>,
+    on_click: Option<Box<dyn FnMut(&mut AppState) -> Action<AppState>>>,
+    phantom: std::marker::PhantomData<AppState>,
 }
 
-impl<DataModel> Button<DataModel> {
+impl<AppState> Button<AppState> {
     pub fn new(text: &str) -> Self {
         let b = Button {
             pressed: false,
@@ -493,12 +492,12 @@ impl<DataModel> Button<DataModel> {
     }
 }
 
-impl<DataModel> Widget<DataModel> for Button<DataModel> {
-    fn mouse_down(&mut self, _: &mut DataModel, _: &Rect, _: &MouseEvent) {
+impl<AppState> Widget<AppState> for Button<AppState> {
+    fn mouse_down(&mut self, _: &mut AppState, _: &Rect, _: &MouseEvent) {
         self.pressed = true;
     }
 
-    fn mouse_up(&mut self, state: &mut DataModel, _: &Rect, _: &MouseEvent) -> Action<DataModel> {
+    fn mouse_up(&mut self, state: &mut AppState, _: &Rect, _: &MouseEvent) -> Action<AppState> {
         self.pressed = false;
         if let Some(handler) = self.on_click.as_mut() {
             return (*handler)(state);
@@ -507,15 +506,15 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
         }
     }
 
-    fn mouse_enter(&mut self, _: &mut DataModel, _: &Rect, _: &MouseEvent) {
+    fn mouse_enter(&mut self, _: &mut AppState, _: &Rect, _: &MouseEvent) {
         self.hovered = true;
     }
 
-    fn mouse_leave(&mut self, _: &mut DataModel, _: &Rect, _: &MouseEvent) {
+    fn mouse_leave(&mut self, _: &mut AppState, _: &Rect, _: &MouseEvent) {
         self.hovered = false;
     }
 
-    fn paint(&mut self, _: &DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
         self.paint.set_anti_alias(true);
         if self.hovered {
             if let Some(color) = style.get("hovered") {
@@ -560,8 +559,8 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
 //     }
 // }
 
-// impl<'a, DataModel> Widget<DataModel> for Table<'a> {
-//     fn paint(&mut self, _: &mut DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+// impl<'a, AppState> Widget<AppState> for Table<'a> {
+//     fn paint(&mut self, _: &mut AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
 //         let e_color = style.get("even").unwrap();
 //         let u_color = style.get("uneven").unwrap();
 
@@ -586,7 +585,7 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
 //         }
 //     }
 
-//     fn mouse_down(&mut self, _: &mut DataModel, rect: &Rect, event: &MouseEvent) {
+//     fn mouse_down(&mut self, _: &mut AppState, rect: &Rect, event: &MouseEvent) {
 //         let y = (event.global_position.y - rect.bottom()) / self.row_count as f32;
 //         let row_size = rect.height() / self.row_count as f32;
 //         let row = y / row_size;
@@ -597,7 +596,7 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
 //     }
 // }
 
-// pub struct Slider<DataModel> {
+// pub struct Slider<AppState> {
 //     label: String,
 //     border_paint: Paint,
 //     bg_paint: Paint,
@@ -610,10 +609,10 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
 //     current_normalized: f32,
 //     current_value: f32,
 //     last_position: f32,
-//     value_changed: Option<Box<dyn FnMut(f32, &mut DataModel)>>,
+//     value_changed: Option<Box<dyn FnMut(f32, &mut AppState)>>,
 // }
 
-// impl<DataModel> Slider<DataModel> {
+// impl<AppState> Slider<AppState> {
 //     pub fn new(label: &str) -> Self {
 //         Slider::new_with_min_max_and_value(label, 0., 1., 0., false)
 //     }
@@ -644,7 +643,7 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
 
 //     pub fn with_handler<F>(mut self, handler: F) -> Self
 //     where
-//         F: FnMut(f32, &mut DataModel) + 'static,
+//         F: FnMut(f32, &mut AppState) + 'static,
 //     {
 //         self.value_changed = Some(Box::new(handler));
 //         self
@@ -656,8 +655,8 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
 //     }
 // }
 
-// impl<DataModel> Widget<DataModel> for Slider<DataModel> {
-//     fn paint(&mut self, _: &mut DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+// impl<AppState> Widget<AppState> for Slider<AppState> {
+//     fn paint(&mut self, _: &mut AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
 //         let bg_color = style.get("bg-color");
 //         let fill_color = style.get("fill-color");
 //         let border_color = style.get("border-color");
@@ -707,7 +706,7 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
 //         );
 //     }
 
-//     fn mouse_down(&mut self, state: &mut DataModel, rect: &Rect, event: &MouseEvent) {
+//     fn mouse_down(&mut self, state: &mut AppState, rect: &Rect, event: &MouseEvent) {
 //         let x = event.global_position.x - rect.left();
 //         self.current_normalized = (1. / rect.width()) * x;
 
@@ -722,7 +721,7 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
 //         self.last_position = x;
 //     }
 
-//     fn mouse_drag(&mut self, state: &mut DataModel, rect: &Rect, event: &MouseEvent) {
+//     fn mouse_drag(&mut self, state: &mut AppState, rect: &Rect, event: &MouseEvent) {
 //         self.last_position += event.delta_position.x;
 //         self.current_normalized =
 //             (1. / rect.width()) * self.last_position.min(rect.width()).max(0.);
@@ -738,7 +737,7 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
 //     }
 // }
 
-// pub struct Spinner<DataModel> {
+// pub struct Spinner<AppState> {
 //     label: String,
 //     border_paint: Paint,
 //     bg_paint: Paint,
@@ -750,10 +749,10 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
 //     step_size: f32,
 //     discrete: bool,
 //     current_value: f32,
-//     value_changed: Option<Box<dyn FnMut(f32, &mut DataModel)>>,
+//     value_changed: Option<Box<dyn FnMut(f32, &mut AppState)>>,
 // }
 
-// impl<DataModel> Spinner<DataModel> {
+// impl<AppState> Spinner<AppState> {
 //     pub fn new(
 //         label: &str,
 //         min: Option<f32>,
@@ -785,15 +784,15 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
 
 //     pub fn with_handler<F>(mut self, handler: F) -> Self
 //     where
-//         F: FnMut(f32, &mut DataModel) + 'static,
+//         F: FnMut(f32, &mut AppState) + 'static,
 //     {
 //         self.value_changed = Some(Box::new(handler));
 //         self
 //     }
 // }
 
-// impl<DataModel> Widget<DataModel> for Spinner<DataModel> {
-//     fn paint(&mut self, _: &mut DataModel, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+// impl<AppState> Widget<AppState> for Spinner<AppState> {
+//     fn paint(&mut self, _: &mut AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
 //         let bg_color = style.get("bg-color");
 //         let fill_color = style.get("fill-color");
 //         let border_color = style.get("border-color");
@@ -825,7 +824,7 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
 //         );
 //     }
 
-//     fn mouse_drag(&mut self, state: &mut DataModel, _: &Rect, event: &MouseEvent) {
+//     fn mouse_drag(&mut self, state: &mut AppState, _: &Rect, event: &MouseEvent) {
 //         self.current_value += -event.delta_position.y * self.step_size;
 
 //         if self.discrete {
@@ -867,14 +866,14 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
 //     }
 // }
 
-// impl<DataModel> Widget<DataModel> for ViewPort {
+// impl<AppState> Widget<AppState> for ViewPort {
 //     fn layout(
 //         &mut self,
-//         _state: &mut DataModel,
+//         _state: &mut AppState,
 //         rect: &Rect,
 //         _spacing: f32,
 //         _padding: f32,
-//         children: &mut [Node<DataModel>],
+//         children: &mut [Node<AppState>],
 //     ) {
 //         assert_eq!(1, children.len());
 
@@ -905,7 +904,7 @@ impl<DataModel> Widget<DataModel> for Button<DataModel> {
 
 //     fn paint(
 //         &mut self,
-//         _state: &mut DataModel,
+//         _state: &mut AppState,
 //         rect: &Rect,
 //         canvas: &mut Canvas,
 //         _style: &StyleSheet,
@@ -951,7 +950,7 @@ impl PopupMenuWidget {
     }
 }
 
-impl<DataModel> Widget<DataModel> for PopupMenuWidget {}
+impl<AppState> Widget<AppState> for PopupMenuWidget {}
 
 impl PopupMenu {
     pub fn new(id: usize, name: &str) -> Self {
@@ -977,15 +976,15 @@ impl PopupMenu {
     }
 }
 
-pub struct PopupRequest<DataModel> {
+pub struct PopupRequest<AppState> {
     menu: PopupMenu,
-    pub handler: Box<dyn FnMut(usize, usize, &mut DataModel) -> Action<DataModel>>,
+    pub handler: Box<dyn FnMut(usize, usize, &mut AppState) -> Action<AppState>>,
 }
 
-impl<DataModel: 'static> PopupRequest<DataModel> {
+impl<AppState: 'static> PopupRequest<AppState> {
     pub fn new<F>(menu: PopupMenu, handler: F) -> Self
     where
-        F: FnMut(usize, usize, &mut DataModel) -> Action<DataModel> + 'static,
+        F: FnMut(usize, usize, &mut AppState) -> Action<AppState> + 'static,
     {
         PopupRequest {
             menu,
@@ -993,7 +992,7 @@ impl<DataModel: 'static> PopupRequest<DataModel> {
         }
     }
 
-    pub fn build(&self) -> Node<DataModel> {
+    pub fn build(&self) -> Node<AppState> {
         let mut b = Node::new("menu")
             .with_widget(Stack::new(Orientation::Vertical))
             .with_spacing(1.);

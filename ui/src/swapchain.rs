@@ -1,7 +1,7 @@
 use ash::version::DeviceV1_0;
 
 pub struct Swapchain {
-    loader: ash::extensions::khr::Swapchain,
+    swapchain_loader: ash::extensions::khr::Swapchain,
     handle: ash::vk::SwapchainKHR,
     images: Vec<ash::vk::Image>,
     image_views: Vec<ash::vk::ImageView>,
@@ -21,6 +21,8 @@ fn create_swapchain(
     ctx: &ash::Device,
     surface_loader: &ash::extensions::khr::Surface,
     surface: &ash::vk::SurfaceKHR,
+    swapchain_loader: &ash::extensions::khr::Swapchain,
+    old_swapchain: Option<&ash::vk::SwapchainKHR>,
     queue_index: u32,
     width: u32,
     height: u32,
@@ -28,6 +30,7 @@ fn create_swapchain(
     ash::vk::SwapchainKHR,
     Vec<ash::vk::Image>,
     Vec<ash::vk::ImageView>,
+    ash::vk::SurfaceFormatKHR,
 ) {
     let _ = unsafe {
         surface_loader
@@ -75,6 +78,10 @@ fn create_swapchain(
         .find(|&mode| mode == ash::vk::PresentModeKHR::MAILBOX)
         .unwrap_or(ash::vk::PresentModeKHR::FIFO);
     let swapchain_loader = ash::extensions::khr::Swapchain::new(instance, ctx);
+    let mut old = ash::vk::SwapchainKHR::null();
+    if old_swapchain.is_some() {
+        old = *old_swapchain.unwrap();
+    }
     let swapchain_create_info = ash::vk::SwapchainCreateInfoKHR::builder()
         .surface(*surface)
         .min_image_count(desired_image_count)
@@ -87,7 +94,8 @@ fn create_swapchain(
         .composite_alpha(ash::vk::CompositeAlphaFlagsKHR::OPAQUE)
         .present_mode(present_mode)
         .clipped(true)
-        .image_array_layers(1);
+        .image_array_layers(1)
+        .old_swapchain(old);
 
     let swapchain = unsafe {
         swapchain_loader
@@ -128,7 +136,7 @@ fn create_swapchain(
         })
         .collect();
 
-    (swapchain, images, image_views)
+    (swapchain, images, image_views, format)
 }
 
 impl Swapchain {
@@ -138,16 +146,20 @@ impl Swapchain {
         ctx: &ash::Device,
         surface_loader: &ash::extensions::khr::Surface,
         surface: &ash::vk::SurfaceKHR,
+        swapchain_loader: &ash::extensions::khr::Swapchain,
+        old_swapchain: Option<&ash::vk::SwapchainKHR>,
         queue_index: u32,
         width: u32,
         height: u32,
     ) -> Self {
-        let (swapchain, images, image_views) = create_swapchain(
+        let (swapchain, images, image_views, format) = create_swapchain(
             instance,
             gpu,
             ctx,
             surface_loader,
             surface,
+            swapchain_loader,
+            old_swapchain,
             queue_index,
             width,
             height,
@@ -218,7 +230,7 @@ impl Swapchain {
 
         Self {
             handle: swapchain,
-            loader: swapchain_loader,
+            swapchain_loader: ash::extensions::khr::Swapchain::new(instance, ctx),
             images,
             image_views,
             present_semaphores,
@@ -231,26 +243,33 @@ impl Swapchain {
         }
     }
 
-    pub fn next_frame_buffer(&mut self) -> (bool, u32, ash::vk::Framebuffer, ash::vk::Semaphore) {
-        let (index, sub_optimal) = unsafe {
-            self.loader
-                .acquire_next_image(
-                    self.handle,
-                    std::u64::MAX,
-                    self.present_semaphores[self.current_index as usize],
-                    ash::vk::Fence::null(),
-                )
-                .expect("Failed to acquire next swapchain image")
+    pub fn next_frame_buffer(
+        &mut self,
+    ) -> Result<(bool, u32, ash::vk::Framebuffer, ash::vk::Semaphore), ash::vk::Result> {
+        unsafe {
+            let result = self.swapchain_loader.acquire_next_image(
+                self.handle,
+                std::u64::MAX,
+                self.present_semaphores[self.current_index as usize],
+                ash::vk::Fence::null(),
+            );
+
+            match result {
+                Ok((index, sub_optimal)) => {
+                    let result = (
+                        true,
+                        index,
+                        self.framebuffers[index as usize],
+                        self.present_semaphores[index as usize],
+                    );
+                    self.current_index = self.current_index + 1;
+                    self.current_index = self.current_index % self.image_count() as u32;
+                    return Ok(result);
+                }
+
+                Err(code) => return Err(code),
+            }
         };
-        let result = (
-            true,
-            index,
-            self.framebuffers[index as usize],
-            self.present_semaphores[index as usize],
-        );
-        self.current_index = self.current_index + 1;
-        self.current_index = self.current_index % self.image_count() as u32;
-        result
     }
 
     pub fn width(&self) -> u32 {
@@ -281,7 +300,11 @@ impl Swapchain {
         &self.format
     }
 
-    pub fn swap(&self, queue: &ash::vk::Queue, semaphore: &ash::vk::Semaphore, index: u32) {
+    pub fn handle(&self) -> &ash::vk::SwapchainKHR {
+        &self.handle
+    }
+
+    pub fn swap(&self, queue: &ash::vk::Queue, semaphore: &ash::vk::Semaphore, index: u32) -> bool {
         let s = &[*semaphore];
         let sc = &[self.handle];
         let i = &[index];
@@ -291,9 +314,13 @@ impl Swapchain {
             .image_indices(i);
 
         unsafe {
-            self.loader
-                .queue_present(*queue, &present_info)
-                .expect("Swapchain present failed");
+            let r = self.swapchain_loader.queue_present(*queue, &present_info);
+
+            if r.is_err() {
+                true
+            } else {
+                false
+            }
         }
     }
 }

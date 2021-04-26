@@ -7,6 +7,8 @@ pub mod user_interface;
 pub mod widget;
 pub mod window;
 
+use window::MouseEventType;
+
 use application::{Application, ApplicationDelegate};
 use ui_window::{UIWindow, WindowDelegate};
 use user_interface::UIDelegate;
@@ -19,14 +21,16 @@ use winit::{
 
 use std::collections::HashMap;
 
-struct AppState {}
-
-struct Delegate<AppState> {
-    windows: HashMap<WindowId, Window>,
-    ui_windows: HashMap<WindowId, Box<dyn WindowDelegate<AppState>>>,
+struct MyState {
+    count: u32,
 }
 
-impl Delegate<AppState> {
+struct Delegate<MyState> {
+    windows: HashMap<WindowId, Window>,
+    ui_windows: HashMap<WindowId, Box<dyn WindowDelegate<MyState>>>,
+}
+
+impl Delegate<MyState> {
     fn new() -> Self {
         Self {
             windows: HashMap::new(),
@@ -36,21 +40,30 @@ impl Delegate<AppState> {
 }
 
 struct MyUIDelegate {}
-impl<AppState: 'static> UIDelegate<AppState> for MyUIDelegate {
-    fn build(&self, _: &str, _: &AppState) -> node::Node<AppState> {
+impl UIDelegate<MyState> for MyUIDelegate {
+    fn build(&self, _: &str, _: &MyState) -> node::Node<MyState> {
         node::Node::new("body")
             .with_widget(widget::Container::new())
             .with_padding(25.)
             .with_child(
                 node::Node::new("div")
+                    .with_name("root")
                     .with_widget(widget::Stack::new(widget::Orientation::Horizontal))
                     .with_relative_max_constraints(None, Some(33.))
-                    .with_rebuild_callback(|_| {
+                    .with_rebuild_callback(|state| {
                         Some(std::vec![
-                            node::Node::new("btn").with_widget(widget::Button::new("Button 1")),
-                            node::Node::new("btn").with_widget(widget::Button::new("Button 2")),
-                            node::Node::new("btn").with_widget(widget::Button::new("Button 3")),
-                            node::Node::new("btn").with_widget(widget::Button::new("Button 4")),
+                            node::Node::<MyState>::new("btn")
+                                .with_widget(widget::Button::new("Button"))
+                                .with_event_callback(MouseEventType::MouseUp, |_event, state| {
+                                    println!("Button 1!");
+                                    state.count = state.count + 1;
+                                    widget::Action::Layout {
+                                        nodes: vec!["root"],
+                                    }
+                                }),
+                            node::Node::new("btn").with_widget(widget::Label::new(
+                                &(String::from("Count: ") + &state.count.to_string())
+                            )),
                         ])
                     })
                     .with_padding(25.)
@@ -59,11 +72,11 @@ impl<AppState: 'static> UIDelegate<AppState> for MyUIDelegate {
     }
 }
 
-impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
+impl ApplicationDelegate<MyState> for Delegate<MyState> {
     fn application_will_start(
         &mut self,
-        app: &Application<AppState>,
-        state: &mut AppState,
+        app: &Application<MyState>,
+        state: &mut MyState,
         target: &EventLoopWindowTarget<()>,
     ) {
         let window = WindowBuilder::new()
@@ -72,7 +85,7 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
             .build(&target)
             .unwrap();
 
-        let ui = match UIWindow::<AppState>::new(app, state, &window, Box::new(MyUIDelegate {})) {
+        let ui = match UIWindow::<MyState>::new(app, state, &window, Box::new(MyUIDelegate {})) {
             Ok(ui_window) => Box::new(ui_window),
             Err(message) => panic!("{}", message),
         };
@@ -84,10 +97,11 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
 
     fn application_updated(
         &mut self,
-        app: &Application<AppState>,
-        state: &mut AppState,
+        app: &Application<MyState>,
+        state: &mut MyState,
     ) -> winit::event_loop::ControlFlow {
         for (_, delegate) in self.ui_windows.iter_mut() {
+            delegate.update(app, state);
             delegate.draw(app, state)
         }
         winit::event_loop::ControlFlow::Poll
@@ -95,8 +109,8 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
 
     fn window_resized(
         &mut self,
-        app: &Application<AppState>,
-        state: &mut AppState,
+        app: &Application<MyState>,
+        state: &mut MyState,
         id: &winit::window::WindowId,
         size: &winit::dpi::PhysicalSize<u32>,
     ) -> winit::event_loop::ControlFlow {
@@ -109,8 +123,8 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
 
     fn window_requested_redraw(
         &mut self,
-        app: &Application<AppState>,
-        state: &AppState,
+        app: &Application<MyState>,
+        state: &MyState,
         window_id: &WindowId,
     ) -> winit::event_loop::ControlFlow {
         if let Some(delegate) = self.ui_windows.get_mut(window_id) {
@@ -124,6 +138,7 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
         &mut self,
         id: &winit::window::WindowId,
     ) -> winit::event_loop::ControlFlow {
+        self.ui_windows.remove(id);
         self.windows.remove(id);
         if self.windows.is_empty() {
             winit::event_loop::ControlFlow::Exit
@@ -134,7 +149,7 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
 
     fn mouse_moved(
         &mut self,
-        state: &mut AppState,
+        state: &mut MyState,
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) -> winit::event_loop::ControlFlow {
@@ -146,7 +161,7 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
 
     fn mouse_dragged(
         &mut self,
-        state: &mut AppState,
+        state: &mut MyState,
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) -> winit::event_loop::ControlFlow {
@@ -158,7 +173,7 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
 
     fn mouse_down(
         &mut self,
-        state: &mut AppState,
+        state: &mut MyState,
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) -> winit::event_loop::ControlFlow {
@@ -170,7 +185,7 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
 
     fn mouse_up(
         &mut self,
-        state: &mut AppState,
+        state: &mut MyState,
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) -> winit::event_loop::ControlFlow {
@@ -182,6 +197,6 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
 }
 
 fn main() {
-    let app: Application<AppState> = Application::new("My Application");
-    app.run(Box::new(Delegate::new()), AppState {});
+    let app: Application<MyState> = Application::new("My Application");
+    app.run(Box::new(Delegate::new()), MyState { count: 0 });
 }

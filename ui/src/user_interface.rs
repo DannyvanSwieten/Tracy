@@ -11,18 +11,18 @@ pub trait UIDelegate<AppState> {
 }
 
 #[repr(C)]
-pub struct UserInterface<DataModel> {
-    pub root: Node<DataModel>,
+pub struct UserInterface<AppState> {
+    pub root: Node<AppState>,
     pub material: Material,
     pub hovered: u32,
 
-    actions: Vec<Action<DataModel>>,
-    pop_up: Option<Node<DataModel>>,
-    pop_up_request: Option<PopupRequest<DataModel>>,
+    actions: Vec<Action<AppState>>,
+    pop_up: Option<Node<AppState>>,
+    pop_up_request: Option<PopupRequest<AppState>>,
 }
 
-impl<DataModel: 'static> UserInterface<DataModel> {
-    pub fn new(root: Node<DataModel>) -> Self {
+impl<AppState: 'static> UserInterface<AppState> {
+    pub fn new(root: Node<AppState>) -> Self {
         let ui = UserInterface {
             root,
             material: Material::new(),
@@ -35,7 +35,7 @@ impl<DataModel: 'static> UserInterface<DataModel> {
         ui
     }
 
-    pub fn update(&mut self, state: &mut DataModel) {
+    pub fn update(&mut self, state: &mut AppState) {
         while let Some(a) = self.actions.pop() {
             match a {
                 Action::None => (),
@@ -57,7 +57,7 @@ impl<DataModel: 'static> UserInterface<DataModel> {
         }
     }
 
-    pub fn build_popup(&mut self, request: PopupRequest<DataModel>, position: &Point) {
+    pub fn build_popup(&mut self, request: PopupRequest<AppState>, position: &Point) {
         self.pop_up = Some(request.build());
         self.pop_up_request = Some(request);
         let node = self.pop_up.as_mut().unwrap();
@@ -65,12 +65,12 @@ impl<DataModel: 'static> UserInterface<DataModel> {
         node.rect.top = position.y;
     }
 
-    pub fn resize(&mut self, state: &DataModel, width: u32, height: u32) {
+    pub fn resize(&mut self, state: &AppState, width: u32, height: u32) {
         self.root.rect.set_wh(width as f32, height as f32);
         self.layout(state);
     }
 
-    pub fn mouse_down(&mut self, state: &mut DataModel, event: &MouseEvent) {
+    pub fn mouse_down(&mut self, state: &mut AppState, event: &MouseEvent) {
         let mut dismiss_popup = false;
         if let Some(popup) = self.pop_up.as_mut() {
             if !popup.hit_test(&event.global_position()) {
@@ -88,21 +88,20 @@ impl<DataModel: 'static> UserInterface<DataModel> {
         self.actions.push(self.root.mouse_down(state, event))
     }
 
-    pub fn mouse_up(&mut self, state: &mut DataModel, event: &MouseEvent) {
+    pub fn mouse_up(&mut self, state: &mut AppState, event: &MouseEvent) {
         if let Some(popup) = self.pop_up.as_mut() {
             self.actions.push(popup.mouse_up(state, event));
             return;
         }
 
-        self.actions
-            .push(self.root.mouse_up(state, event))
+        self.actions.push(self.root.mouse_up(state, event))
     }
 
-    pub fn double_click(&mut self, state: &mut DataModel, event: &MouseEvent) {
+    pub fn double_click(&mut self, state: &mut AppState, event: &MouseEvent) {
         self.root.double_click(state, event);
     }
 
-    pub fn mouse_drag(&mut self, state: &mut DataModel, event: &MouseEvent) {
+    pub fn mouse_drag(&mut self, state: &mut AppState, event: &MouseEvent) {
         if let Some(popup) = self.pop_up.as_mut() {
             self.actions.push(popup.mouse_drag(state, event));
             return;
@@ -111,7 +110,7 @@ impl<DataModel: 'static> UserInterface<DataModel> {
         self.root.mouse_drag(state, event);
     }
 
-    pub fn mouse_moved(&mut self, state: &mut DataModel, event: &MouseEvent) {
+    pub fn mouse_moved(&mut self, state: &mut AppState, event: &MouseEvent) {
         if let Some(popup) = self.pop_up.as_mut() {
             if let Some(uid) = popup.mouse_moved(state, event) {
                 if self.hovered != uid {
@@ -137,19 +136,26 @@ impl<DataModel: 'static> UserInterface<DataModel> {
         }
     }
 
-    pub fn mouse_leave(&mut self, state: &mut DataModel, event: &MouseEvent) {
+    pub fn mouse_leave(&mut self, state: &mut AppState, event: &MouseEvent) {
         self.root.mouse_leave(state, event);
     }
-    pub fn layout(&mut self, state: &DataModel) {
+    pub fn layout(&mut self, state: &AppState) {
         self.root.layout(state);
     }
 
-    pub fn layout_child_with_name(&mut self, child_name: &str, state: &mut DataModel) {
+    pub fn layout_child_with_name(&mut self, child_name: &str, state: &mut AppState) {
         self.root.layout_child_with_name(child_name, state)
     }
 
-    pub fn paint(&mut self, state: &DataModel, canvas: &mut Canvas) {
-        canvas.clear(*self.material.get_child("body").unwrap().get("bg-color").unwrap());
+    pub fn paint(&mut self, state: &AppState, canvas: &mut Canvas) {
+        canvas.clear(
+            *self
+                .material
+                .get_child("body")
+                .unwrap()
+                .get("bg-color")
+                .unwrap(),
+        );
         self.root.draw(state, canvas, &self.material);
         if let Some(popup) = self.pop_up.as_mut() {
             popup.layout(state);
@@ -157,7 +163,7 @@ impl<DataModel: 'static> UserInterface<DataModel> {
         }
     }
 
-    // pub fn paint_gpu(&mut self, state: &mut DataModel, ctx: &mut GraphicsContext) {
+    // pub fn paint_gpu(&mut self, state: &mut AppState, ctx: &mut GraphicsContext) {
     //     self.root.draw_gpu(state, ctx);
     // }
 }

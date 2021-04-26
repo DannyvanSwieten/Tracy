@@ -2,7 +2,9 @@ extern crate ash;
 extern crate ash_window;
 extern crate winit;
 
-use ash::version::InstanceV1_0;
+use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
+use ash::{vk, Device, Entry, Instance};
+
 use std::borrow::Cow;
 use std::ffi::{CStr, CString};
 use std::path::PathBuf;
@@ -30,8 +32,6 @@ fn surface_extension_name() -> &'static CStr {
     Win32Surface::name()
 }
 
-pub use ash::version::{DeviceV1_0, EntryV1_0};
-use ash::{vk, Device, Entry, Instance};
 use vk::Queue;
 
 unsafe extern "system" fn vulkan_debug_callback(
@@ -176,6 +176,8 @@ pub struct Application<AppState> {
     primary_device_context: Device,
     present_queue: Queue,
     present_queue_index: u32,
+    vulkan_surface_ext: ash::extensions::khr::Surface,
+    vulkan_swapchain_ext: ash::extensions::khr::Swapchain,
     _state: std::marker::PhantomData<AppState>,
 }
 
@@ -255,6 +257,7 @@ impl<AppState: 'static> Application<AppState> {
             let device_extension_names_raw = [Swapchain::name().as_ptr()];
             let features = vk::PhysicalDeviceFeatures {
                 shader_clip_distance: 1,
+                multi_draw_indirect: 1,
                 ..Default::default()
             };
             let priorities = [1.0];
@@ -276,6 +279,9 @@ impl<AppState: 'static> Application<AppState> {
             let present_queue =
                 primary_device_context.get_device_queue(present_queue_index as u32, 0);
 
+            let vulkan_surface_ext = ash::extensions::khr::Surface::new(&entry, &instance);
+            let vulkan_swapchain_ext =
+                ash::extensions::khr::Swapchain::new(&instance, &primary_device_context);
             Self {
                 debug_callback,
                 vulkan_entry: entry,
@@ -284,6 +290,8 @@ impl<AppState: 'static> Application<AppState> {
                 primary_device_context,
                 present_queue,
                 present_queue_index,
+                vulkan_surface_ext,
+                vulkan_swapchain_ext,
                 _state: std::marker::PhantomData::<AppState>::default(),
             }
         }
@@ -307,6 +315,14 @@ impl<AppState: 'static> Application<AppState> {
 
     pub fn present_queue_and_index(&self) -> (&Queue, usize) {
         (&self.present_queue, self.present_queue_index as usize)
+    }
+
+    pub fn surface_extension(&self) -> &ash::extensions::khr::Surface {
+        &self.vulkan_surface_ext
+    }
+
+    pub fn swapchain_extension(&self) -> &ash::extensions::khr::Swapchain {
+        &self.vulkan_swapchain_ext
     }
 
     pub fn run(mut self, delegate: Box<dyn ApplicationDelegate<AppState>>, state: AppState) {
@@ -405,10 +421,8 @@ impl<AppState: 'static> Application<AppState> {
 
             match control_flow {
                 ControlFlow::Exit => d.application_will_quit(&mut self, &event_loop),
-                _ => (),
+                _ => *control_flow = d.application_updated(&mut self, &mut s),
             }
-
-            *control_flow = d.application_updated(&mut self, &mut s);
         });
     }
 }

@@ -52,16 +52,16 @@ impl MouseEvent {
 }
 
 #[repr(C)]
-pub struct Window<DataModel> {
+pub struct Window<AppState> {
     uid: usize,
     name: String,
     width: u32,
     height: u32,
-    pub ui: Option<UserInterface<DataModel>>,
+    pub ui: Option<UserInterface<AppState>>,
 }
 
-impl<DataModel: 'static> Window<DataModel> {
-    pub fn new(name: &str) -> Window<DataModel> {
+impl<AppState: 'static> Window<AppState> {
+    pub fn new(name: &str) -> Window<AppState> {
         let ptr = CString::new(name).expect("Failed");
 
         Window {
@@ -73,7 +73,7 @@ impl<DataModel: 'static> Window<DataModel> {
         }
     }
 
-    pub fn update(&mut self, state: &mut DataModel) {
+    pub fn update(&mut self, state: &mut AppState) {
         if let Some(ui) = self.ui.as_mut() {
             ui.update(state)
         }
@@ -87,17 +87,17 @@ impl<DataModel: 'static> Window<DataModel> {
         return self.uid;
     }
 
-    pub fn layout(&mut self, state: &mut DataModel) {
+    pub fn layout(&mut self, state: &mut AppState) {
         if let Some(ui) = self.ui.as_mut() {
             ui.resize(state, self.width, self.height)
         }
     }
 
-    pub fn create_user_interface(&mut self, root: Node<DataModel>) {
+    pub fn create_user_interface(&mut self, root: Node<AppState>) {
         self.ui = Some(UserInterface::new(root))
     }
 
-    pub fn resized(&mut self, state: &mut DataModel, width: u32, height: u32) {
+    pub fn resized(&mut self, state: &mut AppState, width: u32, height: u32) {
         self.width = width;
         self.height = height;
 
@@ -106,43 +106,43 @@ impl<DataModel: 'static> Window<DataModel> {
         }
     }
 
-    pub fn mouse_down(&mut self, state: &mut DataModel, event: &MouseEvent) {
+    pub fn mouse_down(&mut self, state: &mut AppState, event: &MouseEvent) {
         if let Some(ui) = self.ui.as_mut() {
             ui.mouse_down(state, event)
         }
     }
 
-    pub fn mouse_up(&mut self, state: &mut DataModel, event: &MouseEvent) {
+    pub fn mouse_up(&mut self, state: &mut AppState, event: &MouseEvent) {
         if let Some(ui) = self.ui.as_mut() {
             ui.mouse_up(state, event)
         }
     }
 
-    pub fn double_click(&mut self, state: &mut DataModel, event: &MouseEvent) {
+    pub fn double_click(&mut self, state: &mut AppState, event: &MouseEvent) {
         if let Some(ui) = self.ui.as_mut() {
             ui.double_click(state, event);
         }
     }
 
-    pub fn mouse_drag(&mut self, state: &mut DataModel, event: &MouseEvent) {
+    pub fn mouse_drag(&mut self, state: &mut AppState, event: &MouseEvent) {
         if let Some(ui) = self.ui.as_mut() {
             ui.mouse_drag(state, event);
         }
     }
 
-    pub fn mouse_enter(&mut self, state: &mut DataModel, event: &MouseEvent) {
+    pub fn mouse_enter(&mut self, state: &mut AppState, event: &MouseEvent) {
         if let Some(ui) = self.ui.as_mut() {
             ui.mouse_moved(state, event);
         }
     }
 
-    pub fn mouse_leave(&mut self, state: &mut DataModel, event: &MouseEvent) {
+    pub fn mouse_leave(&mut self, state: &mut AppState, event: &MouseEvent) {
         if let Some(ui) = self.ui.as_mut() {
             ui.mouse_leave(state, event);
         }
     }
 
-    pub fn render<'a>(&mut self, state: &mut DataModel, canvas: &mut Canvas) {
+    pub fn render<'a>(&mut self, state: &mut AppState, canvas: &mut Canvas) {
         if let Some(ui) = self.ui.as_mut() {
             ui.paint(state, canvas);
         }

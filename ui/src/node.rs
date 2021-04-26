@@ -18,7 +18,7 @@ fn next_node_id() -> u32 {
 }
 
 #[repr(C)]
-pub struct Node<DataModel> {
+pub struct Node<AppState> {
     uid: u32,
     material_tag: String,
     name: String,
@@ -26,17 +26,17 @@ pub struct Node<DataModel> {
     padding: f32,
     spacing: f32,
     pub constraints: Constraints,
-    widget: Box<dyn Widget<DataModel>>,
-    children: Vec<Node<DataModel>>,
+    widget: Box<dyn Widget<AppState>>,
+    children: Vec<Node<AppState>>,
     style: Material,
 
     mouse_callbacks:
-        HashMap<MouseEventType, Box<dyn FnMut(&MouseEvent, &mut DataModel) -> Action<DataModel>>>,
-    build_callback: Option<Box<dyn FnMut(&DataModel) -> Option<Vec<Node<DataModel>>>>>,
+        HashMap<MouseEventType, Box<dyn FnMut(&MouseEvent, &mut AppState) -> Action<AppState>>>,
+    build_callback: Option<Box<dyn FnMut(&AppState) -> Option<Vec<Node<AppState>>>>>,
 }
 
-impl<DataModel> Node<DataModel> {
-    pub fn new_with_widget(material_tag: &str, widget: Box<dyn Widget<DataModel>>) -> Self {
+impl<AppState> Node<AppState> {
+    pub fn new_with_widget(material_tag: &str, widget: Box<dyn Widget<AppState>>) -> Self {
         Node {
             name: String::from(""),
             material_tag: material_tag.to_string(),
@@ -72,7 +72,7 @@ impl<DataModel> Node<DataModel> {
 
     pub fn with_widget<T>(mut self, w: T) -> Self
     where
-        T: Widget<DataModel> + 'static,
+        T: Widget<AppState> + 'static,
     {
         self.widget = Box::new(w);
         self
@@ -133,7 +133,7 @@ impl<DataModel> Node<DataModel> {
 
     pub fn with_event_callback<F>(mut self, event: MouseEventType, cb: F) -> Self
     where
-        F: FnMut(&MouseEvent, &mut DataModel) -> Action<DataModel> + 'static,
+        F: FnMut(&MouseEvent, &mut AppState) -> Action<AppState> + 'static,
     {
         self.mouse_callbacks.insert(event, Box::new(cb));
         self
@@ -141,18 +141,18 @@ impl<DataModel> Node<DataModel> {
 
     pub fn with_rebuild_callback<F>(mut self, cb: F) -> Self
     where
-        F: FnMut(&DataModel) -> Option<Vec<Node<DataModel>>> + 'static,
+        F: FnMut(&AppState) -> Option<Vec<Node<AppState>>> + 'static,
     {
         self.build_callback = Some(Box::new(cb));
         self
     }
 
-    pub fn add_child(&mut self, child: Node<DataModel>) -> &mut Self {
+    pub fn add_child(&mut self, child: Node<AppState>) -> &mut Self {
         self.children.push(child);
         return self;
     }
 
-    pub fn with_child(mut self, child: Node<DataModel>) -> Self {
+    pub fn with_child(mut self, child: Node<AppState>) -> Self {
         self.children.push(child);
         return self;
     }
@@ -171,7 +171,7 @@ impl<DataModel> Node<DataModel> {
         None
     }
 
-    pub fn send_mouse_enter(&mut self, state: &mut DataModel, uid: u32, event: &MouseEvent) {
+    pub fn send_mouse_enter(&mut self, state: &mut AppState, uid: u32, event: &MouseEvent) {
         if self.uid == uid {
             self.widget.mouse_enter(state, &self.rect, event);
         } else {
@@ -181,7 +181,7 @@ impl<DataModel> Node<DataModel> {
         }
     }
 
-    pub fn send_mouse_leave(&mut self, state: &mut DataModel, uid: u32, event: &MouseEvent) {
+    pub fn send_mouse_leave(&mut self, state: &mut AppState, uid: u32, event: &MouseEvent) {
         if self.uid == uid {
             self.widget.mouse_leave(state, &self.rect, event);
         } else {
@@ -191,7 +191,7 @@ impl<DataModel> Node<DataModel> {
         }
     }
 
-    pub fn layout(&mut self, state: &DataModel) {
+    pub fn layout(&mut self, state: &AppState) {
         self.build(state);
 
         self.widget.layout(
@@ -206,7 +206,7 @@ impl<DataModel> Node<DataModel> {
         }
     }
 
-    pub fn layout_child_with_name(&mut self, name: &str, state: &DataModel) {
+    pub fn layout_child_with_name(&mut self, name: &str, state: &AppState) {
         if self.name == name {
             self.layout(state)
         } else {
@@ -216,7 +216,7 @@ impl<DataModel> Node<DataModel> {
         }
     }
 
-    pub fn build(&mut self, state: &DataModel) {
+    pub fn build(&mut self, state: &AppState) {
         if let Some(cb) = self.build_callback.as_mut() {
             if let Some(children) = cb(state) {
                 self.children = children;
@@ -234,7 +234,7 @@ impl<DataModel> Node<DataModel> {
         self.rect.set_wh(size.width, size.height);
     }
 
-    pub fn draw(&mut self, state: &DataModel, canvas: &mut Canvas, material: &Material) {
+    pub fn draw(&mut self, state: &AppState, canvas: &mut Canvas, material: &Material) {
         self.widget.paint(
             state,
             &self.rect,
@@ -247,7 +247,7 @@ impl<DataModel> Node<DataModel> {
         }
     }
 
-    // pub fn draw_gpu(&mut self, state: &mut DataModel, ctx: &mut GraphicsContext) {
+    // pub fn draw_gpu(&mut self, state: &mut AppState, ctx: &mut GraphicsContext) {
     //     if self.widget.needs_gpu() {
     //         self.widget.paint_gpu(state, &self.rect, ctx);
     //     }
@@ -263,7 +263,7 @@ impl<DataModel> Node<DataModel> {
         bx && by
     }
 
-    pub fn mouse_down(&mut self, state: &mut DataModel, event: &MouseEvent) -> Action<DataModel> {
+    pub fn mouse_down(&mut self, state: &mut AppState, event: &MouseEvent) -> Action<AppState> {
         let mut action = Action::None;
 
         if self.hit_test(&event.global_position()) {
@@ -286,11 +286,7 @@ impl<DataModel> Node<DataModel> {
         action
     }
 
-    pub fn mouse_up(
-        &mut self,
-        state: &mut DataModel,
-        event: &MouseEvent,
-    ) -> Action<DataModel> {
+    pub fn mouse_up(&mut self, state: &mut AppState, event: &MouseEvent) -> Action<AppState> {
         let mut action = Action::None;
 
         if self.hit_test(&event.global_position()) {
@@ -313,7 +309,7 @@ impl<DataModel> Node<DataModel> {
         action
     }
 
-    pub fn double_click(&mut self, state: &mut DataModel, event: &MouseEvent) {
+    pub fn double_click(&mut self, state: &mut AppState, event: &MouseEvent) {
         if self.hit_test(&event.global_position()) {
             let mut consume = true;
             for child in self.children.iter_mut() {
@@ -329,7 +325,7 @@ impl<DataModel> Node<DataModel> {
         }
     }
 
-    pub fn mouse_drag(&mut self, state: &mut DataModel, event: &MouseEvent) -> Action<DataModel> {
+    pub fn mouse_drag(&mut self, state: &mut AppState, event: &MouseEvent) -> Action<AppState> {
         if self.hit_test(&event.global_position()) {
             let mut consume = true;
             for child in self.children.iter_mut() {
@@ -347,7 +343,7 @@ impl<DataModel> Node<DataModel> {
         Action::None
     }
 
-    pub fn mouse_moved(&mut self, state: &mut DataModel, event: &MouseEvent) -> Option<u32> {
+    pub fn mouse_moved(&mut self, state: &mut AppState, event: &MouseEvent) -> Option<u32> {
         for child in self.children.iter_mut() {
             if child.hit_test(&event.global_position()) {
                 return child.mouse_moved(state, event);
@@ -357,7 +353,7 @@ impl<DataModel> Node<DataModel> {
         return Some(self.uid);
     }
 
-    pub fn mouse_leave(&mut self, state: &mut DataModel, event: &MouseEvent) {
+    pub fn mouse_leave(&mut self, state: &mut AppState, event: &MouseEvent) {
         self.widget.mouse_leave(state, &self.rect, event);
     }
 }
