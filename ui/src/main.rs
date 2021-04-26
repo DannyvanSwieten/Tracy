@@ -47,10 +47,10 @@ impl<AppState: 'static> UIDelegate<AppState> for MyUIDelegate {
                     .with_relative_max_constraints(None, Some(33.))
                     .with_rebuild_callback(|_| {
                         Some(std::vec![
-                            node::Node::new("btn").with_widget(widget::Button::new("Label 1")),
-                            node::Node::new("btn").with_widget(widget::Button::new("Label 2")),
-                            node::Node::new("btn").with_widget(widget::Button::new("Label 3")),
-                            node::Node::new("btn").with_widget(widget::Button::new("Label 4")),
+                            node::Node::new("btn").with_widget(widget::Button::new("Button 1")),
+                            node::Node::new("btn").with_widget(widget::Button::new("Button 2")),
+                            node::Node::new("btn").with_widget(widget::Button::new("Button 3")),
+                            node::Node::new("btn").with_widget(widget::Button::new("Button 4")),
                         ])
                     })
                     .with_padding(25.)
@@ -95,13 +95,13 @@ impl<AppState: 'static> ApplicationDelegate<AppState> for Delegate<AppState> {
 
     fn window_resized(
         &mut self,
-        _: &Application<AppState>,
+        app: &Application<AppState>,
         state: &mut AppState,
         id: &winit::window::WindowId,
         size: &winit::dpi::PhysicalSize<u32>,
     ) -> winit::event_loop::ControlFlow {
         if let Some(window) = self.ui_windows.get_mut(id) {
-            window.resized(state, size)
+            window.resized(self.windows.get(id).unwrap(), app, state, size)
         }
 
         winit::event_loop::ControlFlow::Wait

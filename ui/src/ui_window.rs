@@ -5,9 +5,9 @@ use super::window::MouseEvent;
 use ash::version::EntryV1_0;
 use ash::version::InstanceV1_0;
 use ash::vk::Handle;
+use byteorder::ReadBytesExt;
 use skia_safe::gpu::*;
 use skia_safe::{Budgeted, ImageInfo, Surface};
-use byteorder::ReadBytesExt;
 
 unsafe fn get_procedure(
     entry: &ash::Entry,
@@ -32,7 +32,14 @@ pub trait WindowDelegate<AppState> {
     fn mouse_dragged(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
     fn mouse_down(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
     fn mouse_up(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
-    fn resized(&mut self, state: &mut AppState, size: &winit::dpi::PhysicalSize<u32>) {}
+    fn resized(
+        &mut self,
+        window: &winit::window::Window,
+        app: &Application<AppState>,
+        state: &mut AppState,
+        size: &winit::dpi::PhysicalSize<u32>,
+    ) {
+    }
     fn keyboard_event(&mut self, state: &mut AppState, event: &winit::event::KeyboardInput) {}
     fn draw(&mut self, app: &Application<AppState>, state: &AppState) {}
 }
@@ -59,10 +66,76 @@ pub struct UIWindow<AppState> {
     sampler: ash::vk::Sampler,
 
     to_shader_read_barriers: Vec<ash::vk::ImageMemoryBarrier>,
-    to_attachment_barriers: Vec<ash::vk::ImageMemoryBarrier>
+    to_attachment_barriers: Vec<ash::vk::ImageMemoryBarrier>,
+
+    sub_optimal_swapchain: bool,
 }
 
 impl<'a, AppState: 'static> UIWindow<AppState> {
+    fn recreate_surfaces_images_and_views(&mut self, ctx: &ash::Device) {
+        let image_info = ImageInfo::new_n32_premul(
+            (
+                self.swapchain.width() as i32,
+                self.swapchain.height() as i32,
+            ),
+            None,
+        );
+
+        for s in 0..self.swapchain.image_count() {
+            self.surfaces[s] = Surface::new_render_target(
+                &mut self.context,
+                Budgeted::Yes,
+                &image_info,
+                None,
+                SurfaceOrigin::TopLeft,
+                None,
+                false,
+            )
+            .unwrap()
+        }
+
+        self.surface_images = self
+            .surfaces
+            .iter_mut()
+            .map(|surface| {
+                if let Some(t) =
+                    surface.get_backend_texture(skia_safe::surface::BackendHandleAccess::FlushRead)
+                {
+                    if let Some(info) = t.vulkan_image_info() {
+                        let image: ash::vk::Image = unsafe { std::mem::transmute(info.image) };
+                        return image;
+                    }
+                }
+
+                panic!()
+            })
+            .collect();
+
+        self.surface_image_views = self
+            .surface_images
+            .iter()
+            .map(|&image| {
+                let create_info = ash::vk::ImageViewCreateInfo::builder()
+                    .image(image)
+                    .view_type(ash::vk::ImageViewType::TYPE_2D)
+                    .format(ash::vk::Format::B8G8R8A8_UNORM)
+                    .subresource_range(
+                        ash::vk::ImageSubresourceRange::builder()
+                            .aspect_mask(ash::vk::ImageAspectFlags::COLOR)
+                            .level_count(1)
+                            .layer_count(1)
+                            .build(),
+                    )
+                    .build();
+
+                unsafe {
+                    ctx.create_image_view(&create_info, None)
+                        .expect("ImageView creation failed")
+                }
+            })
+            .collect();
+    }
+
     pub fn new(
         app: &'a Application<AppState>,
         state: &AppState,
@@ -216,37 +289,45 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     });
                 }
 
-                let to_shader_read_barriers = surface_images.iter().map(|&image|{
-                    ash::vk::ImageMemoryBarrier::builder()
-                    .old_layout(ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                    .new_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-                    .image(image)
-                    .src_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
-                    .dst_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
-                    .subresource_range(
-                        ash::vk::ImageSubresourceRange::builder()
-                            .aspect_mask(ash::vk::ImageAspectFlags::COLOR)
-                            .layer_count(1)
-                            .level_count(1)
-                            .build(),
-                    ).build()
-                }).collect();
+                let to_shader_read_barriers = surface_images
+                    .iter()
+                    .map(|&image| {
+                        ash::vk::ImageMemoryBarrier::builder()
+                            .old_layout(ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                            .new_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                            .image(image)
+                            .src_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
+                            .dst_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
+                            .subresource_range(
+                                ash::vk::ImageSubresourceRange::builder()
+                                    .aspect_mask(ash::vk::ImageAspectFlags::COLOR)
+                                    .layer_count(1)
+                                    .level_count(1)
+                                    .build(),
+                            )
+                            .build()
+                    })
+                    .collect();
 
-                let to_attachment_barriers = surface_images.iter().map(|&image|{
-                    ash::vk::ImageMemoryBarrier::builder()
-                    .old_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-                    .new_layout(ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                    .image(image)
-                    .src_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
-                    .dst_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
-                    .subresource_range(
-                        ash::vk::ImageSubresourceRange::builder()
-                            .aspect_mask(ash::vk::ImageAspectFlags::COLOR)
-                            .layer_count(1)
-                            .level_count(1)
-                            .build(),
-                    ).build()
-                }).collect();
+                let to_attachment_barriers = surface_images
+                    .iter()
+                    .map(|&image| {
+                        ash::vk::ImageMemoryBarrier::builder()
+                            .old_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                            .new_layout(ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                            .image(image)
+                            .src_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
+                            .dst_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
+                            .subresource_range(
+                                ash::vk::ImageSubresourceRange::builder()
+                                    .aspect_mask(ash::vk::ImageAspectFlags::COLOR)
+                                    .layer_count(1)
+                                    .level_count(1)
+                                    .build(),
+                            )
+                            .build()
+                    })
+                    .collect();
 
                 let mut user_interface = UserInterface::new(ui_delegate.build("root", state));
                 user_interface.resize(state, window.inner_size().width, window.inner_size().height);
@@ -386,12 +467,14 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                 let vertex_input_state_create_info =
                     ash::vk::PipelineVertexInputStateCreateInfo::builder().build();
 
-                let blend_attachment =
-                    [
-                        ash::vk::PipelineColorBlendAttachmentState::builder()
-                        .color_write_mask(ash::vk::ColorComponentFlags::R | ash::vk::ColorComponentFlags::G | ash::vk::ColorComponentFlags::B | ash::vk::ColorComponentFlags::A)
-                        .build()
-                    ];
+                let blend_attachment = [ash::vk::PipelineColorBlendAttachmentState::builder()
+                    .color_write_mask(
+                        ash::vk::ColorComponentFlags::R
+                            | ash::vk::ColorComponentFlags::G
+                            | ash::vk::ColorComponentFlags::B
+                            | ash::vk::ColorComponentFlags::A,
+                    )
+                    .build()];
                 let blend_state_create_info = ash::vk::PipelineColorBlendStateCreateInfo::builder()
                     .attachments(&blend_attachment)
                     .build();
@@ -480,7 +563,7 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     for i in 0..image_descriptors_infos.len() {
                         let write = ash::vk::WriteDescriptorSet::builder()
                             .descriptor_type(ash::vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                            .image_info(&image_descriptors_infos[i..i+1])
+                            .image_info(&image_descriptors_infos[i..i + 1])
                             .dst_set(descriptor_sets[i])
                             .build();
 
@@ -516,6 +599,7 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                     pipeline_layout,
                     graphics_pipeline,
                     sampler,
+                    sub_optimal_swapchain: false,
                 })
             }
             Err(_result) => Err("Swapchain creation failed"),
@@ -526,45 +610,64 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
 impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
     fn mouse_moved(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
         let p = skia_safe::Point::from((event.x as f32, event.y as f32));
-        self.user_interface.mouse_moved(state, &MouseEvent::new(0, &p, &p));
+        self.user_interface
+            .mouse_moved(state, &MouseEvent::new(0, &p, &p));
     }
 
     fn mouse_dragged(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
         let p = skia_safe::Point::from((event.x as f32, event.y as f32));
-        self.user_interface.mouse_drag(state, &MouseEvent::new(0, &p, &p));
+        self.user_interface
+            .mouse_drag(state, &MouseEvent::new(0, &p, &p));
     }
 
     fn mouse_down(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
         let p = skia_safe::Point::from((event.x as f32, event.y as f32));
-        self.user_interface.mouse_down(state, &MouseEvent::new(0, &p, &p));
+        self.user_interface
+            .mouse_down(state, &MouseEvent::new(0, &p, &p));
     }
 
     fn mouse_up(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
         let p = skia_safe::Point::from((event.x as f32, event.y as f32));
-        self.user_interface.mouse_up(state, &MouseEvent::new(0, &p, &p));
+        self.user_interface
+            .mouse_up(state, &MouseEvent::new(0, &p, &p));
     }
 
-    fn resized(&mut self, _: &mut AppState, event: &winit::dpi::PhysicalSize<u32>) {
-        let image_info = ImageInfo::new_n32_premul((event.width as i32, event.height as i32), None);
-
-        for s in 0..self.swapchain.image_count() {
-            self.surfaces[s] = Surface::new_render_target(
-                &mut self.context,
-                Budgeted::Yes,
-                &image_info,
-                None,
-                SurfaceOrigin::TopLeft,
-                None,
-                false,
-            )
-            .unwrap()
-        }
+    fn resized(
+        &mut self,
+        window: &winit::window::Window,
+        app: &Application<AppState>,
+        _: &mut AppState,
+        size: &winit::dpi::PhysicalSize<u32>,
+    ) {
+        let vulkan_surface_fn =
+            ash::extensions::khr::Surface::new(app.vulkan_entry(), app.vulkan_instance());
+        let vulkan_surface = unsafe {
+            ash_window::create_surface(app.vulkan_entry(), app.vulkan_instance(), window, None)
+                .expect("Surface creation failed after resize")
+        };
+        self.swapchain = swapchain::Swapchain::new(
+            app.vulkan_instance(),
+            app.primary_gpu(),
+            app.primary_device_context(),
+            &vulkan_surface_fn,
+            &vulkan_surface,
+            app.present_queue_and_index().1 as u32,
+            window.inner_size().width,
+            window.inner_size().height,
+        );
+        self.recreate_surfaces_images_and_views(app.primary_device_context());
     }
     fn draw(&mut self, app: &Application<AppState>, state: &AppState) {
+        if self.sub_optimal_swapchain {
+            return;
+        }
+
         // Next swapchain image
+
         let (sub_optimal_swapchain, image_index, framebuffer, semaphore) =
             self.swapchain.next_frame_buffer();
 
+        self.sub_optimal_swapchain = sub_optimal_swapchain;
         unsafe {
             app.primary_device_context()
                 .wait_for_fences(&[self.fences[image_index as usize]], true, u64::MAX)
@@ -589,7 +692,12 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
         let commands = &self.command_buffers[image_index as usize];
         let command_buffer_begin_info = ash::vk::CommandBufferBeginInfo::builder().build();
         unsafe {
-            device.reset_command_buffer(*commands, ash::vk::CommandBufferResetFlags::RELEASE_RESOURCES).expect("Reset command buffer failed");
+            device
+                .reset_command_buffer(
+                    *commands,
+                    ash::vk::CommandBufferResetFlags::RELEASE_RESOURCES,
+                )
+                .expect("Reset command buffer failed");
             device
                 .begin_command_buffer(*commands, &command_buffer_begin_info)
                 .expect("Unable to start recording command buffer");
