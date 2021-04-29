@@ -7,7 +7,7 @@ pub mod user_interface;
 pub mod widget;
 pub mod window;
 
-use renderer;
+use renderer::renderer;
 
 use window::MouseEventType;
 
