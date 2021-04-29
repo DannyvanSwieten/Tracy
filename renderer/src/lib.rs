@@ -1,34 +1,57 @@
+use byteorder::ReadBytesExt;
+use std::fs::File;
+use std::io;
+
 use ash;
 use ash::extensions::khr::{AccelerationStructure, DeferredHostOperations, RayTracingPipeline};
 
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0, InstanceV1_1, InstanceV1_2};
 use ash::vk;
 use ash::vk::{
-    Buffer, CommandPoolCreateInfo, DescriptorBindingFlagsEXT, DescriptorPool,
-    DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetLayout,
-    DescriptorSetLayoutBinding, DescriptorSetLayoutBindingFlagsCreateInfoEXT,
-    DescriptorSetLayoutCreateInfo, DescriptorType, Image, ImageView, Queue, ShaderModule,
-    ShaderModuleCreateInfo, ShaderStageFlags,
+    AccelerationStructureKHR, DeferredOperationKHR, PhysicalDeviceFeatures2KHR,
+    PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceRayTracingPipelinePropertiesKHR,
+    RayTracingPipelineCreateInfoKHR, RayTracingShaderGroupCreateInfoKHR,
 };
 use ash::vk::{
-    ExtendsPhysicalDeviceProperties2, PhysicalDeviceRayTracingPipelinePropertiesKHR,
-    RayTracingPipelineCreateInfoKHR,
+    Buffer, CommandPoolCreateInfo, DescriptorBindingFlagsEXT, DescriptorPool,
+    DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo,
+    DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutBindingFlagsCreateInfoEXT,
+    DescriptorSetLayoutCreateInfo, DescriptorType, Image, ImageView, PhysicalDeviceFeatures,
+    Pipeline, PipelineCache, PipelineLayout, PipelineLayoutCreateInfo, Queue, ShaderModule,
+    ShaderModuleCreateInfo, ShaderStageFlags,
 };
 
 use ash::{Device, Instance};
+
+fn load_spirv(path: &str) -> Vec<u32> {
+    let file = File::open(path).expect("File not found");
+    let meta = std::fs::metadata(path).expect("No metadata found for file");
+    let mut buf_reader = std::io::BufReader::new(file);
+
+    let mut buffer = vec![0; (meta.len() / 4) as usize];
+    buf_reader
+        .read_u32_into::<byteorder::NativeEndian>(&mut buffer[..])
+        .expect("Failed reading spirv");
+
+    buffer
+}
 
 pub struct Renderer {
     context: Device,
     queue: Queue,
     queue_family_index: u32,
-    descriptor_sets: Vec<DescriptorSet>,
+    descriptor_sets: DescriptorSet,
     pipeline_properties: PhysicalDeviceRayTracingPipelinePropertiesKHR,
     rtx_pipeline_extension: RayTracingPipeline,
+    pipeline: Pipeline,
+    pipeline_layout: PipelineLayout,
     descriptor_pool: DescriptorPool,
-    descriptor_set_layout: DescriptorSetLayout,
+    descriptor_set_layouts: Vec<DescriptorSetLayout>,
     accumulation_image: Image,
     output_image: Image,
     output_image_view: ImageView,
+    bottom_level_acceleration_structures: Vec<AccelerationStructureKHR>,
+    top_level_acceleration_structure: AccelerationStructureKHR,
 }
 
 impl Renderer {
@@ -74,9 +97,25 @@ impl Renderer {
                 AccelerationStructure::name().as_ptr(),
             ];
 
+            let mut pipeline_properties =
+                vk::PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
+            let mut properties =
+                vk::PhysicalDeviceProperties2::builder().push_next(&mut pipeline_properties);
+            instance.get_physical_device_properties2(gpu, &mut properties);
+
+            let mut rt_features = PhysicalDeviceRayTracingPipelineFeaturesKHR {
+                ray_tracing_pipeline: 1,
+                ..Default::default()
+            };
+
+            let mut features2 = PhysicalDeviceFeatures2KHR::default();
+            instance.get_physical_device_features2(gpu, &mut features2);
+
             let device_create_info = vk::DeviceCreateInfo::builder()
                 .queue_create_infos(&queue_info)
-                .enabled_extension_names(&device_extension_names_raw);
+                .enabled_extension_names(&device_extension_names_raw)
+                .enabled_features(&features2.features)
+                .push_next(&mut rt_features);
 
             let context = instance
                 .create_device(gpu, &device_create_info, None)
@@ -84,29 +123,31 @@ impl Renderer {
 
             let rtx_pipeline_extension = RayTracingPipeline::new(instance, &context);
 
-            let mut pipeline_properties =
-                vk::PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
-            let mut properties =
-                vk::PhysicalDeviceProperties2::builder().push_next(&mut pipeline_properties);
-            instance.get_physical_device_properties2(gpu, &mut properties);
             let queue = context.get_device_queue(queue_family_index as u32, 0);
 
             let mut result = Self {
                 context,
                 queue,
                 queue_family_index: queue_family_index as u32,
-                descriptor_sets: Vec::new(),
+                descriptor_sets: DescriptorSet::null(),
                 rtx_pipeline_extension,
+                pipeline: Pipeline::null(),
                 pipeline_properties,
+                pipeline_layout: PipelineLayout::null(),
                 descriptor_pool: DescriptorPool::null(),
-                descriptor_set_layout: DescriptorSetLayout::null(),
+                descriptor_set_layouts: Vec::new(),
                 accumulation_image: Image::null(),
                 output_image: Image::null(),
                 output_image_view: ImageView::null(),
+                top_level_acceleration_structure: AccelerationStructureKHR::null(),
+                bottom_level_acceleration_structures: Vec::new(),
             };
 
             result.create_descriptor_pool();
             result.create_descriptor_set_layout();
+            result.create_descriptor_set();
+            result.create_pipeline_layout();
+            result.load_shaders_and_pipeline();
 
             result
         }
@@ -116,16 +157,24 @@ impl Renderer {
         unsafe {
             let sizes = [
                 DescriptorPoolSize {
+                    ty: DescriptorType::ACCELERATION_STRUCTURE_KHR,
+                    descriptor_count: 1,
+                },
+                DescriptorPoolSize {
+                    ty: DescriptorType::UNIFORM_BUFFER,
+                    descriptor_count: 1,
+                },
+                DescriptorPoolSize {
                     ty: DescriptorType::STORAGE_IMAGE,
                     descriptor_count: 2,
                 },
                 DescriptorPoolSize {
-                    ty: DescriptorType::ACCELERATION_STRUCTURE_KHR,
-                    descriptor_count: 1,
+                    ty: DescriptorType::STORAGE_BUFFER,
+                    descriptor_count: 4,
                 },
             ];
             let descriptor_pool_create_info = DescriptorPoolCreateInfo::builder()
-                .max_sets(1)
+                .max_sets(2)
                 .pool_sizes(&sizes);
             self.descriptor_pool = self
                 .context
@@ -136,34 +185,13 @@ impl Renderer {
 
     fn create_descriptor_set_layout(&mut self) {
         unsafe {
-            let bindings = [
+            let bindings_ray_gen = [
                 // acceleration structure
                 DescriptorSetLayoutBinding::builder()
                     .descriptor_count(1)
                     .descriptor_type(DescriptorType::ACCELERATION_STRUCTURE_KHR)
                     .stage_flags(ShaderStageFlags::RAYGEN_KHR)
                     .binding(0)
-                    .build(),
-                // position buffer
-                DescriptorSetLayoutBinding::builder()
-                    .descriptor_count(1)
-                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                    .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
-                    .binding(1)
-                    .build(),
-                // index buffer
-                DescriptorSetLayoutBinding::builder()
-                    .descriptor_count(1)
-                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                    .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
-                    .binding(1)
-                    .build(),
-                // accumulation image
-                DescriptorSetLayoutBinding::builder()
-                    .descriptor_count(1)
-                    .descriptor_type(DescriptorType::STORAGE_IMAGE)
-                    .stage_flags(ShaderStageFlags::RAYGEN_KHR)
-                    .binding(1)
                     .build(),
                 // final image
                 DescriptorSetLayoutBinding::builder()
@@ -172,11 +200,53 @@ impl Renderer {
                     .stage_flags(ShaderStageFlags::RAYGEN_KHR)
                     .binding(1)
                     .build(),
+                // accumulation image
+                DescriptorSetLayoutBinding::builder()
+                    .descriptor_count(1)
+                    .descriptor_type(DescriptorType::STORAGE_IMAGE)
+                    .stage_flags(ShaderStageFlags::RAYGEN_KHR)
+                    .binding(2)
+                    .build(),
+                // Camera
+                DescriptorSetLayoutBinding::builder()
+                    .descriptor_count(1)
+                    .descriptor_type(DescriptorType::UNIFORM_BUFFER)
+                    .stage_flags(ShaderStageFlags::RAYGEN_KHR)
+                    .binding(3)
+                    .build(),
             ];
 
-            let mut binding_flags = DescriptorSetLayoutBindingFlagsCreateInfoEXT::builder()
+            let bindings_closest_hit = [
+                // position buffer
+                DescriptorSetLayoutBinding::builder()
+                    .descriptor_count(1)
+                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                    .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
+                    .binding(0)
+                    .build(),
+                // index buffer
+                DescriptorSetLayoutBinding::builder()
+                    .descriptor_count(1)
+                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                    .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
+                    .binding(1)
+                    .build(),
+                DescriptorSetLayoutBinding::builder()
+                    .descriptor_count(1)
+                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                    .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
+                    .binding(2)
+                    .build(),
+                DescriptorSetLayoutBinding::builder()
+                    .descriptor_count(1)
+                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                    .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
+                    .binding(3)
+                    .build(),
+            ];
+
+            let mut binding_flags_ray_gen = DescriptorSetLayoutBindingFlagsCreateInfoEXT::builder()
                 .binding_flags(&[
-                    DescriptorBindingFlagsEXT::empty(),
                     DescriptorBindingFlagsEXT::empty(),
                     DescriptorBindingFlagsEXT::empty(),
                     DescriptorBindingFlagsEXT::empty(),
@@ -184,17 +254,144 @@ impl Renderer {
                 ])
                 .build();
 
-            let layout_info = DescriptorSetLayoutCreateInfo::builder()
-                .bindings(&bindings)
-                .push_next(&mut binding_flags);
-            self.descriptor_set_layout = self
-                .context
-                .create_descriptor_set_layout(&layout_info, None)
-                .expect("Descriptor set layout creation failed");
+            let mut binding_flags_closest_hit =
+                DescriptorSetLayoutBindingFlagsCreateInfoEXT::builder()
+                    .binding_flags(&[
+                        DescriptorBindingFlagsEXT::empty(),
+                        DescriptorBindingFlagsEXT::empty(),
+                        DescriptorBindingFlagsEXT::empty(),
+                        DescriptorBindingFlagsEXT::empty(),
+                    ])
+                    .build();
+
+            let layout_info_ray_gen = DescriptorSetLayoutCreateInfo::builder()
+                .bindings(&bindings_ray_gen)
+                .push_next(&mut binding_flags_ray_gen);
+
+            let layout_info_closest_hit = DescriptorSetLayoutCreateInfo::builder()
+                .bindings(&bindings_closest_hit)
+                .push_next(&mut binding_flags_closest_hit);
+
+            self.descriptor_set_layouts = vec![
+                self.context
+                    .create_descriptor_set_layout(&layout_info_ray_gen, None)
+                    .expect("Descriptor set layout creation failed"),
+                self.context
+                    .create_descriptor_set_layout(&layout_info_closest_hit, None)
+                    .expect("Descriptor set layout creation failed"),
+            ]
         }
     }
 
-    fn load_shaders(&mut self) {}
+    fn create_pipeline_layout(&mut self) {
+        unsafe {
+            self.pipeline_layout = self
+                .context
+                .create_pipeline_layout(
+                    &PipelineLayoutCreateInfo::builder().set_layouts(&self.descriptor_set_layouts),
+                    None,
+                )
+                .expect("Pipeline layout creation failed");
+        }
+    }
+
+    fn create_descriptor_set(&mut self) {
+        unsafe {
+            let descriptor_set_create_info = DescriptorSetAllocateInfo::builder()
+                .set_layouts(&self.descriptor_set_layouts)
+                .descriptor_pool(self.descriptor_pool);
+
+            self.descriptor_sets = self
+                .context
+                .allocate_descriptor_sets(&descriptor_set_create_info)
+                .expect("Descriptor set allocation failed")[0];
+        }
+    }
+
+    fn load_shaders_and_pipeline(&mut self) {
+        unsafe {
+            let code = load_spirv("shaders/rgen.rgen.spv");
+            let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
+            let gen = self
+                .context
+                .create_shader_module(&shader_module_info, None)
+                .expect("Ray generation shader compilation failed");
+            let code = load_spirv("shaders/closesthit.rchit.spv");
+            let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
+            let chit = self
+                .context
+                .create_shader_module(&shader_module_info, None)
+                .expect("Ray closest hit shader compilation failed");
+            let code = load_spirv("shaders/miss.rmiss.spv");
+            let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
+            let miss = self
+                .context
+                .create_shader_module(&shader_module_info, None)
+                .expect("Ray miss shader compilation failed");
+
+            let shader_groups = vec![
+                // group0 = [ raygen ]
+                RayTracingShaderGroupCreateInfoKHR::builder()
+                    .ty(vk::RayTracingShaderGroupTypeNV::GENERAL)
+                    .general_shader(0)
+                    .closest_hit_shader(vk::SHADER_UNUSED_NV)
+                    .any_hit_shader(vk::SHADER_UNUSED_NV)
+                    .intersection_shader(vk::SHADER_UNUSED_NV)
+                    .build(),
+                // group1 = [ chit ]
+                RayTracingShaderGroupCreateInfoKHR::builder()
+                    .ty(vk::RayTracingShaderGroupTypeNV::TRIANGLES_HIT_GROUP)
+                    .general_shader(vk::SHADER_UNUSED_NV)
+                    .closest_hit_shader(1)
+                    .any_hit_shader(vk::SHADER_UNUSED_NV)
+                    .intersection_shader(vk::SHADER_UNUSED_NV)
+                    .build(),
+                // group2 = [ miss ]
+                RayTracingShaderGroupCreateInfoKHR::builder()
+                    .ty(vk::RayTracingShaderGroupTypeNV::GENERAL)
+                    .general_shader(2)
+                    .closest_hit_shader(vk::SHADER_UNUSED_NV)
+                    .any_hit_shader(vk::SHADER_UNUSED_NV)
+                    .intersection_shader(vk::SHADER_UNUSED_NV)
+                    .build(),
+            ];
+
+            let shader_stages = vec![
+                vk::PipelineShaderStageCreateInfo::builder()
+                    .stage(vk::ShaderStageFlags::RAYGEN_KHR)
+                    .module(gen)
+                    .name(std::ffi::CStr::from_bytes_with_nul(b"main\0").unwrap())
+                    .build(),
+                vk::PipelineShaderStageCreateInfo::builder()
+                    .stage(vk::ShaderStageFlags::CLOSEST_HIT_KHR)
+                    .module(chit)
+                    .name(std::ffi::CStr::from_bytes_with_nul(b"main\0").unwrap())
+                    .build(),
+                vk::PipelineShaderStageCreateInfo::builder()
+                    .stage(vk::ShaderStageFlags::MISS_KHR)
+                    .module(miss)
+                    .name(std::ffi::CStr::from_bytes_with_nul(b"main\0").unwrap())
+                    .build(),
+            ];
+
+            let infos = [RayTracingPipelineCreateInfoKHR::builder()
+                .stages(&shader_stages)
+                .groups(&shader_groups)
+                .max_pipeline_ray_recursion_depth(1)
+                .layout(self.pipeline_layout)
+                .build()];
+
+            self.pipeline = self
+                .rtx_pipeline_extension
+                .create_ray_tracing_pipelines(
+                    DeferredOperationKHR::null(),
+                    PipelineCache::null(),
+                    &infos,
+                    None,
+                )
+                .expect("Raytracing pipeline creation failed")[0];
+        }
+    }
 
     fn create_images_and_views(&mut self) {}
 }
