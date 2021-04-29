@@ -7,6 +7,8 @@ pub mod user_interface;
 pub mod widget;
 pub mod window;
 
+use renderer;
+
 use window::MouseEventType;
 
 use application::{Application, ApplicationDelegate};
@@ -90,8 +92,9 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
             Err(message) => panic!("{}", message),
         };
 
-        self.ui_windows.insert(window.id(), ui);
+        let renderer = renderer::Renderer::new(app.vulkan_instance());
 
+        self.ui_windows.insert(window.id(), ui);
         self.windows.insert(window.id(), window);
     }
 

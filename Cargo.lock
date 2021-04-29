@@ -989,6 +989,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24d5f089152e60f62d28b835fbff2cd2e8dc0baf1ac13343bef92ab7eed84548"
 
 [[package]]
+name = "renderer"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "byteorder",
+]
+
+[[package]]
 name = "ring"
 version = "0.16.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1261,6 +1269,7 @@ dependencies = [
  "ash",
  "ash-window",
  "byteorder",
+ "renderer",
  "skia-safe",
  "winit",
 ]
