@@ -17,8 +17,8 @@ use ash::vk::{
     DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo,
     DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutBindingFlagsCreateInfoEXT,
     DescriptorSetLayoutCreateInfo, DescriptorType, Image, ImageView, PhysicalDeviceFeatures,
-    Pipeline, PipelineCache, PipelineLayout, PipelineLayoutCreateInfo, Queue, ShaderModule,
-    ShaderModuleCreateInfo, ShaderStageFlags,
+    Pipeline, PipelineCache, PipelineLayout, PipelineLayoutCreateInfo, PushConstantRange, Queue,
+    ShaderModule, ShaderModuleCreateInfo, ShaderStageFlags,
 };
 
 use ash::{Device, Instance};
@@ -234,7 +234,7 @@ impl Renderer {
                 DescriptorSetLayoutBinding::builder()
                     .descriptor_count(1)
                     .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                    .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
+                    .stage_flags(ShaderStageFlags::RAYGEN_KHR)
                     .binding(2)
                     .build(),
                 DescriptorSetLayoutBinding::builder()
@@ -285,10 +285,16 @@ impl Renderer {
 
     fn create_pipeline_layout(&mut self) {
         unsafe {
+            let push_constant_ranges = [PushConstantRange::builder()
+                .stage_flags(ShaderStageFlags::RAYGEN_KHR)
+                .size(24)
+                .build()];
             self.pipeline_layout = self
                 .context
                 .create_pipeline_layout(
-                    &PipelineLayoutCreateInfo::builder().set_layouts(&self.descriptor_set_layouts),
+                    &PipelineLayoutCreateInfo::builder()
+                        .set_layouts(&self.descriptor_set_layouts)
+                        .push_constant_ranges(&push_constant_ranges),
                     None,
                 )
                 .expect("Pipeline layout creation failed");
