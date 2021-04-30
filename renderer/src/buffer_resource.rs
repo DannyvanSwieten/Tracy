@@ -1,7 +1,7 @@
 use crate::memory::memory_type_index;
 
 use ash::vk::{
-    Buffer, BufferCreateInfo, BufferUsageFlags, DeviceMemory, MemoryAllocateInfo,
+    Buffer, BufferCreateInfo, BufferUsageFlags, DeviceMemory, MemoryAllocateInfo, MemoryMapFlags,
     MemoryPropertyFlags, PhysicalDeviceMemoryProperties, SharingMode,
 };
 
@@ -12,6 +12,26 @@ pub struct BufferResource {
     device: Device,
     buffer: Buffer,
     memory: DeviceMemory,
+    size: u64,
+}
+
+impl BufferResource {
+    pub fn copy_to<T>(&mut self, data: &[T]) {
+        unsafe {
+            let ptr = self
+                .device
+                .map_memory(self.memory, 0, self.size, MemoryMapFlags::default())
+                .expect("Memory map failed on buffer");
+
+            std::ptr::copy_nonoverlapping(
+                data.as_ptr(),
+                ptr as _,
+                self.size as usize / std::mem::size_of::<T>(),
+            );
+
+            self.device.unmap_memory(self.memory);
+        }
+    }
 }
 
 impl BufferResource {
@@ -49,6 +69,7 @@ impl BufferResource {
                     device: device.clone(),
                     buffer,
                     memory,
+                    size,
                 }
             } else {
                 panic!()

@@ -1,3 +1,4 @@
+use crate::buffer_resource::BufferResource;
 use crate::image_resource::Image2DResource;
 use crate::spirv::load_spirv;
 
@@ -16,14 +17,14 @@ use ash::vk::{
 };
 // Core objects
 use ash::vk::{
-    Buffer, BufferCreateInfo, BufferUsageFlags, DescriptorBindingFlagsEXT, DescriptorPool,
-    DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo,
-    DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutBindingFlagsCreateInfoEXT,
+    BufferUsageFlags, DescriptorBindingFlagsEXT, DescriptorPool, DescriptorPoolCreateInfo,
+    DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout,
+    DescriptorSetLayoutBinding, DescriptorSetLayoutBindingFlagsCreateInfoEXT,
     DescriptorSetLayoutCreateInfo, DescriptorType, DeviceCreateInfo, DeviceQueueCreateInfo, Format,
-    Image, ImageCreateInfo, ImageUsageFlags, ImageView, MemoryPropertyFlags,
+    ImageUsageFlags, ImageView, MemoryPropertyFlags,
     PhysicalDeviceMemoryProperties, PhysicalDeviceProperties2, Pipeline, PipelineCache,
     PipelineLayout, PipelineLayoutCreateInfo, PipelineShaderStageCreateInfo, PushConstantRange,
-    Queue, QueueFlags, ShaderModuleCreateInfo, ShaderStageFlags, SharingMode,
+    Queue, QueueFlags, ShaderModuleCreateInfo, ShaderStageFlags
 };
 
 use ash::{Device, Instance};
@@ -45,7 +46,7 @@ pub struct Renderer {
     output_image_view: ImageView,
     bottom_level_acceleration_structures: Vec<AccelerationStructureKHR>,
     top_level_acceleration_structure: AccelerationStructureKHR,
-    shader_binding_table: Buffer,
+    shader_binding_table: Option<BufferResource>,
 }
 
 impl Renderer {
@@ -141,7 +142,7 @@ impl Renderer {
                 output_image_view: ImageView::null(),
                 top_level_acceleration_structure: AccelerationStructureKHR::null(),
                 bottom_level_acceleration_structures: Vec::new(),
-                shader_binding_table: Buffer::null(),
+                shader_binding_table: None,
             };
 
             result.create_descriptor_pool();
@@ -403,23 +404,26 @@ impl Renderer {
 
     fn create_shader_binding_table(&mut self) {
         unsafe {
-            let group_count = 3; // Listed in RayTracingPipelineCreateInfoNV
+            let group_count = 3;
             let table_size =
                 (self.pipeline_properties.shader_group_handle_size * group_count) as usize;
             let table_data: Vec<u8> = self
                 .rtx_pipeline_extension
                 .get_ray_tracing_shader_group_handles(self.pipeline, 0, group_count, table_size)
                 .expect("Get raytracing shader group handles failed");
-            let family_indices = [self.queue_family_index];
-            let buffer_info = BufferCreateInfo::builder()
-                .queue_family_indices(&family_indices)
-                .sharing_mode(SharingMode::EXCLUSIVE)
-                .usage(BufferUsageFlags::TRANSFER_SRC)
-                .size(table_size as u64);
-            self.shader_binding_table = self
-                .context
-                .create_buffer(&buffer_info, None)
-                .expect("Shader binding table buffer creation failed");
+
+            self.shader_binding_table = Some(BufferResource::new(
+                &self.physical_device_memory_properties,
+                &self.context,
+                table_size as u64,
+                MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
+                BufferUsageFlags::TRANSFER_SRC,
+            ));
+
+            self.shader_binding_table
+                .as_mut()
+                .unwrap()
+                .copy_to(&table_data);
         }
     }
 
