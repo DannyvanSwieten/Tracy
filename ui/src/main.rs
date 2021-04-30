@@ -92,7 +92,8 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
             Err(message) => panic!("{}", message),
         };
 
-        let renderer = renderer::Renderer::new(app.vulkan_instance());
+        let mut renderer = renderer::Renderer::new(app.vulkan_instance());
+        renderer.initialize(1200, 800);
 
         self.ui_windows.insert(window.id(), ui);
         self.windows.insert(window.id(), window);

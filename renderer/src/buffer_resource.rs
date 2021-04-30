@@ -1,6 +1,8 @@
+use crate::memory::memory_type_index;
+
 use ash::vk::{
     Buffer, BufferCreateInfo, BufferUsageFlags, DeviceMemory, MemoryAllocateInfo,
-    MemoryRequirements, SharingMode,
+    MemoryPropertyFlags, PhysicalDeviceMemoryProperties, SharingMode,
 };
 
 use ash::version::DeviceV1_0;
@@ -14,10 +16,11 @@ pub struct BufferResource {
 
 impl BufferResource {
     pub fn new(
+        properties: &PhysicalDeviceMemoryProperties,
         device: &Device,
         size: u64,
+        property_flags: MemoryPropertyFlags,
         usage: BufferUsageFlags,
-        memory_type_index: u32,
     ) -> Self {
         unsafe {
             let buffer_info = BufferCreateInfo::builder()
@@ -29,17 +32,26 @@ impl BufferResource {
                 .create_buffer(&buffer_info, None)
                 .expect("Buffer creation failed");
             let memory_requirements = device.get_buffer_memory_requirements(buffer);
-            let allocation_info = MemoryAllocateInfo::builder()
-                .memory_type_index(memory_type_index)
-                .allocation_size(memory_requirements.size);
-            let memory = device
-                .allocate_memory(&allocation_info, None)
-                .expect("Memory allocation failed");
+            let type_index = memory_type_index(
+                memory_requirements.memory_type_bits,
+                properties,
+                property_flags,
+            );
+            if let Some(type_index) = type_index {
+                let allocation_info = MemoryAllocateInfo::builder()
+                    .memory_type_index(type_index)
+                    .allocation_size(memory_requirements.size);
+                let memory = device
+                    .allocate_memory(&allocation_info, None)
+                    .expect("Memory allocation failed");
 
-            Self {
-                device: device.clone(),
-                buffer,
-                memory,
+                Self {
+                    device: device.clone(),
+                    buffer,
+                    memory,
+                }
+            } else {
+                panic!()
             }
         }
     }

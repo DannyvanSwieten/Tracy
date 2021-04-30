@@ -62,8 +62,6 @@ pub struct Window<AppState> {
 
 impl<AppState: 'static> Window<AppState> {
     pub fn new(name: &str) -> Window<AppState> {
-        let ptr = CString::new(name).expect("Failed");
-
         Window {
             uid: 0,
             name: name.to_string(),

@@ -1,27 +1,35 @@
+use crate::image_resource::Image2DResource;
 use crate::spirv::load_spirv;
-use ash;
+
+// Extension functions
 use ash::extensions::khr::{AccelerationStructure, DeferredHostOperations, RayTracingPipeline};
 
-use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0, InstanceV1_1, InstanceV1_2};
-use ash::vk;
+// Version traits
+use ash::version::{DeviceV1_0, InstanceV1_0, InstanceV1_1};
+
+// Extension Objects
 use ash::vk::{
     AccelerationStructureKHR, DeferredOperationKHR, PhysicalDeviceFeatures2KHR,
     PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceRayTracingPipelinePropertiesKHR,
     RayTracingPipelineCreateInfoKHR, RayTracingShaderGroupCreateInfoKHR,
+    RayTracingShaderGroupTypeKHR, SHADER_UNUSED_KHR,
 };
+// Core objects
 use ash::vk::{
-    Buffer, BufferCreateInfo, BufferUsageFlags, CommandPoolCreateInfo, DescriptorBindingFlagsEXT,
-    DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet,
-    DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding,
-    DescriptorSetLayoutBindingFlagsCreateInfoEXT, DescriptorSetLayoutCreateInfo, DescriptorType,
-    Image, ImageView, PhysicalDeviceFeatures, Pipeline, PipelineCache, PipelineLayout,
-    PipelineLayoutCreateInfo, PushConstantRange, Queue, ShaderModule, ShaderModuleCreateInfo,
-    ShaderStageFlags, SharingMode,
+    Buffer, BufferCreateInfo, BufferUsageFlags, DescriptorBindingFlagsEXT, DescriptorPool,
+    DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo,
+    DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutBindingFlagsCreateInfoEXT,
+    DescriptorSetLayoutCreateInfo, DescriptorType, DeviceCreateInfo, DeviceQueueCreateInfo, Format,
+    Image, ImageCreateInfo, ImageUsageFlags, ImageView, MemoryPropertyFlags,
+    PhysicalDeviceMemoryProperties, PhysicalDeviceProperties2, Pipeline, PipelineCache,
+    PipelineLayout, PipelineLayoutCreateInfo, PipelineShaderStageCreateInfo, PushConstantRange,
+    Queue, QueueFlags, ShaderModuleCreateInfo, ShaderStageFlags, SharingMode,
 };
 
 use ash::{Device, Instance};
 
 pub struct Renderer {
+    physical_device_memory_properties: PhysicalDeviceMemoryProperties,
     context: Device,
     queue: Queue,
     queue_family_index: u32,
@@ -32,12 +40,18 @@ pub struct Renderer {
     pipeline_layout: PipelineLayout,
     descriptor_pool: DescriptorPool,
     descriptor_set_layouts: Vec<DescriptorSetLayout>,
-    accumulation_image: Image,
-    output_image: Image,
+    accumulation_image: Option<Image2DResource>,
+    output_image: Option<Image2DResource>,
     output_image_view: ImageView,
     bottom_level_acceleration_structures: Vec<AccelerationStructureKHR>,
     top_level_acceleration_structure: AccelerationStructureKHR,
     shader_binding_table: Buffer,
+}
+
+impl Renderer {
+    pub fn initialize(&mut self, width: u32, height: u32) {
+        self.create_images_and_views(width, height);
+    }
 }
 
 impl Renderer {
@@ -54,8 +68,7 @@ impl Renderer {
                         .iter()
                         .enumerate()
                         .filter_map(|(index, ref info)| {
-                            let supports_graphics =
-                                info.queue_flags.contains(ash::vk::QueueFlags::GRAPHICS);
+                            let supports_graphics = info.queue_flags.contains(QueueFlags::GRAPHICS);
                             if supports_graphics {
                                 Some((*pdevice, index))
                             } else {
@@ -72,7 +85,7 @@ impl Renderer {
 
             let priorities = [1.0];
 
-            let queue_info = [vk::DeviceQueueCreateInfo::builder()
+            let queue_info = [DeviceQueueCreateInfo::builder()
                 .queue_family_index(queue_family_index as u32)
                 .queue_priorities(&priorities)
                 .build()];
@@ -83,10 +96,9 @@ impl Renderer {
                 AccelerationStructure::name().as_ptr(),
             ];
 
-            let mut pipeline_properties =
-                vk::PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
+            let mut pipeline_properties = PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
             let mut properties =
-                vk::PhysicalDeviceProperties2::builder().push_next(&mut pipeline_properties);
+                PhysicalDeviceProperties2::builder().push_next(&mut pipeline_properties);
             instance.get_physical_device_properties2(gpu, &mut properties);
 
             let mut rt_features = PhysicalDeviceRayTracingPipelineFeaturesKHR {
@@ -97,7 +109,7 @@ impl Renderer {
             let mut features2 = PhysicalDeviceFeatures2KHR::default();
             instance.get_physical_device_features2(gpu, &mut features2);
 
-            let device_create_info = vk::DeviceCreateInfo::builder()
+            let device_create_info = DeviceCreateInfo::builder()
                 .queue_create_infos(&queue_info)
                 .enabled_extension_names(&device_extension_names_raw)
                 .enabled_features(&features2.features)
@@ -110,8 +122,10 @@ impl Renderer {
             let rtx_pipeline_extension = RayTracingPipeline::new(instance, &context);
 
             let queue = context.get_device_queue(queue_family_index as u32, 0);
-
+            let physical_device_memory_properties =
+                instance.get_physical_device_memory_properties(gpu);
             let mut result = Self {
+                physical_device_memory_properties,
                 context,
                 queue,
                 queue_family_index: queue_family_index as u32,
@@ -122,8 +136,8 @@ impl Renderer {
                 pipeline_layout: PipelineLayout::null(),
                 descriptor_pool: DescriptorPool::null(),
                 descriptor_set_layouts: Vec::new(),
-                accumulation_image: Image::null(),
-                output_image: Image::null(),
+                accumulation_image: None,
+                output_image: None,
                 output_image_view: ImageView::null(),
                 top_level_acceleration_structure: AccelerationStructureKHR::null(),
                 bottom_level_acceleration_structures: Vec::new(),
@@ -326,43 +340,43 @@ impl Renderer {
             let shader_groups = vec![
                 // group0 = [ raygen ]
                 RayTracingShaderGroupCreateInfoKHR::builder()
-                    .ty(vk::RayTracingShaderGroupTypeNV::GENERAL)
+                    .ty(RayTracingShaderGroupTypeKHR::GENERAL)
                     .general_shader(0)
-                    .closest_hit_shader(vk::SHADER_UNUSED_NV)
-                    .any_hit_shader(vk::SHADER_UNUSED_NV)
-                    .intersection_shader(vk::SHADER_UNUSED_NV)
+                    .closest_hit_shader(SHADER_UNUSED_KHR)
+                    .any_hit_shader(SHADER_UNUSED_KHR)
+                    .intersection_shader(SHADER_UNUSED_KHR)
                     .build(),
                 // group1 = [ chit ]
                 RayTracingShaderGroupCreateInfoKHR::builder()
-                    .ty(vk::RayTracingShaderGroupTypeNV::TRIANGLES_HIT_GROUP)
-                    .general_shader(vk::SHADER_UNUSED_NV)
+                    .ty(RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP)
+                    .general_shader(SHADER_UNUSED_KHR)
                     .closest_hit_shader(1)
-                    .any_hit_shader(vk::SHADER_UNUSED_NV)
-                    .intersection_shader(vk::SHADER_UNUSED_NV)
+                    .any_hit_shader(SHADER_UNUSED_KHR)
+                    .intersection_shader(SHADER_UNUSED_KHR)
                     .build(),
                 // group2 = [ miss ]
                 RayTracingShaderGroupCreateInfoKHR::builder()
-                    .ty(vk::RayTracingShaderGroupTypeNV::GENERAL)
+                    .ty(RayTracingShaderGroupTypeKHR::GENERAL)
                     .general_shader(2)
-                    .closest_hit_shader(vk::SHADER_UNUSED_NV)
-                    .any_hit_shader(vk::SHADER_UNUSED_NV)
-                    .intersection_shader(vk::SHADER_UNUSED_NV)
+                    .closest_hit_shader(SHADER_UNUSED_KHR)
+                    .any_hit_shader(SHADER_UNUSED_KHR)
+                    .intersection_shader(SHADER_UNUSED_KHR)
                     .build(),
             ];
 
             let shader_stages = vec![
-                vk::PipelineShaderStageCreateInfo::builder()
-                    .stage(vk::ShaderStageFlags::RAYGEN_KHR)
+                PipelineShaderStageCreateInfo::builder()
+                    .stage(ShaderStageFlags::RAYGEN_KHR)
                     .module(gen)
                     .name(std::ffi::CStr::from_bytes_with_nul(b"main\0").unwrap())
                     .build(),
-                vk::PipelineShaderStageCreateInfo::builder()
-                    .stage(vk::ShaderStageFlags::CLOSEST_HIT_KHR)
+                PipelineShaderStageCreateInfo::builder()
+                    .stage(ShaderStageFlags::CLOSEST_HIT_KHR)
                     .module(chit)
                     .name(std::ffi::CStr::from_bytes_with_nul(b"main\0").unwrap())
                     .build(),
-                vk::PipelineShaderStageCreateInfo::builder()
-                    .stage(vk::ShaderStageFlags::MISS_KHR)
+                PipelineShaderStageCreateInfo::builder()
+                    .stage(ShaderStageFlags::MISS_KHR)
                     .module(miss)
                     .name(std::ffi::CStr::from_bytes_with_nul(b"main\0").unwrap())
                     .build(),
@@ -389,7 +403,7 @@ impl Renderer {
 
     fn create_shader_binding_table(&mut self) {
         unsafe {
-            let group_count = 3; // Listed in vk::RayTracingPipelineCreateInfoNV
+            let group_count = 3; // Listed in RayTracingPipelineCreateInfoNV
             let table_size =
                 (self.pipeline_properties.shader_group_handle_size * group_count) as usize;
             let table_data: Vec<u8> = self
@@ -409,5 +423,25 @@ impl Renderer {
         }
     }
 
-    fn create_images_and_views(&mut self) {}
+    fn create_images_and_views(&mut self, width: u32, height: u32) {
+        self.output_image = Some(Image2DResource::new(
+            &self.physical_device_memory_properties,
+            &self.context,
+            width,
+            height,
+            Format::R8G8B8A8_UNORM,
+            ImageUsageFlags::STORAGE | ImageUsageFlags::SAMPLED,
+            MemoryPropertyFlags::DEVICE_LOCAL,
+        ));
+
+        self.accumulation_image = Some(Image2DResource::new(
+            &self.physical_device_memory_properties,
+            &self.context,
+            width,
+            height,
+            Format::R32G32B32A32_SFLOAT,
+            ImageUsageFlags::STORAGE,
+            MemoryPropertyFlags::DEVICE_LOCAL,
+        ));
+    }
 }

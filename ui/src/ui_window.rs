@@ -308,17 +308,10 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
                 .expect("Pipline creation failed")[0]
         };
 
-        let pool_sizes = [ash::vk::DescriptorPoolSize::builder()
-            .descriptor_count(1)
-            .ty(ash::vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .build()];
-
-        let descriptor_pool_create_info = ash::vk::DescriptorPoolCreateInfo::builder()
-            .pool_sizes(&pool_sizes)
-            .max_sets(self.swapchain.image_count() as u32)
-            .build();
-
-        unsafe { ctx.free_descriptor_sets(self.descriptor_pool, &self.descriptor_sets) };
+        unsafe {
+            ctx.free_descriptor_sets(self.descriptor_pool, &self.descriptor_sets)
+                .expect("Free descriptor sets failed")
+        };
 
         let descriptor_set_allocate_info = ash::vk::DescriptorSetAllocateInfo::builder()
             .descriptor_pool(self.descriptor_pool)
