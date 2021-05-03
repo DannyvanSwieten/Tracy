@@ -92,8 +92,12 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
             Err(message) => panic!("{}", message),
         };
 
+        let vertices: [f32; 9] = [0., 1., 0., 1., -1., 0., -1., -1., 0.];
+        let indices: [u32; 3] = [0, 1, 2];
+
         let mut renderer = renderer::Renderer::new(app.vulkan_instance());
         renderer.initialize(1200, 800);
+        renderer.build(&vertices, &indices);
 
         self.ui_windows.insert(window.id(), ui);
         self.windows.insert(window.id(), window);

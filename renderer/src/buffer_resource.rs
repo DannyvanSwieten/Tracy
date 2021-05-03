@@ -1,16 +1,17 @@
 use crate::memory::memory_type_index;
 
 use ash::vk::{
-    Buffer, BufferCreateInfo, BufferUsageFlags, DeviceMemory, MemoryAllocateInfo, MemoryMapFlags,
-    MemoryPropertyFlags, PhysicalDeviceMemoryProperties, SharingMode,
+    Buffer, BufferCreateInfo, BufferUsageFlags, DeviceMemory, MemoryAllocateFlags,
+    MemoryAllocateFlagsInfo, MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags,
+    PhysicalDeviceMemoryProperties, SharingMode,
 };
 
-use ash::version::DeviceV1_0;
+use ash::version::{DeviceV1_0, DeviceV1_1, DeviceV1_2};
 use ash::Device;
 
 pub struct BufferResource {
     device: Device,
-    buffer: Buffer,
+    pub buffer: Buffer,
     memory: DeviceMemory,
     size: u64,
 }
@@ -57,13 +58,22 @@ impl BufferResource {
                 properties,
                 property_flags,
             );
+
+            let mut flags = MemoryAllocateFlagsInfo::builder()
+                .flags(MemoryAllocateFlags::DEVICE_ADDRESS_KHR)
+                .build();
             if let Some(type_index) = type_index {
                 let allocation_info = MemoryAllocateInfo::builder()
+                    .push_next(&mut flags)
                     .memory_type_index(type_index)
                     .allocation_size(memory_requirements.size);
                 let memory = device
                     .allocate_memory(&allocation_info, None)
                     .expect("Memory allocation failed");
+
+                device
+                    .bind_buffer_memory(buffer, memory, 0)
+                    .expect("Buffer memory bind failed");
 
                 Self {
                     device: device.clone(),

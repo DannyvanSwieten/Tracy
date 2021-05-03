@@ -1,4 +1,5 @@
 use crate::buffer_resource::BufferResource;
+use crate::geometry::BottomLevelAccelerationStructure;
 use crate::image_resource::Image2DResource;
 use crate::spirv::load_spirv;
 
@@ -10,33 +11,36 @@ use ash::version::{DeviceV1_0, InstanceV1_0, InstanceV1_1};
 
 // Extension Objects
 use ash::vk::{
-    AccelerationStructureKHR, DeferredOperationKHR, PhysicalDeviceFeatures2KHR,
+    AccelerationStructureKHR, DeferredOperationKHR, GeometryTypeKHR,
+    PhysicalDeviceBufferDeviceAddressFeaturesEXT, PhysicalDeviceFeatures2KHR,
     PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceRayTracingPipelinePropertiesKHR,
-    RayTracingPipelineCreateInfoKHR, RayTracingShaderGroupCreateInfoKHR,
-    RayTracingShaderGroupTypeKHR, SHADER_UNUSED_KHR,
+    PhysicalDeviceVulkan12Features, RayTracingPipelineCreateInfoKHR,
+    RayTracingShaderGroupCreateInfoKHR, RayTracingShaderGroupTypeKHR, SHADER_UNUSED_KHR,
 };
 // Core objects
 use ash::vk::{
-    BufferUsageFlags, DescriptorBindingFlagsEXT, DescriptorPool, DescriptorPoolCreateInfo,
-    DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout,
-    DescriptorSetLayoutBinding, DescriptorSetLayoutBindingFlagsCreateInfoEXT,
-    DescriptorSetLayoutCreateInfo, DescriptorType, DeviceCreateInfo, DeviceQueueCreateInfo, Format,
-    ImageUsageFlags, ImageView, MemoryPropertyFlags,
-    PhysicalDeviceMemoryProperties, PhysicalDeviceProperties2, Pipeline, PipelineCache,
-    PipelineLayout, PipelineLayoutCreateInfo, PipelineShaderStageCreateInfo, PushConstantRange,
-    Queue, QueueFlags, ShaderModuleCreateInfo, ShaderStageFlags
+    BufferUsageFlags, CommandPool, CommandPoolCreateInfo, DescriptorBindingFlagsEXT,
+    DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet,
+    DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding,
+    DescriptorSetLayoutBindingFlagsCreateInfoEXT, DescriptorSetLayoutCreateInfo, DescriptorType,
+    DeviceCreateInfo, DeviceQueueCreateInfo, Format, ImageUsageFlags, ImageView,
+    MemoryPropertyFlags, PhysicalDeviceMemoryProperties, PhysicalDeviceMemoryProperties2,
+    PhysicalDeviceProperties2, Pipeline, PipelineCache, PipelineLayout, PipelineLayoutCreateInfo,
+    PipelineShaderStageCreateInfo, PushConstantRange, Queue, QueueFlags, ShaderModuleCreateInfo,
+    ShaderStageFlags,
 };
 
 use ash::{Device, Instance};
 
 pub struct Renderer {
-    physical_device_memory_properties: PhysicalDeviceMemoryProperties,
+    physical_device_memory_properties: PhysicalDeviceMemoryProperties2,
     context: Device,
     queue: Queue,
     queue_family_index: u32,
     descriptor_sets: DescriptorSet,
     pipeline_properties: PhysicalDeviceRayTracingPipelinePropertiesKHR,
     rtx_pipeline_extension: RayTracingPipeline,
+    rtx_acceleration_structure_extension: AccelerationStructure,
     pipeline: Pipeline,
     pipeline_layout: PipelineLayout,
     descriptor_pool: DescriptorPool,
@@ -47,11 +51,41 @@ pub struct Renderer {
     bottom_level_acceleration_structures: Vec<AccelerationStructureKHR>,
     top_level_acceleration_structure: AccelerationStructureKHR,
     shader_binding_table: Option<BufferResource>,
+
+    command_pool: CommandPool,
 }
 
 impl Renderer {
     pub fn initialize(&mut self, width: u32, height: u32) {
         self.create_images_and_views(width, height);
+    }
+
+    pub fn build(&mut self, vertices: &[f32], indices: &[u32]) {
+        let vertex_buffer = BufferResource::new(
+            &self.physical_device_memory_properties.memory_properties,
+            &self.context,
+            (vertices.len() * 12) as u64,
+            MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
+            BufferUsageFlags::VERTEX_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+        );
+
+        let index_buffer = BufferResource::new(
+            &self.physical_device_memory_properties.memory_properties,
+            &self.context,
+            (indices.len() * 4) as u64,
+            MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
+            BufferUsageFlags::INDEX_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+        );
+
+        // let blas = BottomLevelAccelerationStructure::new(
+        //     &self.rtx_acceleration_structure_extension,
+        //     &self.context,
+        //     &self.physical_device_memory_properties,
+        //     &vertex_buffer.buffer,
+        //     &index_buffer.buffer,
+        //     vertices.len() as u32,
+        //     0,
+        // );
     }
 }
 
@@ -107,6 +141,14 @@ impl Renderer {
                 ..Default::default()
             };
 
+            let mut address_features = PhysicalDeviceVulkan12Features::builder()
+                .buffer_device_address(true)
+                .build();
+
+            // instance.get_physical_device_features
+
+            // rt_features.p_next = &mut device_address_features;
+
             let mut features2 = PhysicalDeviceFeatures2KHR::default();
             instance.get_physical_device_features2(gpu, &mut features2);
 
@@ -114,7 +156,8 @@ impl Renderer {
                 .queue_create_infos(&queue_info)
                 .enabled_extension_names(&device_extension_names_raw)
                 .enabled_features(&features2.features)
-                .push_next(&mut rt_features);
+                .push_next(&mut rt_features)
+                .push_next(&mut address_features);
 
             let context = instance
                 .create_device(gpu, &device_create_info, None)
@@ -123,10 +166,16 @@ impl Renderer {
             let rtx_pipeline_extension = RayTracingPipeline::new(instance, &context);
 
             let queue = context.get_device_queue(queue_family_index as u32, 0);
-            let physical_device_memory_properties =
-                instance.get_physical_device_memory_properties(gpu);
+            let mut physical_device_memory_properties = PhysicalDeviceMemoryProperties2::default();
+            instance.get_physical_device_memory_properties2(
+                gpu,
+                &mut physical_device_memory_properties,
+            );
             let mut result = Self {
                 physical_device_memory_properties,
+                rtx_acceleration_structure_extension: AccelerationStructure::new(
+                    instance, &context,
+                ),
                 context,
                 queue,
                 queue_family_index: queue_family_index as u32,
@@ -143,6 +192,7 @@ impl Renderer {
                 top_level_acceleration_structure: AccelerationStructureKHR::null(),
                 bottom_level_acceleration_structures: Vec::new(),
                 shader_binding_table: None,
+                command_pool: CommandPool::null(),
             };
 
             result.create_descriptor_pool();
@@ -151,7 +201,7 @@ impl Renderer {
             result.create_pipeline_layout();
             result.load_shaders_and_pipeline();
             result.create_shader_binding_table();
-
+            result.create_command_pool();
             result
         }
     }
@@ -413,7 +463,7 @@ impl Renderer {
                 .expect("Get raytracing shader group handles failed");
 
             self.shader_binding_table = Some(BufferResource::new(
-                &self.physical_device_memory_properties,
+                &self.physical_device_memory_properties.memory_properties,
                 &self.context,
                 table_size as u64,
                 MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
@@ -427,9 +477,19 @@ impl Renderer {
         }
     }
 
+    fn create_command_pool(&mut self) {
+        unsafe {
+            let info = CommandPoolCreateInfo::builder().queue_family_index(self.queue_family_index);
+            self.command_pool = self
+                .context
+                .create_command_pool(&info, None)
+                .expect("Commandpool creation failed");
+        }
+    }
+
     fn create_images_and_views(&mut self, width: u32, height: u32) {
         self.output_image = Some(Image2DResource::new(
-            &self.physical_device_memory_properties,
+            &self.physical_device_memory_properties.memory_properties,
             &self.context,
             width,
             height,
@@ -439,7 +499,7 @@ impl Renderer {
         ));
 
         self.accumulation_image = Some(Image2DResource::new(
-            &self.physical_device_memory_properties,
+            &self.physical_device_memory_properties.memory_properties,
             &self.context,
             width,
             height,

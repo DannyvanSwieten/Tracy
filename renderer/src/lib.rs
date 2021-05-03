@@ -1,4 +1,5 @@
 pub mod buffer_resource;
+pub mod geometry;
 pub mod image_resource;
 pub mod memory;
 pub mod renderer;
