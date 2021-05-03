@@ -123,12 +123,6 @@ impl BottomLevelAccelerationStructure {
                     | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
             );
 
-            let acc_buffer_address = device.get_buffer_device_address(
-                &BufferDeviceAddressInfo::builder()
-                    .buffer(acc_buffer.buffer)
-                    .build(),
-            );
-
             let create_info = AccelerationStructureCreateInfoKHR::builder()
                 .ty(AccelerationStructureTypeKHR::BOTTOM_LEVEL)
                 .buffer(scratch_buffer.buffer);

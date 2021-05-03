@@ -19,13 +19,14 @@ use ash::vk::{
 };
 // Core objects
 use ash::vk::{
-    BufferUsageFlags, CommandPool, CommandPoolCreateInfo, DescriptorBindingFlagsEXT,
-    DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet,
-    DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding,
+    BufferUsageFlags, CommandBufferAllocateInfo, CommandPool, CommandPoolCreateInfo,
+    DescriptorBindingFlagsEXT, DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize,
+    DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding,
     DescriptorSetLayoutBindingFlagsCreateInfoEXT, DescriptorSetLayoutCreateInfo, DescriptorType,
     DeviceCreateInfo, DeviceQueueCreateInfo, Format, ImageUsageFlags, ImageView,
-    MemoryPropertyFlags, PhysicalDeviceMemoryProperties, PhysicalDeviceMemoryProperties2,
-    PhysicalDeviceProperties2, Pipeline, PipelineCache, PipelineLayout, PipelineLayoutCreateInfo,
+    MemoryPropertyFlags, PhysicalDeviceAccelerationStructureFeaturesKHR,
+    PhysicalDeviceMemoryProperties, PhysicalDeviceMemoryProperties2, PhysicalDeviceProperties2,
+    Pipeline, PipelineCache, PipelineLayout, PipelineLayoutCreateInfo,
     PipelineShaderStageCreateInfo, PushConstantRange, Queue, QueueFlags, ShaderModuleCreateInfo,
     ShaderStageFlags,
 };
@@ -77,15 +78,28 @@ impl Renderer {
             BufferUsageFlags::INDEX_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
         );
 
-        // let blas = BottomLevelAccelerationStructure::new(
-        //     &self.rtx_acceleration_structure_extension,
-        //     &self.context,
-        //     &self.physical_device_memory_properties,
-        //     &vertex_buffer.buffer,
-        //     &index_buffer.buffer,
-        //     vertices.len() as u32,
-        //     0,
-        // );
+        let create_info = CommandBufferAllocateInfo::builder()
+            .command_buffer_count(1)
+            .command_pool(self.command_pool)
+            .build();
+
+        unsafe {
+            let command_buffer = self
+                .context
+                .allocate_command_buffers(&create_info)
+                .expect("CommandBuffer allocation failed")[0];
+
+            let blas = BottomLevelAccelerationStructure::new(
+                &self.rtx_acceleration_structure_extension,
+                &self.context,
+                command_buffer,
+                &self.physical_device_memory_properties,
+                &vertex_buffer.buffer,
+                &index_buffer.buffer,
+                vertices.len() as u32,
+                0,
+            );
+        }
     }
 }
 
@@ -145,9 +159,9 @@ impl Renderer {
                 .buffer_device_address(true)
                 .build();
 
-            // instance.get_physical_device_features
-
-            // rt_features.p_next = &mut device_address_features;
+            let mut acc_features = PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
+                .acceleration_structure(true)
+                .build();
 
             let mut features2 = PhysicalDeviceFeatures2KHR::default();
             instance.get_physical_device_features2(gpu, &mut features2);
@@ -157,7 +171,8 @@ impl Renderer {
                 .enabled_extension_names(&device_extension_names_raw)
                 .enabled_features(&features2.features)
                 .push_next(&mut rt_features)
-                .push_next(&mut address_features);
+                .push_next(&mut address_features)
+                .push_next(&mut acc_features);
 
             let context = instance
                 .create_device(gpu, &device_create_info, None)
@@ -479,7 +494,9 @@ impl Renderer {
 
     fn create_command_pool(&mut self) {
         unsafe {
-            let info = CommandPoolCreateInfo::builder().queue_family_index(self.queue_family_index);
+            let info = CommandPoolCreateInfo::builder()
+                .queue_family_index(self.queue_family_index)
+                .flags(ash::vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
             self.command_pool = self
                 .context
                 .create_command_pool(&info, None)
