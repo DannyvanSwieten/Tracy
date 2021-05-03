@@ -5,12 +5,12 @@ use ash::vk::{
     AccelerationStructureGeometryDataKHR, AccelerationStructureGeometryKHR,
     AccelerationStructureGeometryTrianglesDataKHR, AccelerationStructureKHR,
     AccelerationStructureTypeKHR, Buffer, BufferDeviceAddressInfo, BufferUsageFlags,
-    BuildAccelerationStructureModeKHR, CommandBuffer, DeviceOrHostAddressConstKHR,
-    DeviceOrHostAddressKHR, Format, GeometryTypeKHR, IndexType, MemoryPropertyFlags,
-    PhysicalDeviceMemoryProperties2,
+    BuildAccelerationStructureModeKHR, CommandBuffer, CommandBufferBeginInfo,
+    DeviceOrHostAddressConstKHR, DeviceOrHostAddressKHR, Format, GeometryTypeKHR, IndexType,
+    MemoryPropertyFlags, PhysicalDeviceMemoryProperties2,
 };
 
-use ash::version::DeviceV1_2;
+use ash::version::{DeviceV1_0, DeviceV1_2};
 
 use ash::extensions::khr::AccelerationStructure;
 use ash::Device;
@@ -148,11 +148,21 @@ impl BottomLevelAccelerationStructure {
                 .build()];
             let ranges = vec![&range[0..1]];
 
+            device
+                .begin_command_buffer(command_buffer, &CommandBufferBeginInfo::builder().build())
+                .expect("Start commanbuffer failed");
+
             acceleration_structure_extension.cmd_build_acceleration_structures(
                 command_buffer,
                 &infos,
                 &ranges,
             );
+
+            device
+                .end_command_buffer(command_buffer)
+                .expect("End command buffer failed");
+
+            device.device_wait_idle().expect("Wait failed");
 
             Self {
                 device: device.clone(),
