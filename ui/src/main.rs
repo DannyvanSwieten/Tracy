@@ -95,7 +95,10 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
         let vertices: [f32; 9] = [0., 1., 0., 1., -1., 0., -1., -1., 0.];
         let indices: [u32; 3] = [0, 1, 2];
 
-        let mut renderer = renderer::Renderer::new(app.vulkan_instance());
+        let mut renderer = renderer::Renderer::new(
+            app.vulkan_instance(),
+            Some((*app.primary_gpu(), app.present_queue_and_index().1 as u32)),
+        );
         renderer.initialize(1200, 800);
         renderer.build(&vertices, &indices);
 

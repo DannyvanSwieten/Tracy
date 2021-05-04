@@ -1,5 +1,8 @@
 use crate::buffer_resource::BufferResource;
-use crate::geometry::BottomLevelAccelerationStructure;
+use crate::context::RtxContext;
+use crate::geometry::{
+    BottomLevelAccelerationStructure, GeometryInstance, TopLevelAccelerationStructure,
+};
 use crate::image_resource::Image2DResource;
 use crate::spirv::load_spirv;
 
@@ -24,7 +27,7 @@ use ash::vk::{
     DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding,
     DescriptorSetLayoutBindingFlagsCreateInfoEXT, DescriptorSetLayoutCreateInfo, DescriptorType,
     DeviceCreateInfo, DeviceQueueCreateInfo, Format, ImageUsageFlags, ImageView,
-    MemoryPropertyFlags, PhysicalDeviceAccelerationStructureFeaturesKHR,
+    MemoryPropertyFlags, PhysicalDevice, PhysicalDeviceAccelerationStructureFeaturesKHR,
     PhysicalDeviceMemoryProperties, PhysicalDeviceMemoryProperties2, PhysicalDeviceProperties2,
     Pipeline, PipelineCache, PipelineLayout, PipelineLayoutCreateInfo,
     PipelineShaderStageCreateInfo, PushConstantRange, Queue, QueueFlags, ShaderModuleCreateInfo,
@@ -35,13 +38,10 @@ use ash::{Device, Instance};
 
 pub struct Renderer {
     physical_device_memory_properties: PhysicalDeviceMemoryProperties2,
-    context: Device,
-    queue: Queue,
+    context: RtxContext,
     queue_family_index: u32,
     descriptor_sets: DescriptorSet,
     pipeline_properties: PhysicalDeviceRayTracingPipelinePropertiesKHR,
-    rtx_pipeline_extension: RayTracingPipeline,
-    rtx_acceleration_structure_extension: AccelerationStructure,
     pipeline: Pipeline,
     pipeline_layout: PipelineLayout,
     descriptor_pool: DescriptorPool,
@@ -52,8 +52,6 @@ pub struct Renderer {
     bottom_level_acceleration_structures: Vec<AccelerationStructureKHR>,
     top_level_acceleration_structure: AccelerationStructureKHR,
     shader_binding_table: Option<BufferResource>,
-
-    command_pool: CommandPool,
 }
 
 impl Renderer {
@@ -64,7 +62,7 @@ impl Renderer {
     pub fn build(&mut self, vertices: &[f32], indices: &[u32]) {
         let vertex_buffer = BufferResource::new(
             &self.physical_device_memory_properties.memory_properties,
-            &self.context,
+            &self.context.device(),
             (vertices.len() * 12) as u64,
             MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
             BufferUsageFlags::VERTEX_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
@@ -72,100 +70,90 @@ impl Renderer {
 
         let index_buffer = BufferResource::new(
             &self.physical_device_memory_properties.memory_properties,
-            &self.context,
+            &self.context.device(),
             (indices.len() * 4) as u64,
             MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
             BufferUsageFlags::INDEX_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
         );
 
-        let create_info = CommandBufferAllocateInfo::builder()
-            .command_buffer_count(1)
-            .command_pool(self.command_pool)
-            .build();
+        let blases = [BottomLevelAccelerationStructure::new(
+            &self.context,
+            &vertex_buffer,
+            vertices.len() as u32,
+            0,
+            &index_buffer,
+            indices.len() as u32,
+            0,
+        )];
 
-        unsafe {
-            let command_buffer = self
-                .context
-                .allocate_command_buffers(&create_info)
-                .expect("CommandBuffer allocation failed")[0];
+        let instances = [GeometryInstance::new(0, 0xff, 0, 0, 0)];
 
-            let blas = BottomLevelAccelerationStructure::new(
-                &self.rtx_acceleration_structure_extension,
-                &self.context,
-                command_buffer,
-                &self.physical_device_memory_properties,
-                &vertex_buffer.buffer,
-                &index_buffer.buffer,
-                vertices.len() as u32,
-                0,
-            );
-        }
+        let tlas = TopLevelAccelerationStructure::new(&self.context, &blases, &instances);
     }
 }
 
 impl Renderer {
-    pub fn new(instance: &Instance) -> Self {
+    pub fn new(
+        instance: &Instance,
+        gpu_and_queue_family_index: Option<(PhysicalDevice, u32)>,
+    ) -> Self {
         unsafe {
-            let pdevices = instance
-                .enumerate_physical_devices()
-                .expect("Physical device error");
-            let (gpu, queue_family_index) = pdevices
-                .iter()
-                .map(|pdevice| {
-                    instance
-                        .get_physical_device_queue_family_properties(*pdevice)
+            let (gpu, queue_family_index) = {
+                if let Some((gpu, queue_family_index)) = gpu_and_queue_family_index {
+                    (gpu, queue_family_index)
+                } else {
+                    let pdevices = instance
+                        .enumerate_physical_devices()
+                        .expect("Physical device error");
+                    pdevices
                         .iter()
-                        .enumerate()
-                        .filter_map(|(index, ref info)| {
-                            let supports_graphics = info.queue_flags.contains(QueueFlags::GRAPHICS);
-                            if supports_graphics {
-                                Some((*pdevice, index))
-                            } else {
-                                None
-                            }
+                        .map(|pdevice| {
+                            instance
+                                .get_physical_device_queue_family_properties(*pdevice)
+                                .iter()
+                                .enumerate()
+                                .filter_map(|(index, ref info)| {
+                                    let supports_graphics =
+                                        info.queue_flags.contains(QueueFlags::GRAPHICS);
+                                    if supports_graphics {
+                                        Some((*pdevice, index as u32))
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .next()
                         })
+                        .filter_map(|v| v)
                         .next()
-                })
-                .filter_map(|v| v)
-                .next()
-                .expect("Couldn't find suitable device.");
-
-            queue_family_index as u32;
-
+                        .expect("Couldn't find suitable device.")
+                }
+            };
             let priorities = [1.0];
-
             let queue_info = [DeviceQueueCreateInfo::builder()
                 .queue_family_index(queue_family_index as u32)
                 .queue_priorities(&priorities)
                 .build()];
-
             let device_extension_names_raw = [
                 RayTracingPipeline::name().as_ptr(),
                 DeferredHostOperations::name().as_ptr(),
                 AccelerationStructure::name().as_ptr(),
             ];
-
             let mut pipeline_properties = PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
             let mut properties =
                 PhysicalDeviceProperties2::builder().push_next(&mut pipeline_properties);
             instance.get_physical_device_properties2(gpu, &mut properties);
-
             let mut rt_features = PhysicalDeviceRayTracingPipelineFeaturesKHR {
                 ray_tracing_pipeline: 1,
                 ..Default::default()
             };
-
             let mut address_features = PhysicalDeviceVulkan12Features::builder()
                 .buffer_device_address(true)
                 .build();
-
             let mut acc_features = PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
                 .acceleration_structure(true)
                 .build();
-
             let mut features2 = PhysicalDeviceFeatures2KHR::default();
             instance.get_physical_device_features2(gpu, &mut features2);
-
             let device_create_info = DeviceCreateInfo::builder()
                 .queue_create_infos(&queue_info)
                 .enabled_extension_names(&device_extension_names_raw)
@@ -173,29 +161,29 @@ impl Renderer {
                 .push_next(&mut rt_features)
                 .push_next(&mut address_features)
                 .push_next(&mut acc_features);
-
-            let context = instance
+            let device = instance
                 .create_device(gpu, &device_create_info, None)
                 .expect("Failed raytracing device context creation");
-
-            let rtx_pipeline_extension = RayTracingPipeline::new(instance, &context);
-
-            let queue = context.get_device_queue(queue_family_index as u32, 0);
+            let queue = device.get_device_queue(queue_family_index as u32, 0);
             let mut physical_device_memory_properties = PhysicalDeviceMemoryProperties2::default();
             instance.get_physical_device_memory_properties2(
                 gpu,
                 &mut physical_device_memory_properties,
             );
+
+            let context = RtxContext::new(
+                instance,
+                &device,
+                &queue,
+                queue_family_index as u32,
+                &physical_device_memory_properties,
+            );
+
             let mut result = Self {
                 physical_device_memory_properties,
-                rtx_acceleration_structure_extension: AccelerationStructure::new(
-                    instance, &context,
-                ),
                 context,
-                queue,
                 queue_family_index: queue_family_index as u32,
                 descriptor_sets: DescriptorSet::null(),
-                rtx_pipeline_extension,
                 pipeline: Pipeline::null(),
                 pipeline_properties,
                 pipeline_layout: PipelineLayout::null(),
@@ -207,16 +195,13 @@ impl Renderer {
                 top_level_acceleration_structure: AccelerationStructureKHR::null(),
                 bottom_level_acceleration_structures: Vec::new(),
                 shader_binding_table: None,
-                command_pool: CommandPool::null(),
             };
-
             result.create_descriptor_pool();
             result.create_descriptor_set_layout();
             result.create_descriptor_set();
             result.create_pipeline_layout();
             result.load_shaders_and_pipeline();
             result.create_shader_binding_table();
-            result.create_command_pool();
             result
         }
     }
@@ -246,6 +231,7 @@ impl Renderer {
                 .pool_sizes(&sizes);
             self.descriptor_pool = self
                 .context
+                .device()
                 .create_descriptor_pool(&descriptor_pool_create_info, None)
                 .expect("Descriptor pool creation failed");
         }
@@ -342,9 +328,11 @@ impl Renderer {
 
             self.descriptor_set_layouts = vec![
                 self.context
+                    .device()
                     .create_descriptor_set_layout(&layout_info_ray_gen, None)
                     .expect("Descriptor set layout creation failed"),
                 self.context
+                    .device()
                     .create_descriptor_set_layout(&layout_info_closest_hit, None)
                     .expect("Descriptor set layout creation failed"),
             ]
@@ -359,6 +347,7 @@ impl Renderer {
                 .build()];
             self.pipeline_layout = self
                 .context
+                .device()
                 .create_pipeline_layout(
                     &PipelineLayoutCreateInfo::builder()
                         .set_layouts(&self.descriptor_set_layouts)
@@ -377,6 +366,7 @@ impl Renderer {
 
             self.descriptor_sets = self
                 .context
+                .device()
                 .allocate_descriptor_sets(&descriptor_set_create_info)
                 .expect("Descriptor set allocation failed")[0];
         }
@@ -388,18 +378,21 @@ impl Renderer {
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let gen = self
                 .context
+                .device()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray generation shader compilation failed");
             let code = load_spirv("shaders/closesthit.rchit.spv");
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let chit = self
                 .context
+                .device()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray closest hit shader compilation failed");
             let code = load_spirv("shaders/miss.rmiss.spv");
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let miss = self
                 .context
+                .device()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray miss shader compilation failed");
 
@@ -456,7 +449,8 @@ impl Renderer {
                 .build()];
 
             self.pipeline = self
-                .rtx_pipeline_extension
+                .context
+                .pipeline_ext()
                 .create_ray_tracing_pipelines(
                     DeferredOperationKHR::null(),
                     PipelineCache::null(),
@@ -473,13 +467,14 @@ impl Renderer {
             let table_size =
                 (self.pipeline_properties.shader_group_handle_size * group_count) as usize;
             let table_data: Vec<u8> = self
-                .rtx_pipeline_extension
+                .context
+                .pipeline_ext()
                 .get_ray_tracing_shader_group_handles(self.pipeline, 0, group_count, table_size)
                 .expect("Get raytracing shader group handles failed");
 
             self.shader_binding_table = Some(BufferResource::new(
                 &self.physical_device_memory_properties.memory_properties,
-                &self.context,
+                &self.context.device(),
                 table_size as u64,
                 MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
                 BufferUsageFlags::TRANSFER_SRC,
@@ -492,22 +487,10 @@ impl Renderer {
         }
     }
 
-    fn create_command_pool(&mut self) {
-        unsafe {
-            let info = CommandPoolCreateInfo::builder()
-                .queue_family_index(self.queue_family_index)
-                .flags(ash::vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
-            self.command_pool = self
-                .context
-                .create_command_pool(&info, None)
-                .expect("Commandpool creation failed");
-        }
-    }
-
     fn create_images_and_views(&mut self, width: u32, height: u32) {
         self.output_image = Some(Image2DResource::new(
             &self.physical_device_memory_properties.memory_properties,
-            &self.context,
+            &self.context.device(),
             width,
             height,
             Format::R8G8B8A8_UNORM,
@@ -517,7 +500,7 @@ impl Renderer {
 
         self.accumulation_image = Some(Image2DResource::new(
             &self.physical_device_memory_properties.memory_properties,
-            &self.context,
+            &self.context.device(),
             width,
             height,
             Format::R32G32B32A32_SFLOAT,

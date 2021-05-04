@@ -1,9 +1,9 @@
 use crate::memory::memory_type_index;
 
 use ash::vk::{
-    Buffer, BufferCreateInfo, BufferUsageFlags, DeviceMemory, MemoryAllocateFlags,
-    MemoryAllocateFlagsInfo, MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags,
-    PhysicalDeviceMemoryProperties, SharingMode,
+    Buffer, BufferCreateInfo, BufferDeviceAddressInfo, BufferUsageFlags, DeviceAddress,
+    DeviceMemory, MemoryAllocateFlags, MemoryAllocateFlagsInfo, MemoryAllocateInfo, MemoryMapFlags,
+    MemoryPropertyFlags, PhysicalDeviceMemoryProperties, SharingMode,
 };
 
 use ash::version::{DeviceV1_0, DeviceV1_1, DeviceV1_2};
@@ -85,6 +85,11 @@ impl BufferResource {
                 panic!()
             }
         }
+    }
+
+    pub fn device_address(&self) -> DeviceAddress {
+        let v_address_info = BufferDeviceAddressInfo::builder().buffer(self.buffer);
+        unsafe { self.device.get_buffer_device_address(&v_address_info) }
     }
 }
 
