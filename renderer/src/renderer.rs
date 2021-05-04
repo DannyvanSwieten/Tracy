@@ -65,12 +65,12 @@ impl Renderer {
         self.update_image_descriptors();
     }
 
-    pub fn render(&mut self) {
+    pub fn render(&mut self) -> ImageView {
         unsafe {
             if let Some(image) = self.output_image.as_ref() {
                 image.transition(&self.context.base_context, ImageLayout::GENERAL);
             } else {
-                return;
+                panic!()
             }
 
             let command_buffer = self.context.command_buffer();
@@ -114,6 +114,8 @@ impl Renderer {
                 .device()
                 .device_wait_idle()
                 .expect("wait failed");
+
+            self.output_image_view
         }
     }
 
