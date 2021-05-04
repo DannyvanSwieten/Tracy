@@ -33,6 +33,38 @@ impl BufferResource {
             self.device.unmap_memory(self.memory);
         }
     }
+
+    pub fn copy_aligned_to<T>(&mut self, data: &[T], element_size: Option<usize>, stride: usize) {
+        unsafe {
+            let element_size = if let Some(element_size) = element_size{
+                element_size
+            } else {
+                std::mem::size_of::<T>()
+            };
+
+            let mut data_index = 0;
+            for i in (0..self.size).step_by(stride) {
+                let ptr = self
+                    .device
+                    .map_memory(
+                        self.memory,
+                        i,
+                        element_size as u64,
+                        MemoryMapFlags::default(),
+                    )
+                    .expect("Memory map failed on buffer");
+
+                std::ptr::copy_nonoverlapping(
+                    data[data_index..data_index + 1].as_ptr(),
+                    ptr as *mut T,
+                    element_size,
+                );
+
+                data_index = data_index + 1;
+                self.device.unmap_memory(self.memory);
+            }
+        }
+    }
 }
 
 impl BufferResource {

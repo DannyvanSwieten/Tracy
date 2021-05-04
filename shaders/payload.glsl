@@ -1,3 +1,4 @@
+
 struct RayPayload
 {
 	vec3 N;

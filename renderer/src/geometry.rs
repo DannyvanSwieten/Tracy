@@ -3,13 +3,13 @@ use crate::context::RtxContext;
 use ash::vk::{
     AccelerationStructureBuildGeometryInfoKHR, AccelerationStructureBuildRangeInfoKHR,
     AccelerationStructureBuildTypeKHR, AccelerationStructureCreateInfoKHR,
-    AccelerationStructureGeometryDataKHR, AccelerationStructureGeometryInstancesDataKHR,
-    AccelerationStructureGeometryKHR, AccelerationStructureGeometryTrianglesDataKHR,
-    AccelerationStructureInstanceKHR, AccelerationStructureKHR, AccelerationStructureTypeKHR,
-    Buffer, BufferDeviceAddressInfo, BufferUsageFlags, BuildAccelerationStructureModeKHR,
-    CommandBuffer, CommandBufferBeginInfo, DeviceOrHostAddressConstKHR, DeviceOrHostAddressKHR,
-    Format, GeometryTypeKHR, IndexType, MemoryPropertyFlags, PhysicalDeviceMemoryProperties2,
-    SubmitInfo,
+    AccelerationStructureDeviceAddressInfoKHR, AccelerationStructureGeometryDataKHR,
+    AccelerationStructureGeometryInstancesDataKHR, AccelerationStructureGeometryKHR,
+    AccelerationStructureGeometryTrianglesDataKHR, AccelerationStructureInstanceKHR,
+    AccelerationStructureKHR, AccelerationStructureTypeKHR, Buffer, BufferDeviceAddressInfo,
+    BufferUsageFlags, BuildAccelerationStructureModeKHR, CommandBuffer, CommandBufferBeginInfo,
+    DeviceAddress, DeviceOrHostAddressConstKHR, DeviceOrHostAddressKHR, Format, GeometryTypeKHR,
+    IndexType, MemoryPropertyFlags, PhysicalDeviceMemoryProperties2, SubmitInfo,
 };
 
 use ash::version::{DeviceV1_0, DeviceV1_2};
@@ -50,8 +50,13 @@ pub struct BottomLevelAccelerationStructure {
     acceleration_structure_buffer: BufferResource,
     acceleration_structure_scratch_buffer: BufferResource,
     acceleration_structure: AccelerationStructureKHR,
+    address: DeviceAddress,
 }
-
+impl BottomLevelAccelerationStructure {
+    pub fn address(&self) -> DeviceAddress {
+        self.address
+    }
+}
 impl BottomLevelAccelerationStructure {
     pub fn new(
         ctx: &RtxContext,
@@ -158,19 +163,28 @@ impl BottomLevelAccelerationStructure {
 
             ctx.device().device_wait_idle().expect("Wait failed");
 
+            let address_info = AccelerationStructureDeviceAddressInfoKHR::builder()
+                .acceleration_structure(acceleration_structure)
+                .build();
+            let address = ctx
+                .acceleration_structure_ext()
+                .get_acceleration_structure_device_address(&address_info);
+
             Self {
                 device: ctx.device().clone(),
                 acceleration_structure_buffer: acc_buffer,
                 acceleration_structure_scratch_buffer: scratch_buffer,
                 acceleration_structure,
+                address,
             }
         }
     }
 }
 
 pub struct TopLevelAccelerationStructure {
-    acceleration_structure: AccelerationStructureKHR,
+    pub acceleration_structure: AccelerationStructureKHR,
     instance_buffer: BufferResource,
+    accelation_structure_buffer: BufferResource,
 }
 
 impl TopLevelAccelerationStructure {
@@ -178,7 +192,7 @@ impl TopLevelAccelerationStructure {
         ctx: &RtxContext,
         blases: &[BottomLevelAccelerationStructure],
         instances: &[GeometryInstance],
-    ) {
+    ) -> Self {
         let instance_buffer = BufferResource::new(
             &ctx.memory_properties().memory_properties,
             ctx.device(),
@@ -277,6 +291,12 @@ impl TopLevelAccelerationStructure {
             ctx.submit_command_buffers(&command_buffer);
 
             ctx.device().device_wait_idle().expect("Wait failed");
+
+            Self {
+                acceleration_structure,
+                instance_buffer,
+                accelation_structure_buffer: acc_buffer,
+            }
         }
     }
 }

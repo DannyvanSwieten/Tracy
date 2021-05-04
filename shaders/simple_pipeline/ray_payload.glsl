@@ -1,0 +1,4 @@
+struct RayPayload
+{
+    bool hit;
+};

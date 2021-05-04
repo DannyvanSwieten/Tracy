@@ -2,7 +2,8 @@ use ash::extensions::khr::{AccelerationStructure, RayTracingPipeline};
 use ash::version::{DeviceV1_0, DeviceV1_2, InstanceV1_0};
 use ash::vk::{
     CommandBuffer, CommandBufferAllocateInfo, CommandPool, CommandPoolCreateFlags,
-    CommandPoolCreateInfo, Fence, PhysicalDeviceMemoryProperties2, Queue, SubmitInfo,
+    CommandPoolCreateInfo, Fence, PhysicalDeviceMemoryProperties2,
+    PhysicalDeviceRayTracingPipelinePropertiesKHR, Queue, SubmitInfo,
 };
 use ash::{Device, Instance};
 pub struct Context {
@@ -29,6 +30,9 @@ impl Context {
             }
         }
     }
+    pub fn device(&self) -> &Device {
+        &self.device
+    }
     pub fn command_buffer(&self) -> CommandBuffer {
         let allocate_info = CommandBufferAllocateInfo::builder()
             .command_buffer_count(1)
@@ -54,10 +58,11 @@ impl Context {
 }
 
 pub struct RtxContext {
-    base_context: Context,
+    pub base_context: Context,
     acceleration_structure_ext: AccelerationStructure,
     ray_tracing_pipeline_ext: RayTracingPipeline,
     memory_properties: PhysicalDeviceMemoryProperties2,
+    pipeline_properties: PhysicalDeviceRayTracingPipelinePropertiesKHR,
 }
 
 impl RtxContext {
@@ -67,6 +72,7 @@ impl RtxContext {
         queue: &Queue,
         queue_family_index: u32,
         memory_properties: &PhysicalDeviceMemoryProperties2,
+        pipeline_properties: &PhysicalDeviceRayTracingPipelinePropertiesKHR,
     ) -> Self {
         let base_context = Context::new(device, queue, queue_family_index);
         let acceleration_structure_ext = AccelerationStructure::new(instance, &base_context.device);
@@ -76,6 +82,7 @@ impl RtxContext {
             acceleration_structure_ext,
             ray_tracing_pipeline_ext,
             memory_properties: *memory_properties,
+            pipeline_properties: *pipeline_properties,
         }
     }
 
@@ -101,5 +108,9 @@ impl RtxContext {
 
     pub fn memory_properties(&self) -> &PhysicalDeviceMemoryProperties2 {
         &self.memory_properties
+    }
+
+    pub fn pipeline_properties(&self) -> &PhysicalDeviceRayTracingPipelinePropertiesKHR {
+        &self.pipeline_properties
     }
 }

@@ -14,24 +14,27 @@ use ash::version::{DeviceV1_0, InstanceV1_0, InstanceV1_1};
 
 // Extension Objects
 use ash::vk::{
-    AccelerationStructureKHR, DeferredOperationKHR, GeometryTypeKHR,
+    AccelerationStructureKHR, DeferredOperationKHR, DeviceSize, GeometryTypeKHR,
     PhysicalDeviceBufferDeviceAddressFeaturesEXT, PhysicalDeviceFeatures2KHR,
     PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceRayTracingPipelinePropertiesKHR,
     PhysicalDeviceVulkan12Features, RayTracingPipelineCreateInfoKHR,
-    RayTracingShaderGroupCreateInfoKHR, RayTracingShaderGroupTypeKHR, SHADER_UNUSED_KHR,
+    RayTracingShaderGroupCreateInfoKHR, RayTracingShaderGroupTypeKHR,
+    StridedDeviceAddressRegionKHR, WriteDescriptorSetAccelerationStructureKHR, SHADER_UNUSED_KHR,
 };
 // Core objects
 use ash::vk::{
-    BufferUsageFlags, CommandBufferAllocateInfo, CommandPool, CommandPoolCreateInfo,
-    DescriptorBindingFlagsEXT, DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize,
-    DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding,
-    DescriptorSetLayoutBindingFlagsCreateInfoEXT, DescriptorSetLayoutCreateInfo, DescriptorType,
-    DeviceCreateInfo, DeviceQueueCreateInfo, Format, ImageUsageFlags, ImageView,
-    MemoryPropertyFlags, PhysicalDevice, PhysicalDeviceAccelerationStructureFeaturesKHR,
-    PhysicalDeviceMemoryProperties, PhysicalDeviceMemoryProperties2, PhysicalDeviceProperties2,
-    Pipeline, PipelineCache, PipelineLayout, PipelineLayoutCreateInfo,
-    PipelineShaderStageCreateInfo, PushConstantRange, Queue, QueueFlags, ShaderModuleCreateInfo,
-    ShaderStageFlags,
+    BufferUsageFlags, CommandBufferAllocateInfo, CommandBufferBeginInfo, CommandPool,
+    CommandPoolCreateInfo, DescriptorBindingFlagsEXT, DescriptorImageInfo, DescriptorPool,
+    DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo,
+    DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutBindingFlagsCreateInfoEXT,
+    DescriptorSetLayoutCreateInfo, DescriptorType, DeviceCreateInfo, DeviceQueueCreateInfo, Format,
+    ImageAspectFlags, ImageLayout, ImageMemoryBarrier, ImageSubresourceRange, ImageUsageFlags,
+    ImageView, ImageViewCreateInfo, ImageViewType, MemoryPropertyFlags, PhysicalDevice,
+    PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceMemoryProperties,
+    PhysicalDeviceMemoryProperties2, PhysicalDeviceProperties2, Pipeline, PipelineBindPoint,
+    PipelineCache, PipelineLayout, PipelineLayoutCreateInfo, PipelineShaderStageCreateInfo,
+    PipelineStageFlags, PushConstantRange, Queue, QueueFlags, ShaderModuleCreateInfo,
+    ShaderStageFlags, WriteDescriptorSet,
 };
 
 use ash::{Device, Instance};
@@ -41,7 +44,6 @@ pub struct Renderer {
     context: RtxContext,
     queue_family_index: u32,
     descriptor_sets: DescriptorSet,
-    pipeline_properties: PhysicalDeviceRayTracingPipelinePropertiesKHR,
     pipeline: Pipeline,
     pipeline_layout: PipelineLayout,
     descriptor_pool: DescriptorPool,
@@ -49,46 +51,114 @@ pub struct Renderer {
     accumulation_image: Option<Image2DResource>,
     output_image: Option<Image2DResource>,
     output_image_view: ImageView,
-    bottom_level_acceleration_structures: Vec<AccelerationStructureKHR>,
-    top_level_acceleration_structure: AccelerationStructureKHR,
+    vertex_buffer: Option<BufferResource>,
+    index_buffer: Option<BufferResource>,
+    bottom_level_acceleration_structures: Vec<BottomLevelAccelerationStructure>,
+    top_level_acceleration_structure: Option<TopLevelAccelerationStructure>,
     shader_binding_table: Option<BufferResource>,
+    stride_addresses: Vec<StridedDeviceAddressRegionKHR>,
 }
 
 impl Renderer {
     pub fn initialize(&mut self, width: u32, height: u32) {
         self.create_images_and_views(width, height);
+        self.update_image_descriptors();
+    }
+
+    pub fn render(&mut self) {
+        unsafe {
+            if let Some(image) = self.output_image.as_ref() {
+                image.transition(&self.context.base_context, ImageLayout::GENERAL);
+            } else {
+                return;
+            }
+
+            let command_buffer = self.context.command_buffer();
+            self.context
+                .device()
+                .begin_command_buffer(command_buffer, &CommandBufferBeginInfo::builder().build())
+                .expect("begin command buffer failed");
+
+            self.context.device().cmd_bind_descriptor_sets(
+                command_buffer,
+                PipelineBindPoint::RAY_TRACING_KHR,
+                self.pipeline_layout,
+                0,
+                &[self.descriptor_sets],
+                &[],
+            );
+
+            self.context.device().cmd_bind_pipeline(
+                command_buffer,
+                PipelineBindPoint::RAY_TRACING_KHR,
+                self.pipeline,
+            );
+            self.context.pipeline_ext().cmd_trace_rays(
+                command_buffer,
+                &self.stride_addresses[0],
+                &self.stride_addresses[1],
+                &self.stride_addresses[2],
+                &StridedDeviceAddressRegionKHR::default(),
+                1200,
+                800,
+                1,
+            );
+
+            self.context
+                .device()
+                .end_command_buffer(command_buffer)
+                .expect("end command buffer failed");
+
+            self.context.submit_command_buffers(&command_buffer);
+            self.context
+                .device()
+                .device_wait_idle()
+                .expect("wait failed");
+        }
     }
 
     pub fn build(&mut self, vertices: &[f32], indices: &[u32]) {
-        let vertex_buffer = BufferResource::new(
+        self.vertex_buffer = Some(BufferResource::new(
             &self.physical_device_memory_properties.memory_properties,
             &self.context.device(),
             (vertices.len() * 12) as u64,
             MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
             BufferUsageFlags::VERTEX_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
-        );
+        ));
 
-        let index_buffer = BufferResource::new(
+        self.index_buffer = Some(BufferResource::new(
             &self.physical_device_memory_properties.memory_properties,
             &self.context.device(),
             (indices.len() * 4) as u64,
             MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
             BufferUsageFlags::INDEX_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
-        );
+        ));
 
-        let blases = [BottomLevelAccelerationStructure::new(
+        self.bottom_level_acceleration_structures = vec![BottomLevelAccelerationStructure::new(
             &self.context,
-            &vertex_buffer,
+            &self.vertex_buffer.as_ref().unwrap(),
             vertices.len() as u32,
             0,
-            &index_buffer,
+            &self.index_buffer.as_ref().unwrap(),
             indices.len() as u32,
             0,
         )];
 
-        let instances = [GeometryInstance::new(0, 0xff, 0, 0, 0)];
+        let instances = [GeometryInstance::new(
+            0,
+            0xff,
+            0,
+            0,
+            self.bottom_level_acceleration_structures[0].address(),
+        )];
 
-        let tlas = TopLevelAccelerationStructure::new(&self.context, &blases, &instances);
+        let tlas = TopLevelAccelerationStructure::new(
+            &self.context,
+            &self.bottom_level_acceleration_structures,
+            &instances,
+        );
+        self.top_level_acceleration_structure = Some(tlas);
+        self.update_acceleration_structure_descriptors();
     }
 }
 
@@ -177,6 +247,7 @@ impl Renderer {
                 &queue,
                 queue_family_index as u32,
                 &physical_device_memory_properties,
+                &pipeline_properties,
             );
 
             let mut result = Self {
@@ -185,16 +256,18 @@ impl Renderer {
                 queue_family_index: queue_family_index as u32,
                 descriptor_sets: DescriptorSet::null(),
                 pipeline: Pipeline::null(),
-                pipeline_properties,
                 pipeline_layout: PipelineLayout::null(),
                 descriptor_pool: DescriptorPool::null(),
                 descriptor_set_layouts: Vec::new(),
                 accumulation_image: None,
                 output_image: None,
                 output_image_view: ImageView::null(),
-                top_level_acceleration_structure: AccelerationStructureKHR::null(),
+                vertex_buffer: None,
+                index_buffer: None,
+                top_level_acceleration_structure: None,
                 bottom_level_acceleration_structures: Vec::new(),
                 shader_binding_table: None,
+                stride_addresses: Vec::new(),
             };
             result.create_descriptor_pool();
             result.create_descriptor_set_layout();
@@ -214,16 +287,8 @@ impl Renderer {
                     descriptor_count: 1,
                 },
                 DescriptorPoolSize {
-                    ty: DescriptorType::UNIFORM_BUFFER,
-                    descriptor_count: 1,
-                },
-                DescriptorPoolSize {
                     ty: DescriptorType::STORAGE_IMAGE,
-                    descriptor_count: 2,
-                },
-                DescriptorPoolSize {
-                    ty: DescriptorType::STORAGE_BUFFER,
-                    descriptor_count: 4,
+                    descriptor_count: 1,
                 },
             ];
             let descriptor_pool_create_info = DescriptorPoolCreateInfo::builder()
@@ -254,104 +319,26 @@ impl Renderer {
                     .stage_flags(ShaderStageFlags::RAYGEN_KHR)
                     .binding(1)
                     .build(),
-                // accumulation image
-                DescriptorSetLayoutBinding::builder()
-                    .descriptor_count(1)
-                    .descriptor_type(DescriptorType::STORAGE_IMAGE)
-                    .stage_flags(ShaderStageFlags::RAYGEN_KHR)
-                    .binding(2)
-                    .build(),
-                // Camera
-                DescriptorSetLayoutBinding::builder()
-                    .descriptor_count(1)
-                    .descriptor_type(DescriptorType::UNIFORM_BUFFER)
-                    .stage_flags(ShaderStageFlags::RAYGEN_KHR)
-                    .binding(3)
-                    .build(),
             ];
 
-            let bindings_closest_hit = [
-                // position buffer
-                DescriptorSetLayoutBinding::builder()
-                    .descriptor_count(1)
-                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                    .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
-                    .binding(0)
-                    .build(),
-                // index buffer
-                DescriptorSetLayoutBinding::builder()
-                    .descriptor_count(1)
-                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                    .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
-                    .binding(1)
-                    .build(),
-                DescriptorSetLayoutBinding::builder()
-                    .descriptor_count(1)
-                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                    .stage_flags(ShaderStageFlags::RAYGEN_KHR)
-                    .binding(2)
-                    .build(),
-                DescriptorSetLayoutBinding::builder()
-                    .descriptor_count(1)
-                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
-                    .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
-                    .binding(3)
-                    .build(),
-            ];
+            let layout_info_ray_gen =
+                DescriptorSetLayoutCreateInfo::builder().bindings(&bindings_ray_gen);
 
-            let mut binding_flags_ray_gen = DescriptorSetLayoutBindingFlagsCreateInfoEXT::builder()
-                .binding_flags(&[
-                    DescriptorBindingFlagsEXT::empty(),
-                    DescriptorBindingFlagsEXT::empty(),
-                    DescriptorBindingFlagsEXT::empty(),
-                    DescriptorBindingFlagsEXT::empty(),
-                ])
-                .build();
-
-            let mut binding_flags_closest_hit =
-                DescriptorSetLayoutBindingFlagsCreateInfoEXT::builder()
-                    .binding_flags(&[
-                        DescriptorBindingFlagsEXT::empty(),
-                        DescriptorBindingFlagsEXT::empty(),
-                        DescriptorBindingFlagsEXT::empty(),
-                        DescriptorBindingFlagsEXT::empty(),
-                    ])
-                    .build();
-
-            let layout_info_ray_gen = DescriptorSetLayoutCreateInfo::builder()
-                .bindings(&bindings_ray_gen)
-                .push_next(&mut binding_flags_ray_gen);
-
-            let layout_info_closest_hit = DescriptorSetLayoutCreateInfo::builder()
-                .bindings(&bindings_closest_hit)
-                .push_next(&mut binding_flags_closest_hit);
-
-            self.descriptor_set_layouts = vec![
-                self.context
-                    .device()
-                    .create_descriptor_set_layout(&layout_info_ray_gen, None)
-                    .expect("Descriptor set layout creation failed"),
-                self.context
-                    .device()
-                    .create_descriptor_set_layout(&layout_info_closest_hit, None)
-                    .expect("Descriptor set layout creation failed"),
-            ]
+            self.descriptor_set_layouts = vec![self
+                .context
+                .device()
+                .create_descriptor_set_layout(&layout_info_ray_gen, None)
+                .expect("Descriptor set layout creation failed")]
         }
     }
 
     fn create_pipeline_layout(&mut self) {
         unsafe {
-            let push_constant_ranges = [PushConstantRange::builder()
-                .stage_flags(ShaderStageFlags::RAYGEN_KHR)
-                .size(24)
-                .build()];
             self.pipeline_layout = self
                 .context
                 .device()
                 .create_pipeline_layout(
-                    &PipelineLayoutCreateInfo::builder()
-                        .set_layouts(&self.descriptor_set_layouts)
-                        .push_constant_ranges(&push_constant_ranges),
+                    &PipelineLayoutCreateInfo::builder().set_layouts(&self.descriptor_set_layouts),
                     None,
                 )
                 .expect("Pipeline layout creation failed");
@@ -374,21 +361,21 @@ impl Renderer {
 
     fn load_shaders_and_pipeline(&mut self) {
         unsafe {
-            let code = load_spirv("shaders/rgen.rgen.spv");
+            let code = load_spirv("shaders/simple_pipeline/ray_gen.rgen.spv");
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let gen = self
                 .context
                 .device()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray generation shader compilation failed");
-            let code = load_spirv("shaders/closesthit.rchit.spv");
+            let code = load_spirv("shaders/simple_pipeline/closest_hit.rchit.spv");
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let chit = self
                 .context
                 .device()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray closest hit shader compilation failed");
-            let code = load_spirv("shaders/miss.rmiss.spv");
+            let code = load_spirv("shaders/simple_pipeline/ray_miss.rmiss.spv");
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let miss = self
                 .context
@@ -464,8 +451,10 @@ impl Renderer {
     fn create_shader_binding_table(&mut self) {
         unsafe {
             let group_count = 3;
-            let table_size =
-                (self.pipeline_properties.shader_group_handle_size * group_count) as usize;
+            let properties = self.context.pipeline_properties();
+            let aligned_group_size = properties.shader_group_handle_size
+                + (properties.shader_group_base_alignment - properties.shader_group_handle_size);
+            let table_size = (aligned_group_size * group_count) as usize;
             let table_data: Vec<u8> = self
                 .context
                 .pipeline_ext()
@@ -477,20 +466,80 @@ impl Renderer {
                 &self.context.device(),
                 table_size as u64,
                 MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
-                BufferUsageFlags::TRANSFER_SRC,
+                BufferUsageFlags::TRANSFER_SRC
+                    | BufferUsageFlags::SHADER_BINDING_TABLE_KHR
+                    | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
             ));
 
-            self.shader_binding_table
-                .as_mut()
-                .unwrap()
-                .copy_to(&table_data);
+            self.shader_binding_table.as_mut().unwrap().copy_aligned_to(
+                &table_data,
+                Some(properties.shader_group_handle_size as usize),
+                aligned_group_size as usize,
+            );
+
+            let ray_gen_address = StridedDeviceAddressRegionKHR::builder()
+                .size(
+                    self.context
+                        .pipeline_properties()
+                        .shader_group_base_alignment as DeviceSize,
+                )
+                .stride(
+                    self.context
+                        .pipeline_properties()
+                        .shader_group_base_alignment as DeviceSize,
+                )
+                .device_address(self.shader_binding_table.as_ref().unwrap().device_address())
+                .build();
+
+            let closest_hit_address = StridedDeviceAddressRegionKHR::builder()
+                .size(
+                    self.context
+                        .pipeline_properties()
+                        .shader_group_base_alignment as DeviceSize,
+                )
+                .stride(
+                    self.context
+                        .pipeline_properties()
+                        .shader_group_base_alignment as DeviceSize,
+                )
+                .device_address(
+                    self.shader_binding_table.as_ref().unwrap().device_address()
+                        + self
+                            .context
+                            .pipeline_properties()
+                            .shader_group_base_alignment as DeviceSize
+                            * 2,
+                )
+                .build();
+
+            let miss_address = StridedDeviceAddressRegionKHR::builder()
+                .size(
+                    self.context
+                        .pipeline_properties()
+                        .shader_group_base_alignment as DeviceSize,
+                )
+                .stride(
+                    self.context
+                        .pipeline_properties()
+                        .shader_group_base_alignment as DeviceSize,
+                )
+                .device_address(
+                    self.shader_binding_table.as_ref().unwrap().device_address()
+                        + self
+                            .context
+                            .pipeline_properties()
+                            .shader_group_base_alignment as DeviceSize,
+                )
+                .build();
+
+            self.stride_addresses = vec![ray_gen_address, miss_address, closest_hit_address];
         }
     }
 
     fn create_images_and_views(&mut self, width: u32, height: u32) {
         self.output_image = Some(Image2DResource::new(
             &self.physical_device_memory_properties.memory_properties,
-            &self.context.device(),
+            &self.context.base_context,
             width,
             height,
             Format::R8G8B8A8_UNORM,
@@ -500,12 +549,74 @@ impl Renderer {
 
         self.accumulation_image = Some(Image2DResource::new(
             &self.physical_device_memory_properties.memory_properties,
-            &self.context.device(),
+            &self.context.base_context,
             width,
             height,
             Format::R32G32B32A32_SFLOAT,
             ImageUsageFlags::STORAGE,
             MemoryPropertyFlags::DEVICE_LOCAL,
         ));
+
+        let view_info = ImageViewCreateInfo::builder()
+            .format(Format::R8G8B8A8_UNORM)
+            .subresource_range(
+                ImageSubresourceRange::builder()
+                    .aspect_mask(ImageAspectFlags::COLOR)
+                    .layer_count(1)
+                    .level_count(1)
+                    .build(),
+            )
+            .view_type(ImageViewType::TYPE_2D)
+            .image(*self.output_image.as_ref().unwrap().image());
+
+        unsafe {
+            self.output_image_view = self
+                .context
+                .device()
+                .create_image_view(&view_info, None)
+                .expect("Image View creation failed");
+        }
+    }
+
+    fn update_image_descriptors(&mut self) {
+        let image_writes = [DescriptorImageInfo::builder()
+            .image_view(self.output_image_view)
+            .image_layout(ImageLayout::GENERAL)
+            .build()];
+        let writes = [WriteDescriptorSet::builder()
+            .image_info(&image_writes)
+            .dst_set(self.descriptor_sets)
+            .dst_binding(1)
+            .descriptor_type(DescriptorType::STORAGE_IMAGE)
+            .build()];
+
+        unsafe {
+            self.context.device().update_descriptor_sets(&writes, &[]);
+        }
+    }
+
+    fn update_acceleration_structure_descriptors(&mut self) {
+        let structures = [self
+            .top_level_acceleration_structure
+            .as_ref()
+            .unwrap()
+            .acceleration_structure
+            .clone()];
+        let mut acc_write = WriteDescriptorSetAccelerationStructureKHR::builder()
+            .acceleration_structures(&structures)
+            .build();
+
+        let mut writes = [WriteDescriptorSet::builder()
+            .push_next(&mut acc_write)
+            .dst_set(self.descriptor_sets)
+            .dst_binding(0)
+            .descriptor_type(DescriptorType::ACCELERATION_STRUCTURE_KHR)
+            .build()];
+
+        writes[0].descriptor_count = 1;
+
+        unsafe {
+            self.context.device().update_descriptor_sets(&writes, &[]);
+        }
     }
 }

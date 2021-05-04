@@ -1,9 +1,11 @@
+use crate::context::Context;
 use crate::memory::memory_type_index;
 
 use ash::vk::{
-    DeviceMemory, Extent3D, Format, Image, ImageCreateInfo, ImageType, ImageUsageFlags,
-    MemoryAllocateInfo, MemoryPropertyFlags, PhysicalDeviceMemoryProperties, SampleCountFlags,
-    SharingMode,
+    CommandBufferBeginInfo, DeviceMemory, Extent3D, Format, Image, ImageAspectFlags,
+    ImageCreateInfo, ImageLayout, ImageMemoryBarrier, ImageSubresourceRange, ImageType,
+    ImageUsageFlags, MemoryAllocateInfo, MemoryPropertyFlags, PhysicalDeviceMemoryProperties,
+    PipelineStageFlags, SampleCountFlags, SharingMode,
 };
 
 use ash::version::DeviceV1_0;
@@ -13,12 +15,13 @@ pub struct Image2DResource {
     device: Device,
     image: Image,
     memory: DeviceMemory,
+    layout: ImageLayout,
 }
 
 impl Image2DResource {
     pub fn new(
         properties: &PhysicalDeviceMemoryProperties,
-        device: &Device,
+        context: &Context,
         width: u32,
         height: u32,
         format: Format,
@@ -42,6 +45,8 @@ impl Image2DResource {
                 .mip_levels(1)
                 .usage(usage);
 
+            let device = context.device();
+
             let image = device
                 .create_image(&image_info, None)
                 .expect("Image creation failed");
@@ -59,15 +64,67 @@ impl Image2DResource {
                     .allocate_memory(&allocation_info, None)
                     .expect("Memory allocation failed");
 
+                device
+                    .bind_image_memory(image, memory, 0)
+                    .expect("Image memory bind failed");
+
                 Self {
                     device: device.clone(),
                     image,
                     memory,
+                    layout: ImageLayout::UNDEFINED,
                 }
             } else {
                 panic!()
             }
         }
+    }
+
+    pub fn image(&self) -> &Image {
+        &self.image
+    }
+
+    pub fn layout(&self) -> ImageLayout {
+        self.layout
+    }
+
+    pub fn transition(&self, ctx: &Context, new_layout: ImageLayout) {
+        let barrier = ImageMemoryBarrier::builder()
+            .old_layout(self.layout)
+            .new_layout(new_layout)
+            .image(self.image)
+            .src_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
+            .dst_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
+            .subresource_range(
+                ImageSubresourceRange::builder()
+                    .aspect_mask(ImageAspectFlags::COLOR)
+                    .layer_count(1)
+                    .level_count(1)
+                    .build(),
+            )
+            .build();
+
+        let cmd = ctx.command_buffer();
+        unsafe {
+            ctx.device()
+                .begin_command_buffer(cmd, &CommandBufferBeginInfo::builder().build())
+                .expect("Begin commandbuffer failed");
+
+            ctx.device().cmd_pipeline_barrier(
+                cmd,
+                PipelineStageFlags::ALL_COMMANDS,
+                ash::vk::PipelineStageFlags::ALL_COMMANDS,
+                ash::vk::DependencyFlags::BY_REGION,
+                &[],
+                &[],
+                &[barrier],
+            );
+
+            ctx.device()
+                .end_command_buffer(cmd)
+                .expect("End command buffer failed");
+        }
+        ctx.submit_command_buffers(&cmd);
     }
 }
 

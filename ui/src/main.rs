@@ -101,6 +101,7 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
         );
         renderer.initialize(1200, 800);
         renderer.build(&vertices, &indices);
+        renderer.render();
 
         self.ui_windows.insert(window.id(), ui);
         self.windows.insert(window.id(), window);
