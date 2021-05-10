@@ -13,7 +13,7 @@ use renderer::renderer;
 
 use window::MouseEventType;
 
-use application::{Application, ApplicationDelegate};
+use application::{Application, ApplicationDelegate, WindowRegistry};
 use ui_window::{UIWindowDelegate};
 use user_interface::UIDelegate;
 use window_delegate::WindowDelegate;
@@ -57,7 +57,6 @@ impl UIDelegate<MyState> for MyUIDelegate {
                             node::Node::<MyState>::new("btn")
                                 .with_widget(widget::Button::new("Button"))
                                 .with_event_callback(MouseEventType::MouseUp, |_event, state| {
-                                    println!("Button 1!");
                                     state.count = state.count + 1;
                                     widget::Action::Layout {
                                         nodes: vec!["root"],
@@ -79,15 +78,18 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
         &mut self,
         app: &Application<MyState>,
         state: &mut MyState,
+        window_registry: &mut WindowRegistry<MyState>,
         target: &EventLoopWindowTarget<()>,
     ) {
 
-        let window = winit::window::WindowBuilder::new().with_title("Yeah buddy").with_inner_size(winit::dpi::LogicalSize{width: 1200, height: 800}).build(&target).unwrap();
+        let window = window_registry.create_window(target, "Yeah buddy", 1200, 800);
 
         let ui = match UIWindowDelegate::<MyState>::new(app, state, &window, Box::new(MyUIDelegate {})) {
             Ok(ui_window_delegate) => Box::new(ui_window_delegate),
             Err(message) => panic!("{}", message),
         };
+
+        window_registry.register(window, ui);
 
         // let vertices: [f32; 9] = [0., 1., 0., 1., -1., 0., -1., -1., 0.];
         // let indices: [u32; 3] = [0, 1, 2];

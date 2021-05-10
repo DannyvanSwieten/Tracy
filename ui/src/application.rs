@@ -1,6 +1,9 @@
 extern crate ash;
 extern crate ash_window;
 extern crate winit;
+use crate::window_delegate::WindowDelegate;
+
+use std::collections::HashMap;
 
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 use ash::{vk, Device, Entry, Instance};
@@ -10,6 +13,7 @@ use std::ffi::{CStr, CString};
 use std::path::PathBuf;
 
 use winit::{
+    window::{Window, WindowBuilder, WindowId},
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
 };
@@ -72,6 +76,7 @@ pub trait ApplicationDelegate<AppState> {
         &mut self,
         _: &Application<AppState>,
         _: &mut AppState,
+        _: &mut WindowRegistry<AppState>,
         _: &EventLoopWindowTarget<()>,
     ) {
     }
@@ -165,6 +170,28 @@ pub trait ApplicationDelegate<AppState> {
         _: &winit::dpi::PhysicalPosition<f64>,
     ) -> ControlFlow {
         ControlFlow::Wait
+    }
+}
+
+pub struct WindowRegistry<AppState>{
+    windows: HashMap<WindowId, Window>,
+    window_delegates: HashMap<WindowId, Box<dyn WindowDelegate<AppState>>>
+}
+
+impl<AppState> WindowRegistry<AppState> {
+    pub fn create_window(&self, target: &EventLoopWindowTarget<()>, title: &str, width: u32, height: u32) -> Window {
+        WindowBuilder::new().with_title(title).with_inner_size(winit::dpi::LogicalSize{width, height}).build(target).unwrap()
+    }
+
+    pub fn register(&mut self, window: Window, delegate: Box<dyn WindowDelegate<AppState>>){
+        self.window_delegates.insert(window.id(), delegate);
+        self.windows.insert(window.id(), window);
+    }
+
+    fn close_button_pressed(&mut self, id: &WindowId, state: &mut AppState){
+        if let Some(delegate) = self.window_delegates.get_mut(id){
+            delegate.close_button_pressed(state);
+        }
     }
 }
 
@@ -330,7 +357,9 @@ impl<AppState: 'static> Application<AppState> {
         let event_loop = EventLoop::new();
         let mut d = delegate;
 
-        d.application_will_start(&self, &mut s, &event_loop);
+        let mut window_registry = WindowRegistry{windows: HashMap::new(), window_delegates: HashMap::new()};
+
+        d.application_will_start(&self, &mut s, &mut window_registry, &event_loop);
         let mut last_mouse_position = winit::dpi::PhysicalPosition::<f64>::new(0., 0.);
         let mut mouse_is_down = false;
         event_loop.run(move |e, event_loop, control_flow| {
@@ -342,7 +371,10 @@ impl<AppState: 'static> Application<AppState> {
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
                     window_id,
-                } => *control_flow = d.close_button_pressed(&window_id),
+                } =>{ 
+                    *control_flow = d.close_button_pressed(&window_id);
+                    window_registry.close_button_pressed(&window_id, &mut s);
+                },
 
                 Event::WindowEvent {
                     event: WindowEvent::Destroyed,

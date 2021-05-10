@@ -1,6 +1,7 @@
 use crate::application::Application;
 
 pub trait WindowDelegate<AppState> {
+    fn close_button_pressed(&mut self, state: &mut AppState){}
     fn mouse_moved(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
     fn mouse_dragged(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
     fn mouse_down(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
