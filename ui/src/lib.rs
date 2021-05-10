@@ -1,33 +1,33 @@
 pub mod application;
-pub mod canvas;
 pub mod node;
 pub mod swapchain;
 pub mod ui_window;
 pub mod user_interface;
 pub mod widget;
 pub mod window;
+pub mod window_delegate;
+
+use std::collections::HashMap;
 
 use renderer::renderer;
 
 use window::MouseEventType;
 
 use application::{Application, ApplicationDelegate};
-use ui_window::{UIWindow, WindowDelegate};
+use ui_window::{UIWindowDelegate};
 use user_interface::UIDelegate;
-
+use window_delegate::WindowDelegate;
 use winit::{
     dpi::LogicalSize,
     event_loop::EventLoopWindowTarget,
     window::{Window, WindowBuilder, WindowId},
 };
 
-use std::collections::HashMap;
-
 struct MyState {
     count: u32,
 }
 
-struct Delegate<MyState> {
+struct Delegate<MyState>{
     windows: HashMap<WindowId, Window>,
     ui_windows: HashMap<WindowId, Box<dyn WindowDelegate<MyState>>>,
 }
@@ -36,7 +36,7 @@ impl Delegate<MyState> {
     fn new() -> Self {
         Self {
             windows: HashMap::new(),
-            ui_windows: HashMap::new(),
+            ui_windows: HashMap::new()
         }
     }
 }
@@ -81,30 +81,24 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
         state: &mut MyState,
         target: &EventLoopWindowTarget<()>,
     ) {
-        let window = WindowBuilder::new()
-            .with_title("First Window!")
-            .with_inner_size(LogicalSize::new(1200, 800))
-            .build(&target)
-            .unwrap();
 
-        let ui = match UIWindow::<MyState>::new(app, state, &window, Box::new(MyUIDelegate {})) {
-            Ok(ui_window) => Box::new(ui_window),
+        let window = winit::window::WindowBuilder::new().with_title("Yeah buddy").with_inner_size(winit::dpi::LogicalSize{width: 1200, height: 800}).build(&target).unwrap();
+
+        let ui = match UIWindowDelegate::<MyState>::new(app, state, &window, Box::new(MyUIDelegate {})) {
+            Ok(ui_window_delegate) => Box::new(ui_window_delegate),
             Err(message) => panic!("{}", message),
         };
 
-        let vertices: [f32; 9] = [0., 1., 0., 1., -1., 0., -1., -1., 0.];
-        let indices: [u32; 3] = [0, 1, 2];
+        // let vertices: [f32; 9] = [0., 1., 0., 1., -1., 0., -1., -1., 0.];
+        // let indices: [u32; 3] = [0, 1, 2];
 
-        let mut renderer = renderer::Renderer::new(
-            app.vulkan_instance(),
-            Some((*app.primary_gpu(), app.present_queue_and_index().1 as u32)),
-        );
-        renderer.initialize(1200, 800);
-        renderer.build(&vertices, &indices);
-        renderer.render();
-
-        self.ui_windows.insert(window.id(), ui);
-        self.windows.insert(window.id(), window);
+        // let mut renderer = renderer::Renderer::new(
+        //     app.vulkan_instance(),
+        //     Some((*app.primary_gpu(), app.present_queue_and_index().1 as u32)),
+        // );
+        // renderer.initialize(1200, 800);
+        // renderer.build(&vertices, &indices);
+        // renderer.render();
     }
 
     fn application_updated(
@@ -112,10 +106,10 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
         app: &Application<MyState>,
         state: &mut MyState,
     ) -> winit::event_loop::ControlFlow {
-        for (_, delegate) in self.ui_windows.iter_mut() {
-            delegate.update(app, state);
-            delegate.draw(app, state)
-        }
+        // for (_, delegate) in self.ui_windows.iter_mut() {
+        //     delegate.update(app, state);
+        //     delegate.draw(app, state)
+        // }
         winit::event_loop::ControlFlow::Poll
     }
 
@@ -152,7 +146,7 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
     ) -> winit::event_loop::ControlFlow {
         self.ui_windows.remove(id);
         self.windows.remove(id);
-        if self.windows.is_empty() {
+        if false {
             winit::event_loop::ControlFlow::Exit
         } else {
             winit::event_loop::ControlFlow::Wait

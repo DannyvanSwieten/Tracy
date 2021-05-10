@@ -1,4 +1,6 @@
-use super::application::*;
+use crate::application::Application;
+use crate::window_delegate::WindowDelegate;
+
 use super::swapchain;
 use super::user_interface::{UIDelegate, UserInterface};
 use super::window::MouseEvent;
@@ -26,26 +28,7 @@ unsafe fn get_procedure(
     }
 }
 
-pub trait WindowDelegate<AppState> {
-    fn mouse_moved(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
-    fn mouse_dragged(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
-    fn mouse_down(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
-    fn mouse_up(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {}
-    fn resized(
-        &mut self,
-        window: &winit::window::Window,
-        app: &Application<AppState>,
-        state: &mut AppState,
-        size: &winit::dpi::PhysicalSize<u32>,
-    ) {
-    }
-    fn keyboard_event(&mut self, state: &mut AppState, event: &winit::event::KeyboardInput) {}
-    fn draw(&mut self, app: &Application<AppState>, state: &AppState) {}
-
-    fn update(&mut self, app: &Application<AppState>, state: &mut AppState) {}
-}
-
-pub struct UIWindow<AppState> {
+pub struct UIWindowDelegate<AppState> {
     context: RecordingContext,
     surfaces: Vec<Surface>,
     surface_images: Vec<ash::vk::Image>,
@@ -74,7 +57,7 @@ pub struct UIWindow<AppState> {
     sub_optimal_swapchain: bool,
 }
 
-impl<'a, AppState: 'static> UIWindow<AppState> {
+impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
     fn recreate_resources(&mut self, ctx: &ash::Device) {
         let image_info = ImageInfo::new_n32_premul(
             (
@@ -841,7 +824,7 @@ impl<'a, AppState: 'static> UIWindow<AppState> {
     }
 }
 
-impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
+impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindowDelegate<AppState> {
     fn mouse_moved(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
         let p = skia_safe::Point::from((event.x as f32, event.y as f32));
         self.user_interface
@@ -899,7 +882,7 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindow<AppState> {
         self.user_interface.resize(state, size.width, size.height);
     }
 
-    fn update(&mut self, app: &Application<AppState>, state: &mut AppState) {
+    fn update(&mut self, state: &mut AppState) {
         self.user_interface.update(state)
     }
 
