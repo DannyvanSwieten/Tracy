@@ -193,6 +193,12 @@ impl<AppState> WindowRegistry<AppState> {
             delegate.close_button_pressed(state);
         }
     }
+
+    fn mouse_moved(&mut self, id: &WindowId, state: &mut AppState, position: &winit::dpi::PhysicalPosition<f64>){
+        if let Some(delegate) = self.window_delegates.get_mut(id){
+            delegate.mouse_moved(state, position.x as f32, position.y as f32);
+        }
+    }
 }
 
 pub struct Application<AppState> {

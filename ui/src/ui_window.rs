@@ -825,8 +825,8 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 }
 
 impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindowDelegate<AppState> {
-    fn mouse_moved(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
-        let p = skia_safe::Point::from((event.x as f32, event.y as f32));
+    fn mouse_moved(&mut self, state: &mut AppState, x: f32, y: f32) {
+        let p = skia_safe::Point::from((x, y));
         self.user_interface
             .mouse_moved(state, &MouseEvent::new(0, &p, &p));
     }

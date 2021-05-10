@@ -27,16 +27,13 @@ struct MyState {
     count: u32,
 }
 
-struct Delegate<MyState>{
-    windows: HashMap<WindowId, Window>,
-    ui_windows: HashMap<WindowId, Box<dyn WindowDelegate<MyState>>>,
+struct Delegate{
+
 }
 
-impl Delegate<MyState> {
+impl Delegate {
     fn new() -> Self {
         Self {
-            windows: HashMap::new(),
-            ui_windows: HashMap::new()
         }
     }
 }
@@ -73,7 +70,7 @@ impl UIDelegate<MyState> for MyUIDelegate {
     }
 }
 
-impl ApplicationDelegate<MyState> for Delegate<MyState> {
+impl ApplicationDelegate<MyState> for Delegate{
     fn application_will_start(
         &mut self,
         app: &Application<MyState>,
@@ -122,9 +119,9 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
         id: &winit::window::WindowId,
         size: &winit::dpi::PhysicalSize<u32>,
     ) -> winit::event_loop::ControlFlow {
-        if let Some(window) = self.ui_windows.get_mut(id) {
-            window.resized(self.windows.get(id).unwrap(), app, state, size)
-        }
+        // if let Some(window) = self.ui_windows.get_mut(id) {
+        //     window.resized(self.windows.get(id).unwrap(), app, state, size)
+        // }
 
         winit::event_loop::ControlFlow::Wait
     }
@@ -135,9 +132,9 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
         state: &MyState,
         window_id: &WindowId,
     ) -> winit::event_loop::ControlFlow {
-        if let Some(delegate) = self.ui_windows.get_mut(window_id) {
-            delegate.draw(app, state)
-        }
+        // if let Some(delegate) = self.ui_windows.get_mut(window_id) {
+        //     delegate.draw(app, state)
+        // }
 
         winit::event_loop::ControlFlow::Wait
     }
@@ -146,8 +143,8 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
         &mut self,
         id: &winit::window::WindowId,
     ) -> winit::event_loop::ControlFlow {
-        self.ui_windows.remove(id);
-        self.windows.remove(id);
+        // self.ui_windows.remove(id);
+        // self.windows.remove(id);
         if false {
             winit::event_loop::ControlFlow::Exit
         } else {
@@ -161,9 +158,9 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) -> winit::event_loop::ControlFlow {
-        if let Some(window) = self.ui_windows.get_mut(id) {
-            window.mouse_moved(state, position)
-        }
+        // if let Some(window) = self.ui_windows.get_mut(id) {
+        //     window.mouse_moved(state, position)
+        // }
         winit::event_loop::ControlFlow::Wait
     }
 
@@ -173,9 +170,9 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) -> winit::event_loop::ControlFlow {
-        if let Some(window) = self.ui_windows.get_mut(id) {
-            window.mouse_dragged(state, position)
-        }
+        // if let Some(window) = self.ui_windows.get_mut(id) {
+        //     window.mouse_dragged(state, position)
+        // }
         winit::event_loop::ControlFlow::Wait
     }
 
@@ -185,9 +182,9 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) -> winit::event_loop::ControlFlow {
-        if let Some(window) = self.ui_windows.get_mut(id) {
-            window.mouse_down(state, position)
-        }
+        // if let Some(window) = self.ui_windows.get_mut(id) {
+        //     window.mouse_down(state, position)
+        // }
         winit::event_loop::ControlFlow::Wait
     }
 
@@ -197,9 +194,9 @@ impl ApplicationDelegate<MyState> for Delegate<MyState> {
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) -> winit::event_loop::ControlFlow {
-        if let Some(window) = self.ui_windows.get_mut(id) {
-            window.mouse_up(state, position)
-        }
+        // if let Some(window) = self.ui_windows.get_mut(id) {
+        //     window.mouse_up(state, position)
+        // }
         winit::event_loop::ControlFlow::Wait
     }
 }
