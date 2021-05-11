@@ -3,7 +3,7 @@ use crate::window_delegate::WindowDelegate;
 
 use super::swapchain;
 use super::user_interface::{UIDelegate, UserInterface};
-use super::window::MouseEvent;
+use super::window_event::MouseEvent;
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 use ash::vk::Handle;
 use byteorder::ReadBytesExt;
@@ -831,20 +831,20 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindowDelegate<AppSta
             .mouse_moved(state, &MouseEvent::new(0, &p, &p));
     }
 
-    fn mouse_dragged(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
-        let p = skia_safe::Point::from((event.x as f32, event.y as f32));
+    fn mouse_dragged(&mut self, state: &mut AppState, x: f32, y: f32) {
+        let p = skia_safe::Point::from((x, y));
         self.user_interface
             .mouse_drag(state, &MouseEvent::new(0, &p, &p));
     }
 
-    fn mouse_down(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
-        let p = skia_safe::Point::from((event.x as f32, event.y as f32));
+    fn mouse_down(&mut self, state: &mut AppState, x: f32, y: f32) {
+        let p = skia_safe::Point::from((x, y));
         self.user_interface
             .mouse_down(state, &MouseEvent::new(0, &p, &p));
     }
 
-    fn mouse_up(&mut self, state: &mut AppState, event: &winit::dpi::PhysicalPosition<f64>) {
-        let p = skia_safe::Point::from((event.x as f32, event.y as f32));
+    fn mouse_up(&mut self, state: &mut AppState, x: f32, y: f32) {
+        let p = skia_safe::Point::from((x, y));
         self.user_interface
             .mouse_up(state, &MouseEvent::new(0, &p, &p));
     }
@@ -854,7 +854,8 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindowDelegate<AppSta
         window: &winit::window::Window,
         app: &Application<AppState>,
         state: &mut AppState,
-        size: &winit::dpi::PhysicalSize<u32>,
+        width: u32,
+        height: u32,
     ) {
         unsafe {
             app.primary_device_context()
@@ -879,7 +880,7 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindowDelegate<AppSta
         self.swapchain = new_swapchain;
         self.recreate_resources(app.primary_device_context());
         self.sub_optimal_swapchain = false;
-        self.user_interface.resize(state, size.width, size.height);
+        self.user_interface.resize(state, width, height);
     }
 
     fn update(&mut self, state: &mut AppState) {

@@ -1,10 +1,9 @@
+use crate::canvas3d::Canvas3D;
 use crate::node::*;
 use crate::widget::*;
-use crate::window::MouseEvent;
+use crate::window_event::MouseEvent;
 use skia_safe::canvas::Canvas;
 use skia_safe::Point;
-use skia_safe::Rect;
-use skia_safe::Size;
 
 pub trait UIDelegate<AppState> {
     fn build(&self, section: &str, state: &AppState) -> Node<AppState>;
@@ -163,7 +162,7 @@ impl<AppState: 'static> UserInterface<AppState> {
         }
     }
 
-    // pub fn paint_gpu(&mut self, state: &mut AppState, ctx: &mut GraphicsContext) {
-    //     self.root.draw_gpu(state, ctx);
-    // }
+    pub fn paint_3d(&mut self, state: &AppState, canvas_3d: &mut Canvas3D) {
+        self.root.draw_3d(state);
+    }
 }

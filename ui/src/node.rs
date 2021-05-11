@@ -3,8 +3,7 @@ use skia_safe::Rect;
 use skia_safe::Size;
 
 use crate::widget::*;
-use crate::window::MouseEvent;
-use crate::window::MouseEventType;
+use crate::window_event::{MouseEvent, MouseEventType};
 use skia_safe::canvas::Canvas;
 use std::collections::HashMap;
 
@@ -247,15 +246,15 @@ impl<AppState> Node<AppState> {
         }
     }
 
-    // pub fn draw_gpu(&mut self, state: &mut AppState, ctx: &mut GraphicsContext) {
-    //     if self.widget.needs_gpu() {
-    //         self.widget.paint_gpu(state, &self.rect, ctx);
-    //     }
+    pub fn draw_3d(&mut self, state: &AppState) {
+        if self.widget.needs_gpu() {
+            self.widget.paint_3d(state, &self.rect);
+        }
 
-    //     for child in self.children.iter_mut() {
-    //         child.draw_gpu(state, ctx);
-    //     }
-    // }
+        for child in self.children.iter_mut() {
+            child.draw_3d(state);
+        }
+    }
 
     pub fn hit_test(&self, pos: &Point) -> bool {
         let bx = pos.x >= self.rect.left && pos.x < self.rect.right;

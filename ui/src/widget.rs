@@ -1,15 +1,7 @@
 use crate::node::*;
-use crate::window::MouseEvent;
-use crate::window::MouseEventType;
-use skia_safe::canvas::Canvas;
-use skia_safe::colors;
-use skia_safe::Color;
-use skia_safe::Font;
-use skia_safe::Paint;
-use skia_safe::PaintStyle;
-use skia_safe::Point;
-use skia_safe::Rect;
-use skia_safe::Size;
+use crate::window_event::{MouseEvent, MouseEventType};
+
+use skia_safe::{canvas::Canvas, Color, Font, Paint, PaintStyle, Point, Rect, Size};
 
 use std::collections::HashMap;
 
@@ -212,6 +204,7 @@ pub trait Widget<AppState> {
         _style: &StyleSheet,
     ) {
     }
+    fn paint_3d(&mut self, _state: &AppState, _rect: &Rect) {}
     fn layout(
         &mut self,
         _state: &AppState,

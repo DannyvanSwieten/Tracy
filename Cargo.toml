@@ -1,2 +1,2 @@
 [workspace]
-members = ["ui", "renderer"]
+members = ["ui", "renderer", "app"]

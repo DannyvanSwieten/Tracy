@@ -13,9 +13,9 @@ use std::ffi::{CStr, CString};
 use std::path::PathBuf;
 
 use winit::{
-    window::{Window, WindowBuilder, WindowId},
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
+    window::{Window, WindowBuilder, WindowId},
 };
 
 use ash::extensions::{
@@ -92,19 +92,7 @@ pub trait ApplicationDelegate<AppState> {
         ControlFlow::Wait
     }
 
-    fn close_button_pressed(&mut self, _: &winit::window::WindowId) -> ControlFlow {
-        ControlFlow::Wait
-    }
     fn window_destroyed(&mut self, _: &winit::window::WindowId) -> ControlFlow {
-        ControlFlow::Wait
-    }
-    fn window_resized(
-        &mut self,
-        app: &Application<AppState>,
-        state: &mut AppState,
-        _: &winit::window::WindowId,
-        _: &winit::dpi::PhysicalSize<u32>,
-    ) -> ControlFlow {
         ControlFlow::Wait
     }
 
@@ -135,70 +123,127 @@ pub trait ApplicationDelegate<AppState> {
     fn file_dropped(&mut self, _: &winit::window::WindowId, _: &PathBuf) -> ControlFlow {
         ControlFlow::Wait
     }
-
-    fn mouse_moved(
-        &mut self,
-        _: &mut AppState,
-        _: &winit::window::WindowId,
-        _: &winit::dpi::PhysicalPosition<f64>,
-    ) -> ControlFlow {
-        ControlFlow::Wait
-    }
-
-    fn mouse_dragged(
-        &mut self,
-        _: &mut AppState,
-        _: &winit::window::WindowId,
-        _: &winit::dpi::PhysicalPosition<f64>,
-    ) -> ControlFlow {
-        ControlFlow::Wait
-    }
-
-    fn mouse_down(
-        &mut self,
-        _: &mut AppState,
-        _: &winit::window::WindowId,
-        _: &winit::dpi::PhysicalPosition<f64>,
-    ) -> ControlFlow {
-        ControlFlow::Wait
-    }
-
-    fn mouse_up(
-        &mut self,
-        _: &mut AppState,
-        _: &winit::window::WindowId,
-        _: &winit::dpi::PhysicalPosition<f64>,
-    ) -> ControlFlow {
-        ControlFlow::Wait
-    }
 }
 
-pub struct WindowRegistry<AppState>{
+pub struct WindowRegistry<AppState> {
     windows: HashMap<WindowId, Window>,
-    window_delegates: HashMap<WindowId, Box<dyn WindowDelegate<AppState>>>
+    window_delegates: HashMap<WindowId, Box<dyn WindowDelegate<AppState>>>,
 }
 
 impl<AppState> WindowRegistry<AppState> {
-    pub fn create_window(&self, target: &EventLoopWindowTarget<()>, title: &str, width: u32, height: u32) -> Window {
-        WindowBuilder::new().with_title(title).with_inner_size(winit::dpi::LogicalSize{width, height}).build(target).unwrap()
+    pub fn create_window(
+        &self,
+        target: &EventLoopWindowTarget<()>,
+        title: &str,
+        width: u32,
+        height: u32,
+    ) -> Window {
+        WindowBuilder::new()
+            .with_title(title)
+            .with_inner_size(winit::dpi::LogicalSize { width, height })
+            .build(target)
+            .unwrap()
     }
 
-    pub fn register(&mut self, window: Window, delegate: Box<dyn WindowDelegate<AppState>>){
+    pub fn register(&mut self, window: Window, delegate: Box<dyn WindowDelegate<AppState>>) {
         self.window_delegates.insert(window.id(), delegate);
         self.windows.insert(window.id(), window);
     }
 
-    fn close_button_pressed(&mut self, id: &WindowId, state: &mut AppState){
-        if let Some(delegate) = self.window_delegates.get_mut(id){
-            delegate.close_button_pressed(state);
+    pub fn active_window_count(&self) -> usize {
+        self.windows.len()
+    }
+
+    fn update(&mut self, state: &mut AppState) {
+        for (_, delegate) in self.window_delegates.iter_mut() {
+            delegate.update(state)
         }
     }
 
-    fn mouse_moved(&mut self, id: &WindowId, state: &mut AppState, position: &winit::dpi::PhysicalPosition<f64>){
-        if let Some(delegate) = self.window_delegates.get_mut(id){
+    fn window_resized(
+        &mut self,
+        app: &Application<AppState>,
+        state: &mut AppState,
+        id: &winit::window::WindowId,
+        size: &winit::dpi::PhysicalSize<u32>,
+    ) {
+        if let Some(window) = self.window_delegates.get_mut(id) {
+            window.resized(
+                self.windows.get(id).unwrap(),
+                app,
+                state,
+                size.width,
+                size.height,
+            )
+        }
+    }
+
+    fn close_button_pressed(&mut self, id: &WindowId, state: &mut AppState) {
+        if let Some(delegate) = self.window_delegates.get_mut(id) {
+            if delegate.close_button_pressed(state) {
+                self.windows.remove(id);
+            }
+        }
+    }
+
+    fn mouse_moved(
+        &mut self,
+        state: &mut AppState,
+        id: &WindowId,
+        position: &winit::dpi::PhysicalPosition<f64>,
+    ) {
+        if let Some(delegate) = self.window_delegates.get_mut(id) {
             delegate.mouse_moved(state, position.x as f32, position.y as f32);
         }
     }
+
+    fn mouse_dragged(
+        &mut self,
+        state: &mut AppState,
+        id: &winit::window::WindowId,
+        position: &winit::dpi::PhysicalPosition<f64>,
+    ) {
+        if let Some(delegate) = self.window_delegates.get_mut(id) {
+            delegate.mouse_dragged(state, position.x as f32, position.y as f32);
+        }
+    }
+
+    fn mouse_down(
+        &mut self,
+        state: &mut AppState,
+        id: &winit::window::WindowId,
+        position: &winit::dpi::PhysicalPosition<f64>,
+    ) {
+        if let Some(delegate) = self.window_delegates.get_mut(id) {
+            delegate.mouse_down(state, position.x as f32, position.y as f32);
+        }
+    }
+
+    fn mouse_up(
+        &mut self,
+        state: &mut AppState,
+        id: &winit::window::WindowId,
+        position: &winit::dpi::PhysicalPosition<f64>,
+    ) {
+        if let Some(delegate) = self.window_delegates.get_mut(id) {
+            delegate.mouse_up(state, position.x as f32, position.y as f32);
+        }
+    }
+
+    fn window_moved(&mut self, _: &winit::window::WindowId, _: &winit::dpi::PhysicalPosition<i32>) {
+    }
+
+    fn draw(&mut self, app: &Application<AppState>, state: &mut AppState) {
+        for (_, delegate) in self.window_delegates.iter_mut() {
+            delegate.draw(app, state)
+        }
+    }
+
+    fn window_destroyed(&mut self, id: &WindowId) {
+        self.window_delegates.remove(id);
+    }
+
+    fn file_dropped(&mut self, id: &WindowId, path_buffer: &PathBuf) {}
 }
 
 pub struct Application<AppState> {
@@ -363,13 +408,16 @@ impl<AppState: 'static> Application<AppState> {
         let event_loop = EventLoop::new();
         let mut d = delegate;
 
-        let mut window_registry = WindowRegistry{windows: HashMap::new(), window_delegates: HashMap::new()};
+        let mut window_registry = WindowRegistry {
+            windows: HashMap::new(),
+            window_delegates: HashMap::new(),
+        };
 
         d.application_will_start(&self, &mut s, &mut window_registry, &event_loop);
         let mut last_mouse_position = winit::dpi::PhysicalPosition::<f64>::new(0., 0.);
         let mut mouse_is_down = false;
         event_loop.run(move |e, event_loop, control_flow| {
-            *control_flow = ControlFlow::Wait;
+            *control_flow = ControlFlow::Poll;
 
             d.application_will_update(&mut self, &mut s);
 
@@ -377,30 +425,32 @@ impl<AppState: 'static> Application<AppState> {
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
                     window_id,
-                } =>{ 
-                    *control_flow = d.close_button_pressed(&window_id);
+                } => {
                     window_registry.close_button_pressed(&window_id, &mut s);
-                },
+                    if window_registry.active_window_count() == 0 {
+                        *control_flow = ControlFlow::Exit;
+                    }
+                }
 
                 Event::WindowEvent {
                     event: WindowEvent::Destroyed,
                     window_id,
-                } => *control_flow = d.window_destroyed(&window_id),
+                } => window_registry.window_destroyed(&window_id),
 
                 Event::WindowEvent {
                     event: WindowEvent::Moved(physical_position),
                     window_id,
-                } => *control_flow = d.window_moved(&window_id, &physical_position),
+                } => window_registry.window_moved(&window_id, &physical_position),
 
                 Event::WindowEvent {
                     event: WindowEvent::Resized(physical_size),
                     window_id,
-                } => *control_flow = d.window_resized(&self, &mut s, &window_id, &physical_size),
+                } => window_registry.window_resized(&self, &mut s, &window_id, &physical_size),
 
                 Event::WindowEvent {
                     event: WindowEvent::DroppedFile(path_buffer),
                     window_id,
-                } => *control_flow = d.file_dropped(&window_id, &path_buffer),
+                } => window_registry.file_dropped(&window_id, &path_buffer),
 
                 Event::WindowEvent {
                     event: WindowEvent::Focused(f),
@@ -414,7 +464,7 @@ impl<AppState: 'static> Application<AppState> {
                 }
 
                 Event::RedrawRequested(window_id) => {
-                    *control_flow = d.window_requested_redraw(&self, &s, &window_id)
+                    //window_registry.window_requested_redraw(&self, &s, &window_id)
                 }
 
                 Event::WindowEvent {
@@ -428,9 +478,9 @@ impl<AppState: 'static> Application<AppState> {
                 } => {
                     last_mouse_position = position;
                     if mouse_is_down {
-                        *control_flow = d.mouse_dragged(&mut s, &window_id, &position)
+                        window_registry.mouse_dragged(&mut s, &window_id, &position)
                     } else {
-                        *control_flow = d.mouse_moved(&mut s, &window_id, &position)
+                        window_registry.mouse_moved(&mut s, &window_id, &position)
                     }
                 }
 
@@ -446,11 +496,11 @@ impl<AppState: 'static> Application<AppState> {
                 } => match state {
                     winit::event::ElementState::Pressed => {
                         mouse_is_down = true;
-                        *control_flow = d.mouse_down(&mut s, &window_id, &last_mouse_position)
+                        window_registry.mouse_down(&mut s, &window_id, &last_mouse_position)
                     }
                     winit::event::ElementState::Released => {
                         mouse_is_down = false;
-                        *control_flow = d.mouse_up(&mut s, &window_id, &last_mouse_position)
+                        window_registry.mouse_up(&mut s, &window_id, &last_mouse_position)
                     }
                 },
 
@@ -459,7 +509,10 @@ impl<AppState: 'static> Application<AppState> {
 
             match control_flow {
                 ControlFlow::Exit => d.application_will_quit(&mut self, &event_loop),
-                _ => *control_flow = d.application_updated(&mut self, &mut s),
+                _ => {
+                    window_registry.update(&mut s);
+                    window_registry.draw(&mut self, &mut s);
+                }
             }
         });
     }
