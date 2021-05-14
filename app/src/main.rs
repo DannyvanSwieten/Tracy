@@ -54,7 +54,7 @@ impl ApplicationDelegate<MyState> for Delegate {
         window_registry: &mut WindowRegistry<MyState>,
         target: &EventLoopWindowTarget<()>,
     ) {
-        let window = window_registry.create_window(target, "Yeah buddy", 1200, 800);
+        let window = window_registry.create_window(target, "Application Title", 1200, 800);
 
         let ui = match UIWindowDelegate::<MyState>::new(
             app,

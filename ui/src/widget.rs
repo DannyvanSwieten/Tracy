@@ -589,146 +589,125 @@ impl<AppState> Widget<AppState> for Button<AppState> {
 //     }
 // }
 
-// pub struct Slider<AppState> {
-//     label: String,
-//     border_paint: Paint,
-//     bg_paint: Paint,
-//     fill_paint: Paint,
-//     text_paint: Paint,
-//     font: Font,
-//     min: f32,
-//     max: f32,
-//     discrete: bool,
-//     current_normalized: f32,
-//     current_value: f32,
-//     last_position: f32,
-//     value_changed: Option<Box<dyn FnMut(f32, &mut AppState)>>,
-// }
+pub struct Slider<AppState> {
+    label: String,
+    border_paint: Paint,
+    bg_paint: Paint,
+    fill_paint: Paint,
+    text_paint: Paint,
+    font: Font,
+    min: f32,
+    max: f32,
+    discrete: bool,
+    current_normalized: f32,
+    current_value: f32,
+    last_position: f32,
+    value_changed: Option<Box<dyn FnMut(f32, &mut AppState)>>,
+}
 
-// impl<AppState> Slider<AppState> {
-//     pub fn new(label: &str) -> Self {
-//         Slider::new_with_min_max_and_value(label, 0., 1., 0., false)
-//     }
+impl<AppState> Slider<AppState> {
+    pub fn new(label: &str) -> Self {
+        Slider::new_with_min_max_and_value(label, 0., 1., 0., false)
+    }
 
-//     pub fn new_with_min_max_and_value(
-//         label: &str,
-//         min: f32,
-//         max: f32,
-//         value: f32,
-//         discrete: bool,
-//     ) -> Self {
-//         Slider {
-//             label: label.to_string(),
-//             bg_paint: Paint::default(),
-//             fill_paint: Paint::default(),
-//             text_paint: Paint::default(),
-//             border_paint: Paint::default(),
-//             font: Font::default(),
-//             min,
-//             max,
-//             discrete,
-//             current_normalized: value / (max - min),
-//             current_value: value,
-//             last_position: 0.,
-//             value_changed: None,
-//         }
-//     }
+    pub fn new_with_min_max_and_value(
+        label: &str,
+        min: f32,
+        max: f32,
+        value: f32,
+        discrete: bool,
+    ) -> Self {
+        Slider {
+            label: label.to_string(),
+            bg_paint: Paint::default(),
+            fill_paint: Paint::default(),
+            text_paint: Paint::default(),
+            border_paint: Paint::default(),
+            font: Font::default(),
+            min,
+            max,
+            discrete,
+            current_normalized: value / (max - min),
+            current_value: value,
+            last_position: 0.,
+            value_changed: None,
+        }
+    }
 
-//     pub fn with_handler<F>(mut self, handler: F) -> Self
-//     where
-//         F: FnMut(f32, &mut AppState) + 'static,
-//     {
-//         self.value_changed = Some(Box::new(handler));
-//         self
-//     }
+    pub fn with_handler<F>(mut self, handler: F) -> Self
+    where
+        F: FnMut(f32, &mut AppState) + 'static,
+    {
+        self.value_changed = Some(Box::new(handler));
+        self
+    }
 
-//     pub fn set_value(&mut self, value: f32) {
-//         self.current_value = value.max(self.min).min(self.max);
-//         self.current_normalized = map_range(self.current_value, self.min, self.max, 0., 1.)
-//     }
-// }
+    pub fn set_value(&mut self, value: f32) {
+        self.current_value = value.max(self.min).min(self.max);
+        self.current_normalized = map_range(self.current_value, self.min, self.max, 0., 1.)
+    }
+}
 
-// impl<AppState> Widget<AppState> for Slider<AppState> {
-//     fn paint(&mut self, _: &mut AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
-//         let bg_color = style.get("bg-color");
-//         let fill_color = style.get("fill-color");
-//         let border_color = style.get("border-color");
+impl<AppState> Widget<AppState> for Slider<AppState> {
+    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+        let bg_color = style.get("bg-color");
+        let fill_color = style.get("fill-color");
+        let border_color = style.get("border-color");
 
-//         self.bg_paint
-//             .set_color(bg_color.unwrap_or(&Color::new(1., 0., 0., 1.)));
-//         self.border_paint
-//             .set_color(border_color.unwrap_or(&Color::new(1., 0., 0., 1.)));
-//         self.border_paint.set_style(PaintStyle::Stroke);
-//         self.fill_paint
-//             .set_color(fill_color.unwrap_or(&Color::new(0.2, 0.2, 0.2, 1.)));
-//         self.text_paint.set_color(&Color::new(1., 1., 1., 1.));
-//         canvas.draw_rounded_rect(
-//             rect.left(),
-//             rect.bottom(),
-//             rect.width(),
-//             rect.height(),
-//             2.,
-//             2.,
-//             &self.bg_paint,
-//         );
-//         canvas.draw_rounded_rect(
-//             rect.left(),
-//             rect.bottom(),
-//             rect.width(),
-//             rect.height(),
-//             2.,
-//             2.,
-//             &self.border_paint,
-//         );
-//         canvas.draw_rounded_rect(
-//             rect.left(),
-//             rect.bottom() + 2.,
-//             (rect.width()) * self.current_normalized,
-//             rect.height() - 4.,
-//             0.,
-//             0.,
-//             &self.fill_paint,
-//         );
+        self.bg_paint
+            .set_color(*bg_color.unwrap_or(&Color::new(128)));
+        self.border_paint
+            .set_color(*border_color.unwrap_or(&Color::new(128)));
+        self.border_paint.set_style(PaintStyle::Stroke);
+        self.fill_paint
+            .set_color(*fill_color.unwrap_or(&Color::new(128)));
+        self.text_paint.set_color(Color::new(255));
+        canvas.draw_round_rect(rect, 2., 2., &self.bg_paint);
+        canvas.draw_round_rect(rect, 2., 2., &self.border_paint);
+        let mut fill_rect = Rect::from_xywh(
+            rect.left(),
+            rect.top(),
+            rect.width() * self.current_normalized,
+            rect.height(),
+        );
+        fill_rect.inset((2, 2));
 
-//         let t = self.label.to_string() + ": " + &format!("{:.4}", &self.current_value.to_string());
-//         canvas.draw_text(
-//             &t,
-//             rect,
-//             &self.text_paint,
-//             &self.font,
-//         );
-//     }
+        canvas.draw_round_rect(fill_rect, 0., 0., &self.fill_paint);
 
-//     fn mouse_down(&mut self, state: &mut AppState, rect: &Rect, event: &MouseEvent) {
-//         let x = event.global_position.x - rect.left();
-//         self.current_normalized = (1. / rect.width()) * x;
+        let t = self.label.to_string() + ": " + &format!("{:.4}", &self.current_value.to_string());
+        canvas.draw_str(&t, rect.center(), &self.font, &self.text_paint);
+    }
 
-//         self.current_value = map_range(self.current_normalized, 0., 1., self.min, self.max);
-//         if self.discrete {
-//             self.current_value = self.current_value.round();
-//         }
-//         if let Some(l) = &mut self.value_changed {
-//             (l)(self.current_value, state);
-//         }
+    fn mouse_down(&mut self, state: &mut AppState, rect: &Rect, event: &MouseEvent) {
+        let x = event.global_position().x - rect.left();
+        self.current_normalized = (1. / rect.width()) * x;
 
-//         self.last_position = x;
-//     }
+        self.current_value = map_range(self.current_normalized, 0., 1., self.min, self.max);
+        if self.discrete {
+            self.current_value = self.current_value.round();
+        }
+        if let Some(l) = &mut self.value_changed {
+            (l)(self.current_value, state);
+        }
 
-//     fn mouse_drag(&mut self, state: &mut AppState, rect: &Rect, event: &MouseEvent) {
-//         self.last_position += event.delta_position.x;
-//         self.current_normalized =
-//             (1. / rect.width()) * self.last_position.min(rect.width()).max(0.);
+        self.last_position = x;
+    }
 
-//         self.current_value = map_range(self.current_normalized, 0., 1., self.min, self.max);
+    // fn mouse_drag(&mut self, state: &mut AppState, rect: &Rect, event: &MouseEvent) {
+    //     self.last_position += event.delta_position.x;
+    //     self.current_normalized =
+    //         (1. / rect.width()) * self.last_position.min(rect.width()).max(0.);
 
-//         if self.discrete {
-//             self.current_value = self.current_value.round();
-//         }
-//         if let Some(l) = &mut self.value_changed {
-//             (l)(self.current_value, state);
-//         }
-//     }
-// }
+    //     self.current_value = map_range(self.current_normalized, 0., 1., self.min, self.max);
+
+    //     if self.discrete {
+    //         self.current_value = self.current_value.round();
+    //     }
+    //     if let Some(l) = &mut self.value_changed {
+    //         (l)(self.current_value, state);
+    //     }
+    // }
+}
 
 // pub struct Spinner<AppState> {
 //     label: String,

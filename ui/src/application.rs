@@ -87,15 +87,6 @@ pub trait ApplicationDelegate<AppState> {
     ) {
     }
 
-    fn application_will_update(&mut self, _: &Application<AppState>, _: &mut AppState) {}
-    fn application_updated(&mut self, _: &Application<AppState>, _: &mut AppState) -> ControlFlow {
-        ControlFlow::Wait
-    }
-
-    fn window_destroyed(&mut self, _: &winit::window::WindowId) -> ControlFlow {
-        ControlFlow::Wait
-    }
-
     fn window_moved(
         &mut self,
         _: &winit::window::WindowId,
@@ -418,8 +409,6 @@ impl<AppState: 'static> Application<AppState> {
         let mut mouse_is_down = false;
         event_loop.run(move |e, event_loop, control_flow| {
             *control_flow = ControlFlow::Poll;
-
-            d.application_will_update(&mut self, &mut s);
 
             match e {
                 Event::WindowEvent {
