@@ -47,6 +47,8 @@ impl GraphicsPipelineState {
         self.depth_stencil_state.depth_write_enable = 1;
     }
 
+    pub fn set_vertex_shader_spirv(&mut self, spirv_code: &[u32]) {}
+
     pub fn build(&self, device: &Device) -> Pipeline {
         let create_info = GraphicsPipelineCreateInfo::builder()
             .layout(self.pipeline_layout)
