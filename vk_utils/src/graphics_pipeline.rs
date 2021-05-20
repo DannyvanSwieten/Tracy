@@ -3,14 +3,14 @@ use ash::vk::{
     PipelineDepthStencilStateCreateInfo, PipelineDynamicStateCreateInfo, PipelineLayout,
     PipelineMultisampleStateCreateInfo, PipelineRasterizationStateCreateInfo,
     PipelineShaderStageCreateInfo, PipelineTessellationStateCreateInfo,
-    PipelineViewportStateCreateInfo, RenderPass,
+    PipelineViewportStateCreateInfo, PolygonMode, RenderPass, ShaderModule, ShaderStageFlags,
 };
 
 use ash::Device;
 
 use ash::version::DeviceV1_0;
 
-pub struct GraphicsPipelineState {
+pub struct GraphicsPipeline {
     blend_state: PipelineColorBlendStateCreateInfo,
     depth_stencil_state: PipelineDepthStencilStateCreateInfo,
     dynamic_state: PipelineDynamicStateCreateInfo,
@@ -21,9 +21,10 @@ pub struct GraphicsPipelineState {
     viewport_state: PipelineViewportStateCreateInfo,
     pipeline_layout: PipelineLayout,
     render_pass: RenderPass,
+    pipeline: Pipeline,
 }
 
-impl GraphicsPipelineState {
+impl GraphicsPipeline {
     pub fn new() -> Self {
         Self {
             blend_state: PipelineColorBlendStateCreateInfo::default(),
@@ -36,6 +37,7 @@ impl GraphicsPipelineState {
             viewport_state: PipelineViewportStateCreateInfo::default(),
             pipeline_layout: PipelineLayout::null(),
             render_pass: RenderPass::null(),
+            pipeline: Pipeline::null(),
         }
     }
 
@@ -47,9 +49,52 @@ impl GraphicsPipelineState {
         self.depth_stencil_state.depth_write_enable = 1;
     }
 
-    pub fn set_vertex_shader_spirv(&mut self, spirv_code: &[u32]) {}
+    pub fn set_vertex_shader(&mut self, module: &ShaderModule) {
+        self.shader_stage_state.push(
+            PipelineShaderStageCreateInfo::builder()
+                .module(*module)
+                .stage(ShaderStageFlags::VERTEX)
+                .build(),
+        )
+    }
 
-    pub fn build(&self, device: &Device) -> Pipeline {
+    pub fn set_fragment_shader(&mut self, module: &ShaderModule) {
+        self.shader_stage_state.push(
+            PipelineShaderStageCreateInfo::builder()
+                .module(*module)
+                .stage(ShaderStageFlags::FRAGMENT)
+                .build(),
+        )
+    }
+
+    pub fn set_geometry_shader(&mut self, module: &ShaderModule) {
+        self.shader_stage_state.push(
+            PipelineShaderStageCreateInfo::builder()
+                .module(*module)
+                .stage(ShaderStageFlags::GEOMETRY)
+                .build(),
+        )
+    }
+
+    pub fn set_tesselation_control_shader(&mut self, module: &ShaderModule) {
+        self.shader_stage_state.push(
+            PipelineShaderStageCreateInfo::builder()
+                .module(*module)
+                .stage(ShaderStageFlags::TESSELLATION_CONTROL)
+                .build(),
+        )
+    }
+
+    pub fn set_tesselation_evaluation_shader(&mut self, module: &ShaderModule) {
+        self.shader_stage_state.push(
+            PipelineShaderStageCreateInfo::builder()
+                .module(*module)
+                .stage(ShaderStageFlags::TESSELLATION_EVALUATION)
+                .build(),
+        )
+    }
+
+    pub fn build(&mut self, device: &Device) {
         let create_info = GraphicsPipelineCreateInfo::builder()
             .layout(self.pipeline_layout)
             .render_pass(self.render_pass)
@@ -64,9 +109,17 @@ impl GraphicsPipelineState {
             .build();
 
         unsafe {
-            device
+            self.pipeline = device
                 .create_graphics_pipelines(PipelineCache::null(), &[create_info], None)
-                .expect("Pipeline creation failed")[0]
+                .expect("Pipeline creation failed")[0];
         }
+    }
+
+    pub fn vk_handle(&self) -> &Pipeline {
+        &self.pipeline
+    }
+
+    pub fn layout(&self) -> &PipelineLayout {
+        &self.pipeline_layout
     }
 }
