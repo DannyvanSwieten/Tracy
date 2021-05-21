@@ -145,7 +145,7 @@ impl Vulkan {
                         .enumerate()
                         .filter_map(|(index, ref info)| {
                             if info.queue_flags.contains(flags) {
-                                Some(Gpu::new(self, pdevice, index as u32))
+                                Some(Gpu::new(self, pdevice))
                             } else {
                                 None
                             }

@@ -16,11 +16,7 @@ pub struct Gpu {
 }
 
 impl Gpu {
-    pub(crate) fn new(
-        vulkan: &Vulkan,
-        physical_device: &PhysicalDevice,
-        queue_family_index: u32,
-    ) -> Self {
+    pub(crate) fn new(vulkan: &Vulkan, physical_device: &PhysicalDevice) -> Self {
         unsafe {
             let features = vulkan
                 .vk_instance()
