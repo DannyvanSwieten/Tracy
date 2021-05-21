@@ -26,8 +26,11 @@ impl GraphicsCommandBuffer {
         }
     }
 
-    pub fn submit(&self) {
+    pub(crate) fn submit(&self) {
         unsafe {
+            self.device
+                .end_command_buffer(self.command_buffer[0])
+                .expect("Command Buffer end failed");
             self.device
                 .queue_submit(self.queue, &self.submit_info, Fence::null())
                 .expect("Queue submit failed");
@@ -84,7 +87,7 @@ impl GraphicsCommandBuffer {
         }
     }
 
-    pub fn begin(
+    pub(crate) fn begin(
         &self,
         render_pass: &RenderPass,
         framebuffer: &Framebuffer,

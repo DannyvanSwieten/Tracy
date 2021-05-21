@@ -15,6 +15,8 @@ use ash::extensions::{
     mvk::MacOSSurface,
 };
 
+use crate::gpu::Gpu;
+
 unsafe extern "system" fn vulkan_debug_callback(
     message_severity: DebugUtilsMessageSeverityFlagsEXT,
     message_type: DebugUtilsMessageTypeFlagsEXT,
@@ -58,6 +60,7 @@ fn surface_extension_name() -> &'static CStr {
     Win32Surface::name()
 }
 
+#[derive(Clone)]
 pub struct Vulkan {
     _debug_callback: DebugUtilsMessengerEXT,
     library: Entry,
@@ -65,7 +68,7 @@ pub struct Vulkan {
 }
 
 impl Vulkan {
-    pub fn new(name: &str, layers: &[CString], extensions: &[CString]) -> Self {
+    pub fn new(name: &str, layers: &[String], extensions: &[String]) -> Self {
         let c_name = CString::new(name).unwrap();
         let appinfo = ApplicationInfo::builder()
             .application_name(&c_name)
@@ -74,8 +77,10 @@ impl Vulkan {
             .engine_version(0)
             .api_version(make_version(1, 2, 0));
 
-        let layers_names_raw: Vec<*const i8> =
-            layers.iter().map(|raw_name| raw_name.as_ptr()).collect();
+        let layers_names_raw: Vec<*const i8> = layers
+            .iter()
+            .map(|layer_name| unsafe { CString::from_raw(layer_name.as_ptr() as *mut i8).as_ptr() })
+            .collect();
 
         let surface_extensions = vec![Surface::name(), surface_extension_name()];
         let mut extension_names_raw = surface_extensions
@@ -84,7 +89,7 @@ impl Vulkan {
             .collect::<Vec<_>>();
         extension_names_raw.push(DebugUtils::name().as_ptr());
         for ext in extensions.iter() {
-            extension_names_raw.push(ext.as_ptr())
+            extension_names_raw.push(unsafe { CString::from_raw(ext.as_ptr() as *mut i8).as_ptr() })
         }
 
         let create_info = InstanceCreateInfo::builder()
@@ -123,22 +128,11 @@ impl Vulkan {
     pub fn library(&self) -> &Entry {
         &self.library
     }
-    pub fn instance(&self) -> &Instance {
+    pub fn vk_instance(&self) -> &Instance {
         &self.instance
     }
 
-    pub fn hardware_devices(&self) -> Vec<PhysicalDevice> {
-        unsafe {
-            self.instance
-                .enumerate_physical_devices()
-                .expect("Physical device enumeration failed")
-        }
-    }
-
-    pub fn hardware_devices_with_queue_support(
-        &self,
-        flags: QueueFlags,
-    ) -> Vec<(PhysicalDevice, usize)> {
+    pub fn hardware_devices_with_queue_support(&self, flags: QueueFlags) -> Vec<Gpu> {
         unsafe {
             self.instance
                 .enumerate_physical_devices()
@@ -151,7 +145,7 @@ impl Vulkan {
                         .enumerate()
                         .filter_map(|(index, ref info)| {
                             if info.queue_flags.contains(flags) {
-                                Some((*pdevice, index))
+                                Some(Gpu::new(self, pdevice, index as u32))
                             } else {
                                 None
                             }
@@ -159,7 +153,7 @@ impl Vulkan {
                         .next()
                 })
                 .filter_map(|v| v)
-                .collect::<Vec<(PhysicalDevice, usize)>>()
+                .collect::<Vec<Gpu>>()
         }
     }
 }
