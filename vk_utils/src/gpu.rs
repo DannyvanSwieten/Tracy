@@ -5,6 +5,7 @@ use ash::vk::{
 };
 use ash::{Device, Instance};
 
+use crate::device_context::DeviceContext;
 use crate::vk_instance::Vulkan;
 use std::ffi::CString;
 
@@ -33,6 +34,28 @@ impl Gpu {
                 physical_device: physical_device.clone(),
             }
         }
+    }
+
+    pub fn device_context(&self) -> DeviceContext {
+        DeviceContext::new(&self.vulkan.vk_instance(), self)
+    }
+
+    pub(crate) fn family_type_index(&self, flags: QueueFlags) -> Option<u32> {
+        unsafe {
+            for (index, queue_info) in self
+                .vulkan
+                .vk_instance()
+                .get_physical_device_queue_family_properties(self.physical_device)
+                .iter()
+                .enumerate()
+            {
+                if queue_info.queue_flags.contains(flags) {
+                    return Some(index as u32);
+                }
+            }
+        }
+
+        None
     }
 
     pub fn vk_physical_device(&self) -> &PhysicalDevice {

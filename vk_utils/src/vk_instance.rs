@@ -142,8 +142,7 @@ impl Vulkan {
                     self.instance
                         .get_physical_device_queue_family_properties(*pdevice)
                         .iter()
-                        .enumerate()
-                        .filter_map(|(index, ref info)| {
+                        .filter_map(|ref info| {
                             if info.queue_flags.contains(flags) {
                                 Some(Gpu::new(self, pdevice))
                             } else {

@@ -6,3 +6,4 @@ pub mod graphics_queue;
 pub mod renderpass;
 pub mod shader_library;
 pub mod vk_instance;
+pub mod wait_handle;

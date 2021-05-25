@@ -1,11 +1,13 @@
 use ash::version::DeviceV1_0;
 use ash::vk::{
-    Buffer, CommandBuffer, DescriptorSet, Extent2D, Fence, Framebuffer, PipelineBindPoint,
-    PipelineLayout, Queue, Rect2D, RenderPass, RenderPassBeginInfo, SubmitInfo, SubpassContents,
+    Buffer, CommandBuffer, CommandPool, DescriptorSet, Extent2D, Fence, FenceCreateInfo,
+    Framebuffer, PipelineBindPoint, PipelineLayout, Queue, Rect2D, RenderPass, RenderPassBeginInfo,
+    SubmitInfo, SubpassContents,
 };
 use ash::Device;
 
 use crate::graphics_pipeline::GraphicsPipeline;
+use crate::wait_handle::WaitHandle;
 
 pub struct GraphicsCommandBuffer {
     device: Device,
@@ -26,14 +28,22 @@ impl GraphicsCommandBuffer {
         }
     }
 
-    pub(crate) fn submit(&self) {
+    pub(crate) fn submit(&self, command_pool: &CommandPool) -> WaitHandle {
         unsafe {
+            let info = FenceCreateInfo::builder().build();
+            let fence = self
+                .device
+                .create_fence(&info, None)
+                .expect("Fence creation failed");
+
             self.device
                 .end_command_buffer(self.command_buffer[0])
                 .expect("Command Buffer end failed");
             self.device
-                .queue_submit(self.queue, &self.submit_info, Fence::null())
+                .queue_submit(self.queue, &self.submit_info, fence)
                 .expect("Queue submit failed");
+
+            WaitHandle::new(&self.device, command_pool, self.command_buffer[0], fence)
         }
     }
 
