@@ -3,6 +3,7 @@ use crate::graphics_queue::GraphicsQueue;
 use ash::version::{DeviceV1_0, InstanceV1_0};
 use ash::vk::{DeviceCreateInfo, DeviceQueueCreateInfo, PhysicalDevice, QueueFlags};
 use ash::{Device, Instance};
+use std::ffi::CString;
 pub struct DeviceContext {
     instance: Instance,
     physical_device: PhysicalDevice,
@@ -11,7 +12,7 @@ pub struct DeviceContext {
 }
 
 impl DeviceContext {
-    pub(crate) fn new(instance: &Instance, gpu: &Gpu) -> Self {
+    pub(crate) fn new(instance: &Instance, gpu: &Gpu, extensions: &[String]) -> Self {
         let priorities: [f32; 1] = [1.];
         if let Some(index) = gpu.family_type_index(QueueFlags::GRAPHICS) {
             let queue_info = [DeviceQueueCreateInfo::builder()
@@ -19,7 +20,15 @@ impl DeviceContext {
                 .queue_family_index(index)
                 .build()];
 
+            let extension_names_raw: Vec<*const i8> = extensions
+                .iter()
+                .map(|layer_name| unsafe {
+                    CString::from_raw(layer_name.as_ptr() as *mut i8).as_ptr()
+                })
+                .collect();
+
             let device_create_info = DeviceCreateInfo::builder()
+                .enabled_extension_names(&extension_names_raw)
                 .queue_create_infos(&queue_info)
                 .build();
             unsafe {
@@ -43,4 +52,7 @@ impl DeviceContext {
     }
 
     pub fn graphics_queue(&self) {}
+    pub fn vk_device(&self) -> &Device {
+        &self.device
+    }
 }

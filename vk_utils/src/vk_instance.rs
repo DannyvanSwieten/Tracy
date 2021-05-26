@@ -1,11 +1,11 @@
-use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
+use ash::version::{EntryV1_0, InstanceV1_0};
 use ash::vk::{
     make_version, ApplicationInfo, Bool32, DebugUtilsMessageSeverityFlagsEXT,
     DebugUtilsMessageTypeFlagsEXT, DebugUtilsMessengerCallbackDataEXT,
-    DebugUtilsMessengerCreateInfoEXT, DebugUtilsMessengerEXT, InstanceCreateInfo, PhysicalDevice,
-    QueueFlags, FALSE,
+    DebugUtilsMessengerCreateInfoEXT, DebugUtilsMessengerEXT, InstanceCreateInfo, QueueFlags,
+    FALSE,
 };
-use ash::{Device, Entry, Instance};
+use ash::{Entry, Instance};
 use std::borrow::Cow;
 use std::ffi::{CStr, CString};
 

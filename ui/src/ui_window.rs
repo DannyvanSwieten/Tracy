@@ -355,10 +355,10 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
     ) -> Result<Self, &'static str> {
         let (queue, index) = app.present_queue_and_index();
 
-        let entry = app.vulkan_entry();
-        let instance = app.vulkan_instance();
+        let entry = app.vulkan().library();
+        let instance = app.vulkan().vk_instance();
         let get_proc = move |of| unsafe {
-            if let Some(f) = get_procedure(&entry, &instance, of) {
+            if let Some(f) = get_procedure(&entry, instance, of) {
                 f as *const std::ffi::c_void
             } else {
                 std::ptr::null()
@@ -368,9 +368,9 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
         let mut context = {
             let backend = unsafe {
                 vk::BackendContext::new(
-                    app.vulkan_instance().handle().as_raw() as _,
-                    app.primary_gpu().as_raw() as _,
-                    app.primary_device_context().handle().as_raw() as _,
+                    instance.handle().as_raw() as _,
+                    app.primary_gpu().vk_physical_device().as_raw() as _,
+                    app.primary_device_context().vk_device().handle().as_raw() as _,
                     (queue.as_raw() as _, index),
                     &get_proc as _,
                 )
@@ -391,8 +391,8 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
             Ok(vs) => {
                 let sc = swapchain::Swapchain::new(
                     instance,
-                    app.primary_gpu(),
-                    app.primary_device_context(),
+                    app.primary_gpu().vk_physical_device(),
+                    app.primary_device_context().vk_device(),
                     &app.surface_extension(),
                     &vs,
                     &app.swapchain_extension(),
@@ -453,6 +453,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 
                         unsafe {
                             app.primary_device_context()
+                                .vk_device()
                                 .create_image_view(&create_info, None)
                                 .expect("ImageView creation failed")
                         }
@@ -464,6 +465,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
                     .queue_family_index(app.present_queue_and_index().1 as u32);
                 let command_pool = unsafe {
                     app.primary_device_context()
+                        .vk_device()
                         .create_command_pool(&pool_create_info, None)
                         .expect("Command pool creation failed for UIWindow")
                 };
@@ -475,6 +477,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 
                 let command_buffers = unsafe {
                     app.primary_device_context()
+                        .vk_device()
                         .allocate_command_buffers(&command_buffer_allocate_info)
                         .expect("Command buffer allocation failed for UIWindow")
                 };
@@ -486,6 +489,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 
                     semaphores.push(unsafe {
                         app.primary_device_context()
+                            .vk_device()
                             .create_semaphore(&semaphore_create_info, None)
                             .unwrap()
                     });
@@ -496,6 +500,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 
                     fences.push(unsafe {
                         app.primary_device_context()
+                            .vk_device()
                             .create_fence(&fence_create_info, None)
                             .expect("Fence creation failed")
                     });
@@ -561,6 +566,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 
                 let vertex_shader_module = unsafe {
                     app.primary_device_context()
+                        .vk_device()
                         .create_shader_module(&vertex_shader_module_create_info, None)
                         .expect("Vertex Shader module creation failed")
                 };
@@ -582,6 +588,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 
                 let fragment_shader_module = unsafe {
                     app.primary_device_context()
+                        .vk_device()
                         .create_shader_module(&fragment_shader_module_create_info, None)
                         .expect("Vertex Shader module creation failed")
                 };
@@ -618,6 +625,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 
                 let descriptor_set_layout = unsafe {
                     app.primary_device_context()
+                        .vk_device()
                         .create_descriptor_set_layout(&descriptor_set_layout_create_info, None)
                         .expect("Failed to create descriptor set layout")
                 };
@@ -696,6 +704,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 
                 let cache = unsafe {
                     app.primary_device_context()
+                        .vk_device()
                         .create_pipeline_cache(&pipeline_cache_create_info, None)
                         .expect("Pipeline cache creation failed")
                 };
@@ -715,6 +724,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 
                 let graphics_pipeline = unsafe {
                     app.primary_device_context()
+                        .vk_device()
                         .create_graphics_pipelines(cache, infos, None)
                         .expect("Pipline creation failed")[0]
                 };
@@ -741,6 +751,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
                     .build();
                 let descriptor_sets = unsafe {
                     app.primary_device_context()
+                        .vk_device()
                         .allocate_descriptor_sets(&descriptor_set_allocate_info)
                         .expect("descriptor set allocation failed")
                 };
@@ -754,6 +765,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 
                 let sampler = unsafe {
                     app.primary_device_context()
+                        .vk_device()
                         .create_sampler(&sampler_info, None)
                         .expect("Sampler creation failed")
                 };
@@ -787,6 +799,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 
                 unsafe {
                     app.primary_device_context()
+                        .vk_device()
                         .update_descriptor_sets(&writes, &[])
                 };
 
@@ -797,8 +810,8 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
                     surface_image_views,
                     user_interface,
                     vulkan_surface_fn: ash::extensions::khr::Surface::new(
-                        app.vulkan_entry(),
-                        app.vulkan_instance(),
+                        app.vulkan().library(),
+                        app.vulkan().vk_instance(),
                     ),
                     vulkan_surface: vs,
                     state: std::marker::PhantomData::<AppState>::default(),
@@ -859,16 +872,17 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindowDelegate<AppSta
     ) {
         unsafe {
             app.primary_device_context()
+                .vk_device()
                 .device_wait_idle()
                 .expect("Wait idle failed")
         };
         let vulkan_surface_fn =
-            ash::extensions::khr::Surface::new(app.vulkan_entry(), app.vulkan_instance());
+            ash::extensions::khr::Surface::new(app.vulkan().library(), app.vulkan().vk_instance());
 
         let new_swapchain = swapchain::Swapchain::new(
-            app.vulkan_instance(),
-            app.primary_gpu(),
-            app.primary_device_context(),
+            app.vulkan().vk_instance(),
+            app.primary_gpu().vk_physical_device(),
+            app.primary_device_context().vk_device(),
             &vulkan_surface_fn,
             &self.vulkan_surface,
             &app.swapchain_extension(),
@@ -878,7 +892,7 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindowDelegate<AppSta
             window.inner_size().height,
         );
         self.swapchain = new_swapchain;
-        self.recreate_resources(app.primary_device_context());
+        self.recreate_resources(app.primary_device_context().vk_device());
         self.sub_optimal_swapchain = false;
         self.user_interface.resize(state, width, height);
     }
@@ -906,10 +920,12 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindowDelegate<AppSta
         self.sub_optimal_swapchain = sub_optimal_swapchain;
         unsafe {
             app.primary_device_context()
+                .vk_device()
                 .wait_for_fences(&[self.fences[image_index as usize]], true, u64::MAX)
                 .expect("Wait for fence failed");
 
             app.primary_device_context()
+                .vk_device()
                 .reset_fences(&[self.fences[image_index as usize]])
                 .expect("Fence reset failed");
         };
@@ -919,7 +935,7 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindowDelegate<AppSta
             .paint(state, self.surfaces[image_index as usize].canvas());
         self.surfaces[image_index as usize].flush_and_submit();
 
-        let device = app.primary_device_context();
+        let device = app.primary_device_context().vk_device();
         let commands = &self.command_buffers[image_index as usize];
         let command_buffer_begin_info = ash::vk::CommandBufferBeginInfo::builder().build();
         unsafe {

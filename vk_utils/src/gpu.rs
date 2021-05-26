@@ -1,7 +1,7 @@
 use ash::version::InstanceV1_0;
 use ash::vk::{
     PhysicalDevice, PhysicalDeviceFeatures, PhysicalDeviceLimits, PhysicalDeviceProperties,
-    PhysicalDeviceType, QueueFlags,
+    PhysicalDeviceType, QueueFamilyProperties, QueueFlags,
 };
 use ash::{Device, Instance};
 
@@ -14,6 +14,7 @@ pub struct Gpu {
     physical_device: PhysicalDevice,
     features: PhysicalDeviceFeatures,
     properties: PhysicalDeviceProperties,
+    queue_family_properties: Vec<QueueFamilyProperties>,
 }
 
 impl Gpu {
@@ -32,26 +33,21 @@ impl Gpu {
                 features,
                 properties,
                 physical_device: physical_device.clone(),
+                queue_family_properties: vulkan
+                    .vk_instance()
+                    .get_physical_device_queue_family_properties(*physical_device),
             }
         }
     }
 
-    pub fn device_context(&self) -> DeviceContext {
-        DeviceContext::new(&self.vulkan.vk_instance(), self)
+    pub fn device_context(&self, extensions: &[String]) -> DeviceContext {
+        DeviceContext::new(&self.vulkan.vk_instance(), self, extensions)
     }
 
     pub(crate) fn family_type_index(&self, flags: QueueFlags) -> Option<u32> {
-        unsafe {
-            for (index, queue_info) in self
-                .vulkan
-                .vk_instance()
-                .get_physical_device_queue_family_properties(self.physical_device)
-                .iter()
-                .enumerate()
-            {
-                if queue_info.queue_flags.contains(flags) {
-                    return Some(index as u32);
-                }
+        for (index, queue_info) in self.queue_family_properties.iter().enumerate() {
+            if queue_info.queue_flags.contains(flags) {
+                return Some(index as u32);
             }
         }
 
@@ -90,17 +86,18 @@ impl Gpu {
         self.properties.limits
     }
 
+    pub fn queue_family_count(&self) -> u32 {
+        self.queue_family_properties.len() as u32
+    }
+
+    pub fn queue_count(&self, queue_family_index: u32) -> u32 {
+        self.queue_family_properties[queue_family_index as usize].queue_count
+    }
+
     pub fn supports_graphics(&self) -> bool {
-        unsafe {
-            for queue_info in self
-                .vulkan
-                .vk_instance()
-                .get_physical_device_queue_family_properties(self.physical_device)
-                .iter()
-            {
-                if queue_info.queue_flags.contains(QueueFlags::GRAPHICS) {
-                    return true;
-                }
+        for queue_info in self.queue_family_properties.iter() {
+            if queue_info.queue_flags.contains(QueueFlags::GRAPHICS) {
+                return true;
             }
         }
 
@@ -108,16 +105,9 @@ impl Gpu {
     }
 
     pub fn supports_compute(&self) -> bool {
-        unsafe {
-            for queue_info in self
-                .vulkan
-                .vk_instance()
-                .get_physical_device_queue_family_properties(self.physical_device)
-                .iter()
-            {
-                if queue_info.queue_flags.contains(QueueFlags::COMPUTE) {
-                    return true;
-                }
+        for queue_info in self.queue_family_properties.iter() {
+            if queue_info.queue_flags.contains(QueueFlags::COMPUTE) {
+                return true;
             }
         }
 
@@ -125,16 +115,9 @@ impl Gpu {
     }
 
     pub fn supports_transfer(&self) -> bool {
-        unsafe {
-            for queue_info in self
-                .vulkan
-                .vk_instance()
-                .get_physical_device_queue_family_properties(self.physical_device)
-                .iter()
-            {
-                if queue_info.queue_flags.contains(QueueFlags::TRANSFER) {
-                    return true;
-                }
+        for queue_info in self.queue_family_properties.iter() {
+            if queue_info.queue_flags.contains(QueueFlags::TRANSFER) {
+                return true;
             }
         }
 

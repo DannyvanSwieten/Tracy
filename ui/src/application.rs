@@ -1,15 +1,17 @@
 extern crate ash;
 extern crate ash_window;
 extern crate winit;
+
 use crate::window_delegate::WindowDelegate;
-
 use std::collections::HashMap;
+use vk_utils::{device_context::DeviceContext, gpu::Gpu, vk_instance::Vulkan};
 
-use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
+use ash::version::DeviceV1_0;
+use ash::vk::QueueFlags;
 use ash::{vk, Device, Entry, Instance};
 
 use std::borrow::Cow;
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 use std::path::PathBuf;
 
 use winit::{
@@ -37,39 +39,6 @@ fn surface_extension_name() -> &'static CStr {
 }
 
 use vk::Queue;
-
-unsafe extern "system" fn vulkan_debug_callback(
-    message_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
-    message_type: vk::DebugUtilsMessageTypeFlagsEXT,
-    p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT,
-    _user_data: *mut std::os::raw::c_void,
-) -> vk::Bool32 {
-    let callback_data = *p_callback_data;
-    let message_id_number: i32 = callback_data.message_id_number as i32;
-
-    let message_id_name = if callback_data.p_message_id_name.is_null() {
-        Cow::from("")
-    } else {
-        CStr::from_ptr(callback_data.p_message_id_name).to_string_lossy()
-    };
-
-    let message = if callback_data.p_message.is_null() {
-        Cow::from("")
-    } else {
-        CStr::from_ptr(callback_data.p_message).to_string_lossy()
-    };
-
-    println!(
-        "{:?}:\n{:?} [{} ({})] : {}\n",
-        message_severity,
-        message_type,
-        message_id_name,
-        &message_id_number.to_string(),
-        message,
-    );
-
-    vk::FALSE
-}
 
 pub trait ApplicationDelegate<AppState> {
     fn application_will_start(
@@ -238,13 +207,9 @@ impl<AppState> WindowRegistry<AppState> {
 }
 
 pub struct Application<AppState> {
-    debug_callback: vk::DebugUtilsMessengerEXT,
-    vulkan_entry: Entry,
-    vulkan_instance: Instance,
-    primary_gpu: vk::PhysicalDevice,
-    primary_device_context: Device,
-    present_queue: Queue,
-    present_queue_index: u32,
+    vulkan: Vulkan,
+    primary_gpu: Gpu,
+    primary_device_context: DeviceContext,
     vulkan_surface_ext: ash::extensions::khr::Surface,
     vulkan_swapchain_ext: ash::extensions::khr::Swapchain,
     _state: std::marker::PhantomData<AppState>,
@@ -252,113 +217,32 @@ pub struct Application<AppState> {
 
 impl<AppState: 'static> Application<AppState> {
     pub fn new(name: &str) -> Self {
-        let app_name = CString::new(name).unwrap();
-        let layer_names = [CString::new("VK_LAYER_KHRONOS_validation").unwrap()];
-        let layers_names_raw: Vec<*const i8> = layer_names
-            .iter()
-            .map(|raw_name| raw_name.as_ptr())
-            .collect();
+        let vulkan = Vulkan::new(
+            name,
+            &[String::from("VK_LAYER_KHRONOS_validation")],
+            &[
+                String::from(Surface::name().to_str().unwrap()),
+                String::from(surface_extension_name().to_str().unwrap()),
+                String::from(DebugUtils::name().to_str().unwrap()),
+            ],
+        );
 
-        let surface_extensions = vec![Surface::name(), surface_extension_name()];
-        let mut extension_names_raw = surface_extensions
-            .iter()
-            .map(|ext| ext.as_ptr())
-            .collect::<Vec<_>>();
-        extension_names_raw.push(DebugUtils::name().as_ptr());
-
-        let appinfo = vk::ApplicationInfo::builder()
-            .application_name(&app_name)
-            .application_version(0)
-            .engine_name(&app_name)
-            .engine_version(0)
-            .api_version(vk::make_version(1, 2, 0));
-
-        let create_info = vk::InstanceCreateInfo::builder()
-            .application_info(&appinfo)
-            .enabled_layer_names(&layers_names_raw)
-            .enabled_extension_names(&extension_names_raw);
+        let primary_gpu = vulkan.hardware_devices_with_queue_support(QueueFlags::GRAPHICS)[0];
+        let primary_device_context =
+            primary_gpu.device_context(&[String::from(Swapchain::name().to_str().unwrap())]);
+        let queue = primary_device_context.graphics_queue();
 
         unsafe {
-            let entry = Entry::new().unwrap();
-            let instance: Instance = entry
-                .create_instance(&create_info, None)
-                .expect("Instance creation error");
-
-            let debug_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
-                .message_severity(
-                    vk::DebugUtilsMessageSeverityFlagsEXT::ERROR
-                        | vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
-                        | vk::DebugUtilsMessageSeverityFlagsEXT::INFO,
-                )
-                .message_type(vk::DebugUtilsMessageTypeFlagsEXT::all())
-                .pfn_user_callback(Some(vulkan_debug_callback));
-
-            let debug_utils_loader = DebugUtils::new(&entry, &instance);
-            let debug_callback = debug_utils_loader
-                .create_debug_utils_messenger(&debug_info, None)
-                .unwrap();
-
-            let pdevices = instance
-                .enumerate_physical_devices()
-                .expect("Physical device error");
-            let (primary_gpu, queue_family_index) = pdevices
-                .iter()
-                .map(|pdevice| {
-                    instance
-                        .get_physical_device_queue_family_properties(*pdevice)
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(index, ref info)| {
-                            let supports_graphic_and_surface =
-                                info.queue_flags.contains(vk::QueueFlags::GRAPHICS);
-                            if supports_graphic_and_surface {
-                                Some((*pdevice, index))
-                            } else {
-                                None
-                            }
-                        })
-                        .next()
-                })
-                .filter_map(|v| v)
-                .next()
-                .expect("Couldn't find suitable device.");
-            let present_queue_index = queue_family_index as u32;
-            let device_extension_names_raw = [Swapchain::name().as_ptr()];
-            let features = vk::PhysicalDeviceFeatures {
-                shader_clip_distance: 1,
-                multi_draw_indirect: 1,
-                ..Default::default()
-            };
-            let priorities = [1.0];
-
-            let queue_info = [vk::DeviceQueueCreateInfo::builder()
-                .queue_family_index(present_queue_index)
-                .queue_priorities(&priorities)
-                .build()];
-
-            let device_create_info = vk::DeviceCreateInfo::builder()
-                .queue_create_infos(&queue_info)
-                .enabled_extension_names(&device_extension_names_raw)
-                .enabled_features(&features);
-
-            let primary_device_context: Device = instance
-                .create_device(primary_gpu, &device_create_info, None)
-                .unwrap();
-
-            let present_queue =
-                primary_device_context.get_device_queue(present_queue_index as u32, 0);
-
-            let vulkan_surface_ext = ash::extensions::khr::Surface::new(&entry, &instance);
-            let vulkan_swapchain_ext =
-                ash::extensions::khr::Swapchain::new(&instance, &primary_device_context);
+            let vulkan_surface_ext =
+                ash::extensions::khr::Surface::new(vulkan.library(), vulkan.vk_instance());
+            let vulkan_swapchain_ext = ash::extensions::khr::Swapchain::new(
+                vulkan.vk_instance(),
+                primary_device_context.vk_device(),
+            );
             Self {
-                debug_callback,
-                vulkan_entry: entry,
-                vulkan_instance: instance,
+                vulkan,
                 primary_gpu,
                 primary_device_context,
-                present_queue,
-                present_queue_index,
                 vulkan_surface_ext,
                 vulkan_swapchain_ext,
                 _state: std::marker::PhantomData::<AppState>::default(),
@@ -366,24 +250,16 @@ impl<AppState: 'static> Application<AppState> {
         }
     }
 
-    pub fn vulkan_entry(&self) -> &Entry {
-        &self.vulkan_entry
+    pub fn vulkan(&self) -> &Vulkan {
+        &self.vulkan
     }
 
-    pub fn vulkan_instance(&self) -> &Instance {
-        &self.vulkan_instance
-    }
-
-    pub fn primary_gpu(&self) -> &vk::PhysicalDevice {
+    pub fn primary_gpu(&self) -> &Gpu {
         &self.primary_gpu
     }
 
-    pub fn primary_device_context(&self) -> &Device {
+    pub fn primary_device_context(&self) -> &DeviceContext{
         &self.primary_device_context
-    }
-
-    pub fn present_queue_and_index(&self) -> (&Queue, usize) {
-        (&self.present_queue, self.present_queue_index as usize)
     }
 
     pub fn surface_extension(&self) -> &ash::extensions::khr::Surface {
