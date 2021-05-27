@@ -1,5 +1,5 @@
 use ash::extensions::khr::{AccelerationStructure, RayTracingPipeline};
-use ash::version::{DeviceV1_0, DeviceV1_2, InstanceV1_0};
+use ash::version::DeviceV1_0;
 use ash::vk::{
     CommandBuffer, CommandBufferAllocateInfo, CommandPool, CommandPoolCreateFlags,
     CommandPoolCreateInfo, Fence, PhysicalDeviceMemoryProperties2,

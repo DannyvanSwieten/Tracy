@@ -1,24 +1,24 @@
 use crate::application::Application;
 
 pub trait WindowDelegate<AppState> {
-    fn close_button_pressed(&mut self, state: &mut AppState) -> bool {
+    fn close_button_pressed(&mut self, _state: &mut AppState) -> bool {
         true
     }
-    fn mouse_moved(&mut self, state: &mut AppState, x: f32, y: f32) {}
-    fn mouse_dragged(&mut self, state: &mut AppState, x: f32, y: f32) {}
-    fn mouse_down(&mut self, state: &mut AppState, x: f32, y: f32) {}
-    fn mouse_up(&mut self, state: &mut AppState, x: f32, y: f32) {}
+    fn mouse_moved(&mut self, _state: &mut AppState, _x: f32, _y: f32) {}
+    fn mouse_dragged(&mut self, _state: &mut AppState, _x: f32, _y: f32) {}
+    fn mouse_down(&mut self, _state: &mut AppState, _x: f32, _y: f32) {}
+    fn mouse_up(&mut self, _state: &mut AppState, _x: f32, _y: f32) {}
     fn resized(
         &mut self,
-        window: &winit::window::Window,
-        app: &Application<AppState>,
-        state: &mut AppState,
-        width: u32,
-        height: u32,
+        _window: &winit::window::Window,
+        _app: &Application<AppState>,
+        _state: &mut AppState,
+        _width: u32,
+        _height: u32,
     ) {
     }
-    fn keyboard_event(&mut self, state: &mut AppState, event: &winit::event::KeyboardInput) {}
-    fn draw(&mut self, app: &Application<AppState>, state: &AppState) {}
+    fn keyboard_event(&mut self, _state: &mut AppState, _event: &winit::event::KeyboardInput) {}
+    fn draw(&mut self, _app: &Application<AppState>, _state: &AppState) {}
 
-    fn update(&mut self, state: &mut AppState) {}
+    fn update(&mut self, _state: &mut AppState) {}
 }

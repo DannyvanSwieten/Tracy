@@ -1,10 +1,10 @@
-use crate::buffer_resource::BufferResource;
 use crate::context::RtxContext;
 use crate::geometry::{
     BottomLevelAccelerationStructure, GeometryInstance, TopLevelAccelerationStructure,
 };
 use crate::image_resource::Image2DResource;
 use crate::spirv::load_spirv;
+use vk_utils::buffer_resource::BufferResource;
 
 // Extension functions
 use ash::extensions::khr::{AccelerationStructure, DeferredHostOperations, RayTracingPipeline};
@@ -14,8 +14,7 @@ use ash::version::{DeviceV1_0, InstanceV1_0, InstanceV1_1};
 
 // Extension Objects
 use ash::vk::{
-    AccelerationStructureKHR, DeferredOperationKHR, DeviceSize, GeometryTypeKHR,
-    PhysicalDeviceBufferDeviceAddressFeaturesEXT, PhysicalDeviceFeatures2KHR,
+    DeferredOperationKHR, DeviceSize, PhysicalDeviceFeatures2KHR,
     PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceRayTracingPipelinePropertiesKHR,
     PhysicalDeviceVulkan12Features, RayTracingPipelineCreateInfoKHR,
     RayTracingShaderGroupCreateInfoKHR, RayTracingShaderGroupTypeKHR,
@@ -23,21 +22,18 @@ use ash::vk::{
 };
 // Core objects
 use ash::vk::{
-    BufferUsageFlags, CommandBufferAllocateInfo, CommandBufferBeginInfo, CommandPool,
-    CommandPoolCreateInfo, DescriptorBindingFlagsEXT, DescriptorImageInfo, DescriptorPool,
+    BufferUsageFlags, CommandBufferBeginInfo, DescriptorImageInfo, DescriptorPool,
     DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo,
-    DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutBindingFlagsCreateInfoEXT,
-    DescriptorSetLayoutCreateInfo, DescriptorType, DeviceCreateInfo, DeviceQueueCreateInfo, Format,
-    ImageAspectFlags, ImageLayout, ImageMemoryBarrier, ImageSubresourceRange, ImageUsageFlags,
-    ImageView, ImageViewCreateInfo, ImageViewType, MemoryPropertyFlags, PhysicalDevice,
-    PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceMemoryProperties,
+    DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo, DescriptorType,
+    DeviceCreateInfo, DeviceQueueCreateInfo, Format, ImageAspectFlags, ImageLayout,
+    ImageSubresourceRange, ImageUsageFlags, ImageView, ImageViewCreateInfo, ImageViewType,
+    MemoryPropertyFlags, PhysicalDevice, PhysicalDeviceAccelerationStructureFeaturesKHR,
     PhysicalDeviceMemoryProperties2, PhysicalDeviceProperties2, Pipeline, PipelineBindPoint,
     PipelineCache, PipelineLayout, PipelineLayoutCreateInfo, PipelineShaderStageCreateInfo,
-    PipelineStageFlags, PushConstantRange, Queue, QueueFlags, ShaderModuleCreateInfo,
-    ShaderStageFlags, WriteDescriptorSet,
+    QueueFlags, ShaderModuleCreateInfo, ShaderStageFlags, WriteDescriptorSet,
 };
 
-use ash::{Device, Instance};
+use ash::Instance;
 
 pub struct Renderer {
     physical_device_memory_properties: PhysicalDeviceMemoryProperties2,

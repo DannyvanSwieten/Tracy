@@ -8,6 +8,7 @@ use ash::Device;
 pub struct GraphicsQueue {
     device: Device,
     queue: Queue,
+    queue_family_index: u32,
     command_pool: CommandPool,
 }
 
@@ -24,8 +25,17 @@ impl GraphicsQueue {
         Self {
             device: device.clone(),
             queue: queue.clone(),
+            queue_family_index,
             command_pool,
         }
+    }
+
+    pub fn family_type_index(&self) -> u32 {
+        self.queue_family_index
+    }
+
+    pub fn vk_queue(&self) -> &Queue {
+        &self.queue
     }
 
     fn command_buffer(&self) -> GraphicsCommandBuffer {

@@ -1,18 +1,17 @@
-use crate::buffer_resource::BufferResource;
 use crate::context::RtxContext;
 use ash::vk::{
     AccelerationStructureBuildGeometryInfoKHR, AccelerationStructureBuildRangeInfoKHR,
     AccelerationStructureBuildTypeKHR, AccelerationStructureCreateInfoKHR,
     AccelerationStructureDeviceAddressInfoKHR, AccelerationStructureGeometryDataKHR,
     AccelerationStructureGeometryInstancesDataKHR, AccelerationStructureGeometryKHR,
-    AccelerationStructureGeometryTrianglesDataKHR, AccelerationStructureInstanceKHR,
-    AccelerationStructureKHR, AccelerationStructureTypeKHR, Buffer, BufferDeviceAddressInfo,
-    BufferUsageFlags, BuildAccelerationStructureModeKHR, CommandBuffer, CommandBufferBeginInfo,
-    DeviceAddress, DeviceOrHostAddressConstKHR, DeviceOrHostAddressKHR, Format, GeometryTypeKHR,
-    IndexType, MemoryPropertyFlags, PhysicalDeviceMemoryProperties2, SubmitInfo,
+    AccelerationStructureGeometryTrianglesDataKHR, AccelerationStructureKHR,
+    AccelerationStructureTypeKHR, BufferUsageFlags, BuildAccelerationStructureModeKHR,
+    CommandBufferBeginInfo, DeviceAddress, DeviceOrHostAddressConstKHR, DeviceOrHostAddressKHR,
+    Format, GeometryTypeKHR, IndexType, MemoryPropertyFlags,
 };
+use vk_utils::buffer_resource::BufferResource;
 
-use ash::version::{DeviceV1_0, DeviceV1_2};
+use ash::version::DeviceV1_0;
 
 use ash::extensions::khr::AccelerationStructure;
 use ash::Device;

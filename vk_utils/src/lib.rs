@@ -1,9 +1,13 @@
+pub mod buffer_resource;
 pub mod device_context;
 pub mod gpu;
 pub mod graphics_command_buffer;
 pub mod graphics_pipeline;
 pub mod graphics_queue;
+pub mod image_resource;
+pub mod memory;
 pub mod renderpass;
 pub mod shader_library;
+pub mod swapchain;
 pub mod vk_instance;
 pub mod wait_handle;

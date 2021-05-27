@@ -3,7 +3,7 @@ use crate::graphics_queue::GraphicsQueue;
 use ash::version::{DeviceV1_0, InstanceV1_0};
 use ash::vk::{DeviceCreateInfo, DeviceQueueCreateInfo, PhysicalDevice, QueueFlags};
 use ash::{Device, Instance};
-use std::ffi::CString;
+use std::ffi::CStr;
 pub struct DeviceContext {
     instance: Instance,
     physical_device: PhysicalDevice,
@@ -12,7 +12,7 @@ pub struct DeviceContext {
 }
 
 impl DeviceContext {
-    pub(crate) fn new(instance: &Instance, gpu: &Gpu, extensions: &[String]) -> Self {
+    pub(crate) fn new(instance: &Instance, gpu: &Gpu, extensions: &[&'static CStr]) -> Self {
         let priorities: [f32; 1] = [1.];
         if let Some(index) = gpu.family_type_index(QueueFlags::GRAPHICS) {
             let queue_info = [DeviceQueueCreateInfo::builder()
@@ -22,9 +22,7 @@ impl DeviceContext {
 
             let extension_names_raw: Vec<*const i8> = extensions
                 .iter()
-                .map(|layer_name| unsafe {
-                    CString::from_raw(layer_name.as_ptr() as *mut i8).as_ptr()
-                })
+                .map(|layer_name| layer_name.as_ptr())
                 .collect();
 
             let device_create_info = DeviceCreateInfo::builder()
@@ -51,7 +49,9 @@ impl DeviceContext {
         }
     }
 
-    pub fn graphics_queue(&self) {}
+    pub fn graphics_queue(&self) -> &Option<GraphicsQueue> {
+        &self.graphics_queue
+    }
     pub fn vk_device(&self) -> &Device {
         &self.device
     }

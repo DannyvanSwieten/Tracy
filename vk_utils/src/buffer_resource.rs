@@ -1,3 +1,4 @@
+use crate::device_context::DeviceContext;
 use crate::memory::memory_type_index;
 
 use ash::vk::{
@@ -6,7 +7,7 @@ use ash::vk::{
     MemoryPropertyFlags, PhysicalDeviceMemoryProperties, SharingMode,
 };
 
-use ash::version::{DeviceV1_0, DeviceV1_1, DeviceV1_2};
+use ash::version::{DeviceV1_0, DeviceV1_2};
 use ash::Device;
 
 pub struct BufferResource {
@@ -36,7 +37,7 @@ impl BufferResource {
 
     pub fn copy_aligned_to<T>(&mut self, data: &[T], element_size: Option<usize>, stride: usize) {
         unsafe {
-            let element_size = if let Some(element_size) = element_size{
+            let element_size = if let Some(element_size) = element_size {
                 element_size
             } else {
                 std::mem::size_of::<T>()
@@ -70,12 +71,13 @@ impl BufferResource {
 impl BufferResource {
     pub fn new(
         properties: &PhysicalDeviceMemoryProperties,
-        device: &Device,
+        device_context: &DeviceContext,
         size: u64,
         property_flags: MemoryPropertyFlags,
         usage: BufferUsageFlags,
     ) -> Self {
         unsafe {
+            let device = device_context.vk_device();
             let buffer_info = BufferCreateInfo::builder()
                 .size(size)
                 .sharing_mode(SharingMode::EXCLUSIVE)

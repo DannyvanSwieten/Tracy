@@ -1,7 +1,6 @@
 pub mod application;
 pub mod canvas3d;
 pub mod node;
-pub mod swapchain;
 pub mod ui_window;
 pub mod user_interface;
 pub mod widget;

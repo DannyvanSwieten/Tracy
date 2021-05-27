@@ -162,7 +162,7 @@ impl<AppState: 'static> UserInterface<AppState> {
         }
     }
 
-    pub fn paint_3d(&mut self, state: &AppState, canvas_3d: &mut Canvas3D) {
+    pub fn paint_3d(&mut self, state: &AppState, _canvas_3d: &mut Canvas3D) {
         self.root.draw_3d(state);
     }
 }

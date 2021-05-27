@@ -3,11 +3,10 @@ use ash::vk::{
     PhysicalDevice, PhysicalDeviceFeatures, PhysicalDeviceLimits, PhysicalDeviceProperties,
     PhysicalDeviceType, QueueFamilyProperties, QueueFlags,
 };
-use ash::{Device, Instance};
 
 use crate::device_context::DeviceContext;
 use crate::vk_instance::Vulkan;
-use std::ffi::CString;
+use std::ffi::CStr;
 
 pub struct Gpu {
     vulkan: Vulkan,
@@ -40,7 +39,7 @@ impl Gpu {
         }
     }
 
-    pub fn device_context(&self, extensions: &[String]) -> DeviceContext {
+    pub fn device_context(&self, extensions: &[&'static CStr]) -> DeviceContext {
         DeviceContext::new(&self.vulkan.vk_instance(), self, extensions)
     }
 
@@ -59,8 +58,8 @@ impl Gpu {
     }
 
     pub fn name(&self) -> String {
-        let c_str = unsafe { CString::from_raw(self.properties.device_name.as_ptr() as *mut i8) };
-        c_str.into_string().expect("String conversion failed")
+        let c_str = unsafe { CStr::from_ptr(self.properties.device_name.as_ptr()) };
+        String::from(c_str.to_str().expect("String conversion failed"))
     }
 
     pub fn vendor_id(&self) -> u32 {

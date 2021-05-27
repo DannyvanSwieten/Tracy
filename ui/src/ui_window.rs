@@ -1,7 +1,6 @@
 use crate::application::Application;
 use crate::window_delegate::WindowDelegate;
 
-use super::swapchain;
 use super::user_interface::{UIDelegate, UserInterface};
 use super::window_event::MouseEvent;
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
@@ -9,6 +8,7 @@ use ash::vk::Handle;
 use byteorder::ReadBytesExt;
 use skia_safe::gpu::*;
 use skia_safe::{Budgeted, ImageInfo, Surface};
+use vk_utils;
 
 unsafe fn get_procedure(
     entry: &ash::Entry,
@@ -38,7 +38,7 @@ pub struct UIWindowDelegate<AppState> {
     vulkan_surface_fn: ash::extensions::khr::Surface,
 
     state: std::marker::PhantomData<AppState>,
-    swapchain: swapchain::Swapchain,
+    swapchain: vk_utils::swapchain::Swapchain,
     command_pool: ash::vk::CommandPool,
     command_buffers: Vec<ash::vk::CommandBuffer>,
     semaphores: Vec<ash::vk::Semaphore>,
@@ -353,7 +353,11 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
         window: &winit::window::Window,
         ui_delegate: Box<dyn UIDelegate<AppState>>,
     ) -> Result<Self, &'static str> {
-        let (queue, index) = app.present_queue_and_index();
+        let queue = app
+            .primary_device_context()
+            .graphics_queue()
+            .as_ref()
+            .unwrap();
 
         let entry = app.vulkan().library();
         let instance = app.vulkan().vk_instance();
@@ -371,7 +375,10 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
                     instance.handle().as_raw() as _,
                     app.primary_gpu().vk_physical_device().as_raw() as _,
                     app.primary_device_context().vk_device().handle().as_raw() as _,
-                    (queue.as_raw() as _, index),
+                    (
+                        queue.vk_queue().as_raw() as _,
+                        queue.family_type_index() as usize,
+                    ),
                     &get_proc as _,
                 )
             };
@@ -389,7 +396,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
         let vulkan_surface = unsafe { ash_window::create_surface(entry, instance, window, None) };
         match vulkan_surface {
             Ok(vs) => {
-                let sc = swapchain::Swapchain::new(
+                let sc = vk_utils::swapchain::Swapchain::new(
                     instance,
                     app.primary_gpu().vk_physical_device(),
                     app.primary_device_context().vk_device(),
@@ -397,7 +404,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
                     &vs,
                     &app.swapchain_extension(),
                     None,
-                    app.present_queue_and_index().1 as u32,
+                    queue.family_type_index(),
                     window.inner_size().width,
                     window.inner_size().height,
                 );
@@ -462,7 +469,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 
                 let pool_create_info = ash::vk::CommandPoolCreateInfo::builder()
                     .flags(ash::vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
-                    .queue_family_index(app.present_queue_and_index().1 as u32);
+                    .queue_family_index(queue.family_type_index());
                 let command_pool = unsafe {
                     app.primary_device_context()
                         .vk_device()
@@ -642,6 +649,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 
                 let pipeline_layout = unsafe {
                     app.primary_device_context()
+                        .vk_device()
                         .create_pipeline_layout(&pipeline_layout_create_info, None)
                         .expect("Pipeline layout creation failed")
                 };
@@ -741,6 +749,7 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
 
                 let descriptor_pool = unsafe {
                     app.primary_device_context()
+                        .vk_device()
                         .create_descriptor_pool(&descriptor_pool_create_info, None)
                         .expect("Descriptor pool creations failed")
                 };
@@ -879,7 +888,7 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindowDelegate<AppSta
         let vulkan_surface_fn =
             ash::extensions::khr::Surface::new(app.vulkan().library(), app.vulkan().vk_instance());
 
-        let new_swapchain = swapchain::Swapchain::new(
+        let new_swapchain = vk_utils::swapchain::Swapchain::new(
             app.vulkan().vk_instance(),
             app.primary_gpu().vk_physical_device(),
             app.primary_device_context().vk_device(),
@@ -887,7 +896,11 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindowDelegate<AppSta
             &self.vulkan_surface,
             &app.swapchain_extension(),
             Some(self.swapchain.handle()),
-            app.present_queue_and_index().1 as u32,
+            app.primary_device_context()
+                .graphics_queue()
+                .as_ref()
+                .unwrap()
+                .family_type_index(),
             window.inner_size().width,
             window.inner_size().height,
         );
@@ -915,6 +928,12 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindowDelegate<AppSta
             self.sub_optimal_swapchain = true;
             return;
         }
+
+        let queue = app
+            .primary_device_context()
+            .graphics_queue()
+            .as_ref()
+            .unwrap();
 
         let (sub_optimal_swapchain, image_index, framebuffer, semaphore) = r.ok().unwrap();
         self.sub_optimal_swapchain = sub_optimal_swapchain;
@@ -1026,7 +1045,7 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindowDelegate<AppSta
                 .build();
             device
                 .queue_submit(
-                    *app.present_queue_and_index().0,
+                    *queue.vk_queue(),
                     &[submit_info],
                     self.fences[image_index as usize],
                 )
@@ -1034,7 +1053,7 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIWindowDelegate<AppSta
         }
 
         self.sub_optimal_swapchain = self.swapchain.swap(
-            app.present_queue_and_index().0,
+            queue.vk_queue(),
             &self.semaphores[image_index as usize],
             image_index,
         );

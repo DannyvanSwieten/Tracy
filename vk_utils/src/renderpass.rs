@@ -3,8 +3,6 @@ use ash::vk::{
     RenderPassCreateInfo, SampleCountFlags,
 };
 
-use ash::version::DeviceV1_0;
-
 pub struct RenderPass {
     attachment_refs: Vec<AttachmentReference>,
     attachment_descriptions: Vec<AttachmentDescription>,

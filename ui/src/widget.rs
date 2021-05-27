@@ -914,7 +914,7 @@ struct PopupMenuWidget {
 }
 
 impl PopupMenuWidget {
-    fn new(request: PopupMenu) -> Self {
+    fn new(_request: PopupMenu) -> Self {
         PopupMenuWidget {
             active: true,
             children: Vec::new(),

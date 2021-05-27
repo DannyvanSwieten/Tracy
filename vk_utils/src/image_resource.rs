@@ -1,4 +1,4 @@
-use crate::context::Context;
+use crate::device_context::DeviceContext;
 use crate::memory::memory_type_index;
 
 use ash::vk::{
@@ -21,7 +21,7 @@ pub struct Image2DResource {
 impl Image2DResource {
     pub fn new(
         properties: &PhysicalDeviceMemoryProperties,
-        context: &Context,
+        context: &DeviceContext,
         width: u32,
         height: u32,
         format: Format,
@@ -45,7 +45,7 @@ impl Image2DResource {
                 .mip_levels(1)
                 .usage(usage);
 
-            let device = context.device();
+            let device = context.vk_device();
 
             let image = device
                 .create_image(&image_info, None)
@@ -88,7 +88,7 @@ impl Image2DResource {
         self.layout
     }
 
-    pub fn transition(&self, ctx: &Context, new_layout: ImageLayout) {
+    pub fn transition(&self, ctx: &DeviceContext, new_layout: ImageLayout) {
         let barrier = ImageMemoryBarrier::builder()
             .old_layout(self.layout)
             .new_layout(new_layout)

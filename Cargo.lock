@@ -994,6 +994,7 @@ version = "0.1.0"
 dependencies = [
  "ash",
  "byteorder",
+ "vk_utils",
 ]
 
 [[package]]

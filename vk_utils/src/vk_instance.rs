@@ -68,7 +68,7 @@ pub struct Vulkan {
 }
 
 impl Vulkan {
-    pub fn new(name: &str, layers: &[String], extensions: &[String]) -> Self {
+    pub fn new(name: &str, layers: &[CString], extensions: &[&'static CStr]) -> Self {
         let c_name = CString::new(name).unwrap();
         let appinfo = ApplicationInfo::builder()
             .application_name(&c_name)
@@ -79,18 +79,13 @@ impl Vulkan {
 
         let layers_names_raw: Vec<*const i8> = layers
             .iter()
-            .map(|layer_name| unsafe { CString::from_raw(layer_name.as_ptr() as *mut i8).as_ptr() })
+            .map(|layer_name| layer_name.as_ptr() as _)
             .collect();
 
-        let surface_extensions = vec![Surface::name(), surface_extension_name()];
-        let mut extension_names_raw = surface_extensions
+        let extension_names_raw = extensions
             .iter()
-            .map(|ext| ext.as_ptr())
+            .map(|ext| ext.as_ptr() as _)
             .collect::<Vec<_>>();
-        extension_names_raw.push(DebugUtils::name().as_ptr());
-        for ext in extensions.iter() {
-            extension_names_raw.push(unsafe { CString::from_raw(ext.as_ptr() as *mut i8).as_ptr() })
-        }
 
         let create_info = InstanceCreateInfo::builder()
             .application_info(&appinfo)

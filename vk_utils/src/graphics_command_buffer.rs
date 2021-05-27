@@ -1,8 +1,8 @@
 use ash::version::DeviceV1_0;
 use ash::vk::{
-    Buffer, CommandBuffer, CommandPool, DescriptorSet, Extent2D, Fence, FenceCreateInfo,
-    Framebuffer, PipelineBindPoint, PipelineLayout, Queue, Rect2D, RenderPass, RenderPassBeginInfo,
-    SubmitInfo, SubpassContents,
+    Buffer, CommandBuffer, CommandPool, DescriptorSet, Extent2D, FenceCreateInfo, Framebuffer,
+    PipelineBindPoint, PipelineLayout, Queue, Rect2D, RenderPass, RenderPassBeginInfo, SubmitInfo,
+    SubpassContents,
 };
 use ash::Device;
 

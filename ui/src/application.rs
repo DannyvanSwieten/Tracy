@@ -6,12 +6,9 @@ use crate::window_delegate::WindowDelegate;
 use std::collections::HashMap;
 use vk_utils::{device_context::DeviceContext, gpu::Gpu, vk_instance::Vulkan};
 
-use ash::version::DeviceV1_0;
 use ash::vk::QueueFlags;
-use ash::{vk, Device, Entry, Instance};
 
-use std::borrow::Cow;
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::path::PathBuf;
 
 use winit::{
@@ -22,10 +19,13 @@ use winit::{
 
 use ash::extensions::{
     ext::DebugUtils,
-    khr::{Surface, Swapchain, Win32Surface},
-    mvk::MacOSSurface,
+    khr::{Surface, Swapchain},
 };
 
+#[cfg(target_os = "macos")]
+use ash::extensions::mvk::MacOSSurface;
+
+#[cfg(target_os = "macos")]
 use ash::vk::ExtMetalSurfaceFn;
 
 #[cfg(target_os = "macos")]
@@ -34,11 +34,12 @@ fn surface_extension_name() -> &'static CStr {
 }
 
 #[cfg(target_os = "windows")]
+use ash::extensions::khr::Win32Surface;
+
+#[cfg(target_os = "windows")]
 fn surface_extension_name() -> &'static CStr {
     Win32Surface::name()
 }
-
-use vk::Queue;
 
 pub trait ApplicationDelegate<AppState> {
     fn application_will_start(
@@ -203,50 +204,43 @@ impl<AppState> WindowRegistry<AppState> {
         self.window_delegates.remove(id);
     }
 
-    fn file_dropped(&mut self, id: &WindowId, path_buffer: &PathBuf) {}
+    fn file_dropped(&mut self, _: &WindowId, _: &PathBuf) {}
 }
 
 pub struct Application<AppState> {
     vulkan: Vulkan,
     primary_gpu: Gpu,
     primary_device_context: DeviceContext,
-    vulkan_surface_ext: ash::extensions::khr::Surface,
-    vulkan_swapchain_ext: ash::extensions::khr::Swapchain,
+    vulkan_surface_ext: Surface,
+    vulkan_swapchain_ext: Swapchain,
     _state: std::marker::PhantomData<AppState>,
 }
 
 impl<AppState: 'static> Application<AppState> {
     pub fn new(name: &str) -> Self {
-        let vulkan = Vulkan::new(
-            name,
-            &[String::from("VK_LAYER_KHRONOS_validation")],
-            &[
-                String::from(Surface::name().to_str().unwrap()),
-                String::from(surface_extension_name().to_str().unwrap()),
-                String::from(DebugUtils::name().to_str().unwrap()),
-            ],
-        );
+        let layers = [CString::new("VK_LAYER_KHRONOS_validation").expect("String Creation Failed")];
+        let instance_extensions = [
+            Surface::name(),
+            surface_extension_name(),
+            DebugUtils::name(),
+        ];
+        let vulkan = Vulkan::new(name, &layers, &instance_extensions);
 
-        let primary_gpu = vulkan.hardware_devices_with_queue_support(QueueFlags::GRAPHICS)[0];
-        let primary_device_context =
-            primary_gpu.device_context(&[String::from(Swapchain::name().to_str().unwrap())]);
+        let mut gpus = vulkan.hardware_devices_with_queue_support(QueueFlags::GRAPHICS);
+        let primary_gpu = gpus.remove(0);
+        let primary_device_context = primary_gpu.device_context(&[Swapchain::name()]);
         let queue = primary_device_context.graphics_queue();
 
-        unsafe {
-            let vulkan_surface_ext =
-                ash::extensions::khr::Surface::new(vulkan.library(), vulkan.vk_instance());
-            let vulkan_swapchain_ext = ash::extensions::khr::Swapchain::new(
-                vulkan.vk_instance(),
-                primary_device_context.vk_device(),
-            );
-            Self {
-                vulkan,
-                primary_gpu,
-                primary_device_context,
-                vulkan_surface_ext,
-                vulkan_swapchain_ext,
-                _state: std::marker::PhantomData::<AppState>::default(),
-            }
+        let vulkan_surface_ext = Surface::new(vulkan.library(), vulkan.vk_instance());
+        let vulkan_swapchain_ext =
+            Swapchain::new(vulkan.vk_instance(), primary_device_context.vk_device());
+        Self {
+            vulkan,
+            primary_gpu,
+            primary_device_context,
+            vulkan_surface_ext,
+            vulkan_swapchain_ext,
+            _state: std::marker::PhantomData::<AppState>::default(),
         }
     }
 
@@ -258,7 +252,7 @@ impl<AppState: 'static> Application<AppState> {
         &self.primary_gpu
     }
 
-    pub fn primary_device_context(&self) -> &DeviceContext{
+    pub fn primary_device_context(&self) -> &DeviceContext {
         &self.primary_device_context
     }
 
@@ -328,7 +322,7 @@ impl<AppState: 'static> Application<AppState> {
                     }
                 }
 
-                Event::RedrawRequested(window_id) => {
+                Event::RedrawRequested(_window_id) => {
                     //window_registry.window_requested_redraw(&self, &s, &window_id)
                 }
 
