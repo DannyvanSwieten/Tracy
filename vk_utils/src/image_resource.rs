@@ -80,51 +80,12 @@ impl Image2DResource {
         }
     }
 
-    pub fn image(&self) -> &Image {
+    pub fn vk_image(&self) -> &Image {
         &self.image
     }
 
     pub fn layout(&self) -> ImageLayout {
         self.layout
-    }
-
-    pub fn transition(&self, ctx: &DeviceContext, new_layout: ImageLayout) {
-        let barrier = ImageMemoryBarrier::builder()
-            .old_layout(self.layout)
-            .new_layout(new_layout)
-            .image(self.image)
-            .src_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
-            .dst_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
-            .subresource_range(
-                ImageSubresourceRange::builder()
-                    .aspect_mask(ImageAspectFlags::COLOR)
-                    .layer_count(1)
-                    .level_count(1)
-                    .build(),
-            )
-            .build();
-
-        let cmd = ctx.command_buffer();
-        unsafe {
-            ctx.device()
-                .begin_command_buffer(cmd, &CommandBufferBeginInfo::builder().build())
-                .expect("Begin commandbuffer failed");
-
-            ctx.device().cmd_pipeline_barrier(
-                cmd,
-                PipelineStageFlags::ALL_COMMANDS,
-                ash::vk::PipelineStageFlags::ALL_COMMANDS,
-                ash::vk::DependencyFlags::BY_REGION,
-                &[],
-                &[],
-                &[barrier],
-            );
-
-            ctx.device()
-                .end_command_buffer(cmd)
-                .expect("End command buffer failed");
-        }
-        ctx.submit_command_buffers(&cmd);
     }
 }
 

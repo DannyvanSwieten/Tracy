@@ -1,4 +1,4 @@
-use crate::graphics_command_buffer::GraphicsCommandBuffer;
+use crate::graphics_command_buffer::CommandBufferHandle;
 use crate::wait_handle::WaitHandle;
 use ash::version::DeviceV1_0;
 use ash::vk::{
@@ -38,7 +38,7 @@ impl GraphicsQueue {
         &self.queue
     }
 
-    fn command_buffer(&self) -> GraphicsCommandBuffer {
+    fn command_buffer(&self) -> CommandBufferHandle {
         let info = CommandBufferAllocateInfo::builder()
             .command_pool(self.command_pool)
             .command_buffer_count(1)
@@ -48,7 +48,7 @@ impl GraphicsQueue {
                 .allocate_command_buffers(&info)
                 .expect("Command Buffer allocation failed")[0]
         };
-        GraphicsCommandBuffer::new(&self.device, &self.queue, &command_buffer)
+        CommandBufferHandle::new(&self.device, &self.queue, &command_buffer)
     }
 
     pub fn begin<F>(
@@ -60,7 +60,7 @@ impl GraphicsQueue {
         f: F,
     ) -> WaitHandle
     where
-        F: FnOnce(GraphicsCommandBuffer) -> GraphicsCommandBuffer,
+        F: FnOnce(CommandBufferHandle) -> CommandBufferHandle,
     {
         let command_buffer = self.command_buffer();
         command_buffer.begin(render_pass, framebuffer, width, height);

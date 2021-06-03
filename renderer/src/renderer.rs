@@ -2,9 +2,9 @@ use crate::context::RtxContext;
 use crate::geometry::{
     BottomLevelAccelerationStructure, GeometryInstance, TopLevelAccelerationStructure,
 };
-use crate::image_resource::Image2DResource;
 use crate::spirv::load_spirv;
 use vk_utils::buffer_resource::BufferResource;
+use vk_utils::image_resource::Image2DResource;
 
 // Extension functions
 use ash::extensions::khr::{AccelerationStructure, DeferredHostOperations, RayTracingPipeline};
@@ -565,7 +565,7 @@ impl Renderer {
                     .build(),
             )
             .view_type(ImageViewType::TYPE_2D)
-            .image(*self.output_image.as_ref().unwrap().image());
+            .image(*self.output_image.as_ref().unwrap().vk_image());
 
         unsafe {
             self.output_image_view = self
