@@ -2,15 +2,14 @@ use crate::context::RtxContext;
 use crate::geometry::{
     BottomLevelAccelerationStructure, GeometryInstance, TopLevelAccelerationStructure,
 };
-use crate::spirv::load_spirv;
+
 use vk_utils::buffer_resource::BufferResource;
+use vk_utils::device_context::DeviceContext;
+use vk_utils::gpu::Gpu;
 use vk_utils::image_resource::Image2DResource;
 
-// Extension functions
-use ash::extensions::khr::{AccelerationStructure, DeferredHostOperations, RayTracingPipeline};
-
 // Version traits
-use ash::version::{DeviceV1_0, InstanceV1_0, InstanceV1_1};
+use ash::version::{DeviceV1_0, InstanceV1_1};
 
 // Extension Objects
 use ash::vk::{
@@ -25,17 +24,15 @@ use ash::vk::{
     BufferUsageFlags, CommandBufferBeginInfo, DescriptorImageInfo, DescriptorPool,
     DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo,
     DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo, DescriptorType,
-    DeviceCreateInfo, DeviceQueueCreateInfo, Format, ImageAspectFlags, ImageLayout,
-    ImageSubresourceRange, ImageUsageFlags, ImageView, ImageViewCreateInfo, ImageViewType,
-    MemoryPropertyFlags, PhysicalDevice, PhysicalDeviceAccelerationStructureFeaturesKHR,
-    PhysicalDeviceMemoryProperties2, PhysicalDeviceProperties2, Pipeline, PipelineBindPoint,
-    PipelineCache, PipelineLayout, PipelineLayoutCreateInfo, PipelineShaderStageCreateInfo,
-    QueueFlags, ShaderModuleCreateInfo, ShaderStageFlags, WriteDescriptorSet,
+    Format, ImageAspectFlags, ImageLayout, ImageSubresourceRange, ImageUsageFlags, ImageView,
+    ImageViewCreateInfo, ImageViewType, MemoryPropertyFlags,
+    PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceMemoryProperties2, Pipeline,
+    PipelineBindPoint, PipelineCache, PipelineLayout, PipelineLayoutCreateInfo,
+    PipelineShaderStageCreateInfo, ShaderModuleCreateInfo, ShaderStageFlags, WriteDescriptorSet,
 };
 
-use ash::Instance;
-
 pub struct Renderer {
+    device_context: DeviceContext,
     physical_device_memory_properties: PhysicalDeviceMemoryProperties2,
     context: RtxContext,
     queue_family_index: u32,
@@ -161,83 +158,41 @@ impl Renderer {
 }
 
 impl Renderer {
-    pub fn new(
-        instance: &Instance,
-        gpu_and_queue_family_index: Option<(PhysicalDevice, u32)>,
-    ) -> Self {
+    pub fn new(gpu: &Gpu) -> Self {
         unsafe {
-            let (gpu, queue_family_index) = {
-                if let Some((gpu, queue_family_index)) = gpu_and_queue_family_index {
-                    (gpu, queue_family_index)
-                } else {
-                    let pdevices = instance
-                        .enumerate_physical_devices()
-                        .expect("Physical device error");
-                    pdevices
-                        .iter()
-                        .map(|pdevice| {
-                            instance
-                                .get_physical_device_queue_family_properties(*pdevice)
-                                .iter()
-                                .enumerate()
-                                .filter_map(|(index, ref info)| {
-                                    let supports_graphics =
-                                        info.queue_flags.contains(QueueFlags::GRAPHICS);
-                                    if supports_graphics {
-                                        Some((*pdevice, index as u32))
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .next()
-                        })
-                        .filter_map(|v| v)
-                        .next()
-                        .expect("Couldn't find suitable device.")
-                }
-            };
-            let priorities = [1.0];
-            let queue_info = [DeviceQueueCreateInfo::builder()
-                .queue_family_index(queue_family_index as u32)
-                .queue_priorities(&priorities)
-                .build()];
-            let device_extension_names_raw = [
-                RayTracingPipeline::name().as_ptr(),
-                DeferredHostOperations::name().as_ptr(),
-                AccelerationStructure::name().as_ptr(),
-            ];
             let mut pipeline_properties = PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
-            let mut properties =
-                PhysicalDeviceProperties2::builder().push_next(&mut pipeline_properties);
-            instance.get_physical_device_properties2(gpu, &mut properties);
-            let mut rt_features = PhysicalDeviceRayTracingPipelineFeaturesKHR {
-                ray_tracing_pipeline: 1,
-                ..Default::default()
-            };
-            let mut address_features = PhysicalDeviceVulkan12Features::builder()
-                .buffer_device_address(true)
-                .build();
+            let properties =
+                gpu.extension_properties(|builder| builder.push_next(&mut pipeline_properties));
+            let mut rt_features =
+                PhysicalDeviceRayTracingPipelineFeaturesKHR::builder().ray_tracing_pipeline(true);
+            let mut address_features =
+                PhysicalDeviceVulkan12Features::builder().buffer_device_address(true);
             let mut acc_features = PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
-                .acceleration_structure(true)
-                .build();
+                .acceleration_structure(true);
             let mut features2 = PhysicalDeviceFeatures2KHR::default();
-            instance.get_physical_device_features2(gpu, &mut features2);
-            let device_create_info = DeviceCreateInfo::builder()
-                .queue_create_infos(&queue_info)
-                .enabled_extension_names(&device_extension_names_raw)
-                .enabled_features(&features2.features)
-                .push_next(&mut rt_features)
-                .push_next(&mut address_features)
-                .push_next(&mut acc_features);
-            let device = instance
-                .create_device(gpu, &device_create_info, None)
-                .expect("Failed raytracing device context creation");
-            let queue = device.get_device_queue(queue_family_index as u32, 0);
-            let mut physical_device_memory_properties = PhysicalDeviceMemoryProperties2::default();
-            instance.get_physical_device_memory_properties2(
-                gpu,
-                &mut physical_device_memory_properties,
+
+            gpu.vulkan()
+                .vk_instance()
+                .get_physical_device_features2(*gpu.vk_physical_device(), &mut features2);
+
+            let ctx = gpu.device_context(
+                &[ash::extensions::khr::RayTracingPipeline::name()],
+                |builder| {
+                    builder
+                        .push_next(&mut address_features)
+                        .push_next(&mut rt_features)
+                        .push_next(&mut acc_features)
+                        .enabled_features(&features2.features)
+                },
             );
+
+            let mut physical_device_memory_properties = PhysicalDeviceMemoryProperties2::default();
+            gpu.vulkan()
+                .vk_instance()
+                .get_physical_device_memory_properties2(
+                    *gpu.vk_physical_device(),
+                    &mut physical_device_memory_properties,
+                );
 
             let context = RtxContext::new(
                 instance,

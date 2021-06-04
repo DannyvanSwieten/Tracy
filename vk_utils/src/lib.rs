@@ -1,6 +1,5 @@
 pub mod buffer_resource;
 pub mod command_buffer;
-pub mod command_buffer_handle;
 pub mod device_context;
 pub mod gpu;
 pub mod graphics_pipeline;

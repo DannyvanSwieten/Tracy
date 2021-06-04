@@ -1,13 +1,15 @@
-use ash::version::InstanceV1_0;
+use ash::version::{InstanceV1_0, InstanceV1_1};
 use ash::vk::{
-    PhysicalDevice, PhysicalDeviceFeatures, PhysicalDeviceLimits, PhysicalDeviceProperties,
-    PhysicalDeviceType, QueueFamilyProperties, QueueFlags,
+    DeviceCreateInfo, DeviceCreateInfoBuilder, PhysicalDevice, PhysicalDeviceFeatures,
+    PhysicalDeviceLimits, PhysicalDeviceProperties, PhysicalDeviceProperties2,
+    PhysicalDeviceProperties2Builder, PhysicalDeviceType, QueueFamilyProperties, QueueFlags,
 };
 
 use crate::device_context::DeviceContext;
 use crate::vk_instance::Vulkan;
 use std::ffi::CStr;
 
+#[derive(Clone)]
 pub struct Gpu {
     vulkan: Vulkan,
     physical_device: PhysicalDevice,
@@ -39,8 +41,19 @@ impl Gpu {
         }
     }
 
-    pub fn device_context(&self, extensions: &[&'static CStr]) -> DeviceContext {
-        DeviceContext::new(&self.vulkan.vk_instance(), self, extensions)
+    pub fn device_context<F>(
+        &self,
+        extensions: &[&'static CStr],
+        builder_function: F,
+    ) -> DeviceContext
+    where
+        F: FnOnce(DeviceCreateInfoBuilder) -> DeviceCreateInfoBuilder,
+    {
+        DeviceContext::new(
+            self,
+            extensions,
+            builder_function(DeviceCreateInfo::builder()),
+        )
     }
 
     pub(crate) fn family_type_index(&self, flags: QueueFlags) -> Option<u32> {
@@ -93,6 +106,19 @@ impl Gpu {
         self.queue_family_properties[queue_family_index as usize].queue_count
     }
 
+    pub fn extension_properties<F>(&self, builder_function: F) -> PhysicalDeviceProperties2
+    where
+        F: FnOnce(PhysicalDeviceProperties2Builder) -> PhysicalDeviceProperties2Builder,
+    {
+        let mut properties = builder_function(PhysicalDeviceProperties2::builder()).build();
+        unsafe {
+            self.vulkan()
+                .vk_instance()
+                .get_physical_device_properties2(self.physical_device, &mut properties);
+        }
+
+        properties
+    }
     pub fn supports_graphics(&self) -> bool {
         for queue_info in self.queue_family_properties.iter() {
             if queue_info.queue_flags.contains(QueueFlags::GRAPHICS) {
@@ -121,5 +147,9 @@ impl Gpu {
         }
 
         false
+    }
+
+    pub fn vulkan(&self) -> &Vulkan {
+        &self.vulkan
     }
 }

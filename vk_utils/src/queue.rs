@@ -1,18 +1,18 @@
-use crate::graphics_command_buffer::CommandBufferHandle;
+use crate::command_buffer::CommandBufferHandle;
 use crate::wait_handle::WaitHandle;
 use ash::version::DeviceV1_0;
 use ash::vk::{
     CommandBufferAllocateInfo, CommandPool, CommandPoolCreateInfo, Framebuffer, Queue, RenderPass,
 };
 use ash::Device;
-pub struct GraphicsQueue {
+pub struct QueueHandle {
     device: Device,
     queue: Queue,
     queue_family_index: u32,
     command_pool: CommandPool,
 }
 
-impl GraphicsQueue {
+impl QueueHandle {
     pub(crate) fn new(device: &Device, queue: &Queue, queue_family_index: u32) -> Self {
         let pool_info = CommandPoolCreateInfo::builder()
             .queue_family_index(queue_family_index)
