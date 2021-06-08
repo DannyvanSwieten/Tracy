@@ -5,7 +5,7 @@ use ash::vk::{
     CommandPoolCreateInfo, Fence, PhysicalDeviceMemoryProperties2,
     PhysicalDeviceRayTracingPipelinePropertiesKHR, Queue, SubmitInfo,
 };
-use ash::{Device, Instance};
+use ash::Device;
 pub struct Context {
     device: Device,
     queue: Queue,
@@ -58,7 +58,6 @@ impl Context {
 }
 
 pub struct RtxContext {
-    pub base_context: Context,
     acceleration_structure_ext: AccelerationStructure,
     ray_tracing_pipeline_ext: RayTracingPipeline,
     memory_properties: PhysicalDeviceMemoryProperties2,
@@ -67,35 +66,17 @@ pub struct RtxContext {
 
 impl RtxContext {
     pub fn new(
-        instance: &Instance,
-        device: &Device,
-        queue: &Queue,
-        queue_family_index: u32,
+        acceleration_structure_ext: AccelerationStructure,
+        ray_tracing_pipeline_ext: RayTracingPipeline,
         memory_properties: &PhysicalDeviceMemoryProperties2,
         pipeline_properties: &PhysicalDeviceRayTracingPipelinePropertiesKHR,
     ) -> Self {
-        let base_context = Context::new(device, queue, queue_family_index);
-        let acceleration_structure_ext = AccelerationStructure::new(instance, &base_context.device);
-        let ray_tracing_pipeline_ext = RayTracingPipeline::new(instance, &base_context.device);
         Self {
-            base_context,
             acceleration_structure_ext,
             ray_tracing_pipeline_ext,
             memory_properties: *memory_properties,
             pipeline_properties: *pipeline_properties,
         }
-    }
-
-    pub fn device(&self) -> &Device {
-        &self.base_context.device
-    }
-
-    pub fn command_buffer(&self) -> CommandBuffer {
-        self.base_context.command_buffer()
-    }
-
-    pub fn submit_command_buffers(&self, command_buffer: &CommandBuffer) {
-        self.base_context.submit_command_buffers(command_buffer)
     }
 
     pub fn pipeline_ext(&self) -> &RayTracingPipeline {

@@ -1,8 +1,9 @@
 use ash::version::{InstanceV1_0, InstanceV1_1};
 use ash::vk::{
     DeviceCreateInfo, DeviceCreateInfoBuilder, PhysicalDevice, PhysicalDeviceFeatures,
-    PhysicalDeviceLimits, PhysicalDeviceProperties, PhysicalDeviceProperties2,
-    PhysicalDeviceProperties2Builder, PhysicalDeviceType, QueueFamilyProperties, QueueFlags,
+    PhysicalDeviceLimits, PhysicalDeviceMemoryProperties2, PhysicalDeviceProperties,
+    PhysicalDeviceProperties2, PhysicalDeviceProperties2Builder, PhysicalDeviceType,
+    QueueFamilyProperties, QueueFlags,
 };
 
 use crate::device_context::DeviceContext;
@@ -15,6 +16,7 @@ pub struct Gpu {
     physical_device: PhysicalDevice,
     features: PhysicalDeviceFeatures,
     properties: PhysicalDeviceProperties,
+    memory_properties: PhysicalDeviceMemoryProperties2,
     queue_family_properties: Vec<QueueFamilyProperties>,
 }
 
@@ -29,6 +31,10 @@ impl Gpu {
                 .vk_instance()
                 .get_physical_device_properties(*physical_device);
 
+            let mut memory_properties = PhysicalDeviceMemoryProperties2::default();
+            vulkan
+                .vk_instance()
+                .get_physical_device_memory_properties2(*physical_device, &mut memory_properties);
             Self {
                 vulkan: vulkan.clone(),
                 features,
@@ -37,6 +43,7 @@ impl Gpu {
                 queue_family_properties: vulkan
                     .vk_instance()
                     .get_physical_device_queue_family_properties(*physical_device),
+                memory_properties,
             }
         }
     }
@@ -151,5 +158,9 @@ impl Gpu {
 
     pub fn vulkan(&self) -> &Vulkan {
         &self.vulkan
+    }
+
+    pub fn memory_properties(&self) -> &PhysicalDeviceMemoryProperties2 {
+        &self.memory_properties
     }
 }
