@@ -1,9 +1,9 @@
 use ash::version::DeviceV1_0;
 use ash::vk::{
-    Buffer, CommandBuffer, CommandPool, DependencyFlags, DescriptorSet, Extent2D, FenceCreateInfo,
-    Framebuffer, ImageAspectFlags, ImageLayout, ImageMemoryBarrier, ImageSubresourceRange,
-    PipelineBindPoint, PipelineLayout, PipelineStageFlags, Queue, Rect2D, RenderPass,
-    RenderPassBeginInfo, SubmitInfo, SubpassContents,
+    Buffer, CommandBuffer, CommandBufferBeginInfo, CommandPool, DependencyFlags, DescriptorSet,
+    Extent2D, FenceCreateInfo, Framebuffer, ImageAspectFlags, ImageLayout, ImageMemoryBarrier,
+    ImageSubresourceRange, PipelineBindPoint, PipelineLayout, PipelineStageFlags, Queue, Rect2D,
+    RenderPass, RenderPassBeginInfo, SubmitInfo, SubpassContents,
 };
 use ash::Device;
 
@@ -16,6 +16,7 @@ pub struct CommandBufferHandle {
     queue: Queue,
     command_buffer: [CommandBuffer; 1],
     submit_info: [SubmitInfo; 1],
+    begin_info: CommandBufferBeginInfo,
 }
 
 impl CommandBufferHandle {
@@ -25,6 +26,15 @@ impl CommandBufferHandle {
             queue: queue.clone(),
             command_buffer: [command_buffer.clone()],
             submit_info: [SubmitInfo::default()],
+            begin_info: CommandBufferBeginInfo::default(),
+        }
+    }
+
+    pub(crate) fn begin(&self) {
+        unsafe {
+            self.device
+                .begin_command_buffer(self.command_buffer[0], &self.begin_info)
+                .expect("Command buffer begin failed");
         }
     }
 
@@ -47,7 +57,7 @@ impl CommandBufferHandle {
         }
     }
 
-    pub fn bind_pipeline(&mut self, pipeline: &GraphicsPipeline) {
+    pub fn bind_graphics_pipeline(&mut self, pipeline: &GraphicsPipeline) {
         unsafe {
             self.device.cmd_bind_pipeline(
                 *self.command_buffer(),
@@ -59,17 +69,22 @@ impl CommandBufferHandle {
         }
     }
 
-    pub fn bind_descriptor_sets(&self, sets: &[DescriptorSet]) {
-        // unsafe {
-        //     self.device.cmd_bind_descriptor_sets(
-        //         *self.command_buffer(),
-        //         PipelineBindPoint::GRAPHICS,
-        //         self.layout,
-        //         0,
-        //         sets,
-        //         &[],
-        //     )
-        // }
+    pub fn bind_descriptor_sets(
+        &self,
+        layout: &PipelineLayout,
+        bind_point: PipelineBindPoint,
+        sets: &[DescriptorSet],
+    ) {
+        unsafe {
+            self.device.cmd_bind_descriptor_sets(
+                *self.command_buffer(),
+                bind_point,
+                *layout,
+                0,
+                sets,
+                &[],
+            )
+        }
     }
 
     pub fn bind_vertex_buffer(&self, first_binding: u32, buffers: &[Buffer]) {
@@ -109,6 +124,10 @@ impl CommandBufferHandle {
         &self.command_buffer[0]
     }
 
+    pub fn native_handle(&self) -> &CommandBuffer {
+        &self.command_buffer[0]
+    }
+
     pub(crate) fn submit_info(&self) -> &[SubmitInfo] {
         &self.submit_info
     }
@@ -142,7 +161,7 @@ impl CommandBufferHandle {
         }
     }
 
-    pub(crate) fn begin(
+    pub(crate) fn begin_render_pass(
         &self,
         render_pass: &RenderPass,
         framebuffer: &Framebuffer,

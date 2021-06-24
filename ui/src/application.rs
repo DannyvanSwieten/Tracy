@@ -228,8 +228,8 @@ impl<AppState: 'static> Application<AppState> {
 
         let mut gpus = vulkan.hardware_devices_with_queue_support(QueueFlags::GRAPHICS);
         let primary_gpu = gpus.remove(0);
-        let primary_device_context = primary_gpu.device_context(&[Swapchain::name()]);
-        let queue = primary_device_context.graphics_queue();
+        let primary_device_context =
+            primary_gpu.device_context(&[Swapchain::name()], |_builder| _builder);
 
         let vulkan_surface_ext = Surface::new(vulkan.library(), vulkan.vk_instance());
         let vulkan_swapchain_ext =

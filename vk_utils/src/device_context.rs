@@ -58,6 +58,12 @@ impl DeviceContext {
         }
     }
 
+    pub fn wait(&self) {
+        unsafe {
+            self.device.device_wait_idle().expect("Wait failed");
+        }
+    }
+
     pub fn graphics_queue(&self) -> &Option<QueueHandle> {
         &self.graphics_queue
     }

@@ -48,13 +48,13 @@ impl Gpu {
         }
     }
 
-    pub fn device_context<F>(
-        &self,
+    pub fn device_context<'a, F>(
+        &'a self,
         extensions: &[&'static CStr],
         builder_function: F,
     ) -> DeviceContext
     where
-        F: FnOnce(DeviceCreateInfoBuilder) -> DeviceCreateInfoBuilder,
+        F: FnOnce(DeviceCreateInfoBuilder<'a>) -> DeviceCreateInfoBuilder<'a>,
     {
         DeviceContext::new(
             self,
@@ -113,9 +113,9 @@ impl Gpu {
         self.queue_family_properties[queue_family_index as usize].queue_count
     }
 
-    pub fn extension_properties<F>(&self, builder_function: F) -> PhysicalDeviceProperties2
+    pub fn extension_properties<'a, F>(&self, builder_function: F) -> PhysicalDeviceProperties2
     where
-        F: FnOnce(PhysicalDeviceProperties2Builder) -> PhysicalDeviceProperties2Builder,
+        F: FnOnce(PhysicalDeviceProperties2Builder<'a>) -> PhysicalDeviceProperties2Builder<'a>,
     {
         let mut properties = builder_function(PhysicalDeviceProperties2::builder()).build();
         unsafe {

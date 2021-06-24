@@ -51,7 +51,7 @@ impl QueueHandle {
         CommandBufferHandle::new(&self.device, &self.queue, &command_buffer)
     }
 
-    pub fn begin<F>(
+    pub fn begin_render_pass<F>(
         &self,
         render_pass: &RenderPass,
         framebuffer: &Framebuffer,
@@ -63,7 +63,18 @@ impl QueueHandle {
         F: FnOnce(CommandBufferHandle) -> CommandBufferHandle,
     {
         let command_buffer = self.command_buffer();
-        command_buffer.begin(render_pass, framebuffer, width, height);
+        command_buffer.begin();
+        command_buffer.begin_render_pass(render_pass, framebuffer, width, height);
+        let command_buffer = f(command_buffer);
+        command_buffer.submit(&self.command_pool)
+    }
+
+    pub fn begin<F>(&self, f: F) -> WaitHandle
+    where
+        F: FnOnce(CommandBufferHandle) -> CommandBufferHandle,
+    {
+        let command_buffer = self.command_buffer();
+        command_buffer.begin();
         let command_buffer = f(command_buffer);
         command_buffer.submit(&self.command_pool)
     }

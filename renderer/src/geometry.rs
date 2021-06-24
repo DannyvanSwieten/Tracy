@@ -6,15 +6,12 @@ use ash::vk::{
     AccelerationStructureGeometryInstancesDataKHR, AccelerationStructureGeometryKHR,
     AccelerationStructureGeometryTrianglesDataKHR, AccelerationStructureKHR,
     AccelerationStructureTypeKHR, BufferUsageFlags, BuildAccelerationStructureModeKHR,
-    CommandBufferBeginInfo, DeviceAddress, DeviceOrHostAddressConstKHR, DeviceOrHostAddressKHR,
-    Format, GeometryTypeKHR, IndexType, MemoryPropertyFlags,
+    DeviceAddress, DeviceOrHostAddressConstKHR, DeviceOrHostAddressKHR, Format, GeometryTypeKHR,
+    IndexType, MemoryPropertyFlags,
 };
-use vk_utils::buffer_resource::BufferResource;
-
-use ash::version::DeviceV1_0;
-
-use ash::extensions::khr::AccelerationStructure;
 use ash::Device;
+use vk_utils::buffer_resource::BufferResource;
+use vk_utils::device_context::DeviceContext;
 
 #[repr(C)]
 pub struct GeometryInstance {
@@ -58,7 +55,8 @@ impl BottomLevelAccelerationStructure {
 }
 impl BottomLevelAccelerationStructure {
     pub fn new(
-        ctx: &RtxContext,
+        device: &DeviceContext,
+        rtx: &RtxContext,
         vertex_buffer: &BufferResource,
         vertex_count: u32,
         vertex_offset: u32,
@@ -94,25 +92,21 @@ impl BottomLevelAccelerationStructure {
                 .ty(AccelerationStructureTypeKHR::BOTTOM_LEVEL);
 
             let max_primitives: [u32; 1] = [index_count];
-            let build_sizes = ctx
+            let build_sizes = rtx
                 .acceleration_structure_ext()
                 .get_acceleration_structure_build_sizes(
                     AccelerationStructureBuildTypeKHR::HOST_OR_DEVICE,
                     &build_info,
                     &max_primitives,
                 );
-            let scratch_buffer = BufferResource::new(
-                &ctx.memory_properties().memory_properties,
-                ctx.device(),
+            let scratch_buffer = device.buffer(
                 build_sizes.build_scratch_size,
                 MemoryPropertyFlags::DEVICE_LOCAL,
                 BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
                     | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
             );
 
-            let acc_buffer = BufferResource::new(
-                &ctx.memory_properties().memory_properties,
-                ctx.device(),
+            let acc_buffer = device.buffer(
                 build_sizes.acceleration_structure_size,
                 MemoryPropertyFlags::DEVICE_LOCAL,
                 BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
@@ -123,7 +117,7 @@ impl BottomLevelAccelerationStructure {
                 .ty(AccelerationStructureTypeKHR::BOTTOM_LEVEL)
                 .buffer(acc_buffer.buffer);
 
-            let acceleration_structure = ctx
+            let acceleration_structure = rtx
                 .acceleration_structure_ext()
                 .create_acceleration_structure(&create_info, None)
                 .expect("Acceleration structure creation failed");
@@ -145,32 +139,29 @@ impl BottomLevelAccelerationStructure {
                 .build()];
             let ranges = vec![&range[0..1]];
 
-            let command_buffer = ctx.command_buffer();
+            if let Some(queue) = device.graphics_queue() {
+                queue.begin(|command_buffer| {
+                    rtx.acceleration_structure_ext()
+                        .cmd_build_acceleration_structures(
+                            *command_buffer.native_handle(),
+                            &infos,
+                            &ranges,
+                        );
+                    command_buffer
+                });
 
-            ctx.device()
-                .begin_command_buffer(command_buffer, &CommandBufferBeginInfo::builder().build())
-                .expect("Start commanbuffer failed");
-
-            ctx.acceleration_structure_ext()
-                .cmd_build_acceleration_structures(command_buffer, &infos, &ranges);
-
-            ctx.device()
-                .end_command_buffer(command_buffer)
-                .expect("End command buffer failed");
-
-            ctx.submit_command_buffers(&command_buffer);
-
-            ctx.device().device_wait_idle().expect("Wait failed");
+                device.wait();
+            }
 
             let address_info = AccelerationStructureDeviceAddressInfoKHR::builder()
                 .acceleration_structure(acceleration_structure)
                 .build();
-            let address = ctx
+            let address = rtx
                 .acceleration_structure_ext()
                 .get_acceleration_structure_device_address(&address_info);
 
             Self {
-                device: ctx.device().clone(),
+                device: device.vk_device().clone(),
                 acceleration_structure_buffer: acc_buffer,
                 acceleration_structure_scratch_buffer: scratch_buffer,
                 acceleration_structure,
@@ -181,6 +172,7 @@ impl BottomLevelAccelerationStructure {
 }
 
 pub struct TopLevelAccelerationStructure {
+    device: Device,
     pub acceleration_structure: AccelerationStructureKHR,
     instance_buffer: BufferResource,
     accelation_structure_buffer: BufferResource,
@@ -188,13 +180,12 @@ pub struct TopLevelAccelerationStructure {
 
 impl TopLevelAccelerationStructure {
     pub fn new(
-        ctx: &RtxContext,
+        device: &DeviceContext,
+        rtx: &RtxContext,
         blases: &[BottomLevelAccelerationStructure],
         instances: &[GeometryInstance],
     ) -> Self {
-        let instance_buffer = BufferResource::new(
-            &ctx.memory_properties().memory_properties,
-            ctx.device(),
+        let instance_buffer = device.buffer(
             instances.len() as u64 * 64,
             MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
             BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
@@ -222,7 +213,7 @@ impl TopLevelAccelerationStructure {
         let max_primitives = [instances.len() as u32];
 
         unsafe {
-            let build_sizes = ctx
+            let build_sizes = rtx
                 .acceleration_structure_ext()
                 .get_acceleration_structure_build_sizes(
                     AccelerationStructureBuildTypeKHR::HOST_OR_DEVICE,
@@ -230,18 +221,14 @@ impl TopLevelAccelerationStructure {
                     &max_primitives,
                 );
 
-            let scratch_buffer = BufferResource::new(
-                &ctx.memory_properties().memory_properties,
-                ctx.device(),
+            let scratch_buffer = device.buffer(
                 build_sizes.build_scratch_size,
                 MemoryPropertyFlags::DEVICE_LOCAL,
                 BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
                     | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
             );
 
-            let acc_buffer = BufferResource::new(
-                &ctx.memory_properties().memory_properties,
-                ctx.device(),
+            let acc_buffer = device.buffer(
                 build_sizes.acceleration_structure_size,
                 MemoryPropertyFlags::DEVICE_LOCAL,
                 BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
@@ -252,7 +239,7 @@ impl TopLevelAccelerationStructure {
                 .ty(AccelerationStructureTypeKHR::TOP_LEVEL)
                 .buffer(acc_buffer.buffer);
 
-            let acceleration_structure = ctx
+            let acceleration_structure = rtx
                 .acceleration_structure_ext()
                 .create_acceleration_structure(&create_info, None)
                 .expect("Acceleration structure creation failed");
@@ -273,25 +260,22 @@ impl TopLevelAccelerationStructure {
                 .first_vertex(0)
                 .build()];
             let ranges = vec![&range[0..1]];
+            if let Some(queue) = device.graphics_queue() {
+                queue.begin(|command_buffer| {
+                    rtx.acceleration_structure_ext()
+                        .cmd_build_acceleration_structures(
+                            *command_buffer.native_handle(),
+                            &infos,
+                            &ranges,
+                        );
+                    command_buffer
+                });
 
-            let command_buffer = ctx.command_buffer();
-
-            ctx.device()
-                .begin_command_buffer(command_buffer, &CommandBufferBeginInfo::builder().build())
-                .expect("Start commanbuffer failed");
-
-            ctx.acceleration_structure_ext()
-                .cmd_build_acceleration_structures(command_buffer, &infos, &ranges);
-
-            ctx.device()
-                .end_command_buffer(command_buffer)
-                .expect("End command buffer failed");
-
-            ctx.submit_command_buffers(&command_buffer);
-
-            ctx.device().device_wait_idle().expect("Wait failed");
+                device.wait();
+            }
 
             Self {
+                device: device.vk_device().clone(),
                 acceleration_structure,
                 instance_buffer,
                 accelation_structure_buffer: acc_buffer,

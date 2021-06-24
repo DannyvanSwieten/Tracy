@@ -68,14 +68,14 @@ impl RtxContext {
     pub fn new(
         acceleration_structure_ext: AccelerationStructure,
         ray_tracing_pipeline_ext: RayTracingPipeline,
-        memory_properties: &PhysicalDeviceMemoryProperties2,
-        pipeline_properties: &PhysicalDeviceRayTracingPipelinePropertiesKHR,
+        memory_properties: PhysicalDeviceMemoryProperties2,
+        pipeline_properties: PhysicalDeviceRayTracingPipelinePropertiesKHR,
     ) -> Self {
         Self {
             acceleration_structure_ext,
             ray_tracing_pipeline_ext,
-            memory_properties: *memory_properties,
-            pipeline_properties: *pipeline_properties,
+            memory_properties: memory_properties,
+            pipeline_properties: pipeline_properties,
         }
     }
 
