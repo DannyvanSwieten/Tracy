@@ -1,3 +1,5 @@
+use image::save_buffer;
+use renderer::geometry::*;
 use renderer::renderer::*;
 use ui::{
     application::{Application, ApplicationDelegate, WindowRegistry},
@@ -62,7 +64,7 @@ impl ApplicationDelegate<MyState> for Delegate {
         window_registry: &mut WindowRegistry<MyState>,
         target: &EventLoopWindowTarget<()>,
     ) {
-        let window = window_registry.create_window(target, "Application Title", 1200, 200);
+        let window = window_registry.create_window(target, "Application Title", 1000, 200);
 
         let ui = match UIWindowDelegate::<MyState>::new(
             app,
@@ -76,11 +78,24 @@ impl ApplicationDelegate<MyState> for Delegate {
 
         let gpu = &app
             .vulkan()
-            .hardware_devices_with_queue_support(renderer::ash::vk::QueueFlags::GRAPHICS)[0];
+            .hardware_devices_with_queue_support(renderer::vk::QueueFlags::GRAPHICS)[0];
         let mut renderer = Renderer::new(&gpu);
-        let vertices: Vec<f32> = vec![0.0, 1.0, 0.0, 1.0, -1.0, 0.0, -1.0, -1.0, 0.0];
+        renderer.initialize(1200, 800);
+        let vertices = vec![
+            Vertex::new(0.0, 1.0, 0.0),
+            Vertex::new(1.0, -1.0, 0.0),
+            Vertex::new(-1.0, -1.0, 0.0),
+        ];
         let indices: Vec<u32> = vec![0, 1, 2];
-        renderer.build(&vertices, &indices);
+        let buffer = GeometryBuffer::new_with_data(indices, vertices);
+        let views = [GeometryBufferView::new(3, 0, 3, 0)];
+        renderer.build(&buffer, &views);
+        renderer.set_camera(&glm::vec3(0., 0., -5.), &glm::vec3(0., 0., 0.));
+        renderer.render();
+        let output = renderer.download_image().copy_data::<u8>();
+        save_buffer("image.png", &output, 1200, 800, image::ColorType::Rgba8)
+            .expect("Image write failed");
+
         window_registry.register(window, ui);
     }
 }

@@ -1,12 +1,14 @@
 use ash::version::DeviceV1_0;
 use ash::vk::{
-    Buffer, CommandBuffer, CommandBufferBeginInfo, CommandPool, DependencyFlags, DescriptorSet,
-    Extent2D, FenceCreateInfo, Framebuffer, ImageAspectFlags, ImageLayout, ImageMemoryBarrier,
+    Buffer, BufferImageCopy, ClearColorValue, CommandBuffer, CommandBufferBeginInfo, CommandPool,
+    DependencyFlags, DescriptorSet, Extent2D, Extent3D, FenceCreateInfo, Framebuffer,
+    ImageAspectFlags, ImageLayout, ImageMemoryBarrier, ImageSubresourceLayers,
     ImageSubresourceRange, PipelineBindPoint, PipelineLayout, PipelineStageFlags, Queue, Rect2D,
     RenderPass, RenderPassBeginInfo, SubmitInfo, SubpassContents,
 };
 use ash::Device;
 
+use crate::buffer_resource::BufferResource;
 use crate::graphics_pipeline::GraphicsPipeline;
 use crate::image_resource::Image2DResource;
 use crate::wait_handle::WaitHandle;
@@ -21,13 +23,16 @@ pub struct CommandBufferHandle {
 
 impl CommandBufferHandle {
     pub(crate) fn new(device: &Device, queue: &Queue, command_buffer: &CommandBuffer) -> Self {
-        Self {
+        let mut me = Self {
             device: device.clone(),
             queue: queue.clone(),
             command_buffer: [command_buffer.clone()],
             submit_info: [SubmitInfo::default()],
             begin_info: CommandBufferBeginInfo::default(),
-        }
+        };
+
+        me.submit_info[0] = *SubmitInfo::builder().command_buffers(&me.command_buffer);
+        me
     }
 
     pub(crate) fn begin(&self) {
@@ -158,6 +163,49 @@ impl CommandBufferHandle {
                 &[],
                 &[barrier],
             );
+        }
+    }
+
+    pub fn clear_image_2d(&self, image: &Image2DResource, r: f32, g: f32, b: f32, a: f32) {
+        unsafe {
+            let value = ClearColorValue {
+                float32: [r, g, b, a],
+            };
+            let range = [*ImageSubresourceRange::builder()
+                .layer_count(1)
+                .level_count(1)
+                .aspect_mask(ImageAspectFlags::COLOR)];
+            self.device.cmd_clear_color_image(
+                *self.command_buffer(),
+                *image.vk_image(),
+                ImageLayout::GENERAL,
+                &value,
+                &range,
+            )
+        }
+    }
+
+    pub fn copy_image_2d_to_buffer(&self, image: &Image2DResource, buffer: &BufferResource) {
+        let layer_info = ImageSubresourceLayers::builder()
+            .layer_count(1)
+            .aspect_mask(ImageAspectFlags::COLOR);
+        let copy = [*BufferImageCopy::builder()
+            .image_extent(
+                *Extent3D::builder()
+                    .width(image.width())
+                    .height(image.height())
+                    .depth(1),
+            )
+            .image_subresource(*layer_info)];
+
+        unsafe {
+            self.device.cmd_copy_image_to_buffer(
+                self.command_buffer[0],
+                *image.vk_image(),
+                image.layout(),
+                buffer.buffer,
+                &copy,
+            )
         }
     }
 

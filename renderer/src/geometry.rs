@@ -14,6 +14,75 @@ use vk_utils::buffer_resource::BufferResource;
 use vk_utils::device_context::DeviceContext;
 
 #[repr(C)]
+#[derive(Default)]
+pub struct Vertex {
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
+impl Vertex {
+    pub fn new(x: f32, y: f32, z: f32) -> Self {
+        Self { x, y, z }
+    }
+}
+
+pub struct GeometryBuffer {
+    indices: Vec<u32>,
+    vertices: Vec<Vertex>,
+}
+
+impl GeometryBuffer {
+    pub fn new() -> Self {
+        Self {
+            indices: Vec::default(),
+            vertices: Vec::default(),
+        }
+    }
+    pub fn new_with_data(indices: Vec<u32>, vertices: Vec<Vertex>) -> Self {
+        Self { indices, vertices }
+    }
+    pub fn vertices(&self) -> &[Vertex] {
+        &self.vertices
+    }
+    pub fn indices(&self) -> &[u32] {
+        &self.indices
+    }
+}
+
+#[repr(C)]
+pub struct GeometryBufferView {
+    index_count: u32,
+    index_offset: u32,
+    vertex_count: u32,
+    vertex_offset: u32,
+}
+
+impl GeometryBufferView {
+    pub fn new(index_count: u32, index_offset: u32, vertex_count: u32, vertex_offset: u32) -> Self {
+        Self {
+            index_count,
+            index_offset,
+            vertex_count,
+            vertex_offset,
+        }
+    }
+
+    pub fn index_count(&self) -> u32 {
+        self.index_count
+    }
+    pub fn index_offset(&self) -> u32 {
+        self.index_offset
+    }
+    pub fn vertex_count(&self) -> u32 {
+        self.vertex_count
+    }
+    pub fn vertex_offset(&self) -> u32 {
+        self.vertex_offset
+    }
+}
+
+#[repr(C)]
 pub struct GeometryInstance {
     transform: [f32; 12],
     id_and_mask: u32,

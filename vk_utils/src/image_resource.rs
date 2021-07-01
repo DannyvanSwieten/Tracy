@@ -15,7 +15,8 @@ pub struct Image2DResource {
     device: Device,
     image: Image,
     memory: DeviceMemory,
-    layout: ImageLayout,
+    pub layout: ImageLayout,
+    image_info: ImageCreateInfo,
 }
 
 impl Image2DResource {
@@ -73,6 +74,7 @@ impl Image2DResource {
                     image,
                     memory,
                     layout: ImageLayout::UNDEFINED,
+                    image_info: image_info.build(),
                 }
             } else {
                 panic!()
@@ -86,6 +88,18 @@ impl Image2DResource {
 
     pub fn layout(&self) -> ImageLayout {
         self.layout
+    }
+
+    pub fn width(&self) -> u32 {
+        self.image_info.extent.width
+    }
+
+    pub fn height(&self) -> u32 {
+        self.image_info.extent.height
+    }
+
+    pub fn format(&self) -> Format {
+        self.image_info.format
     }
 }
 

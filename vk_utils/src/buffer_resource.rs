@@ -66,6 +66,23 @@ impl BufferResource {
             }
         }
     }
+
+    pub fn copy_data<T: Copy>(&self) -> Vec<T> {
+        unsafe {
+            let ptr = self
+                .device
+                .map_memory(self.memory, 0, self.size, MemoryMapFlags::default())
+                .expect("Memory map failed on buffer") as *mut T;
+
+            let mut output = Vec::new();
+            let count = (self.size as usize / std::mem::size_of::<T>()) as isize;
+            for i in 0..count {
+                output.push(*ptr.offset(i) as T);
+            }
+
+            output
+        }
+    }
 }
 
 impl BufferResource {

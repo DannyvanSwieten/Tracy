@@ -8,3 +8,5 @@ edition = "2018"
 renderer = {path = "../renderer"}
 ui = {path = "../ui"}
 winit = "*"
+image = "*"
+glm = "*"
