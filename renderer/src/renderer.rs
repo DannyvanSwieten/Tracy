@@ -3,6 +3,7 @@ use crate::geometry::{
     BottomLevelAccelerationStructure, GeometryBuffer, GeometryBufferView, GeometryInstance,
     TopLevelAccelerationStructure, Vertex,
 };
+use crate::scene::Scene;
 use glm::Vec3;
 
 use vk_utils::buffer_resource::BufferResource;
@@ -18,7 +19,7 @@ use ash::extensions::khr::{AccelerationStructure, RayTracingPipeline};
 
 // Extension Objects
 use ash::vk::{
-    DeferredOperationKHR, DeviceSize, PhysicalDeviceFeatures2KHR,
+    DeferredOperationKHR, DeviceSize, GeometryInstanceFlagsKHR, PhysicalDeviceFeatures2KHR,
     PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceRayTracingPipelinePropertiesKHR,
     PhysicalDeviceVulkan12Features, RayTracingPipelineCreateInfoKHR,
     RayTracingShaderGroupCreateInfoKHR, RayTracingShaderGroupTypeKHR,
@@ -123,18 +124,24 @@ impl Renderer {
                     command_buffer
                 });
             }
-
+            self.device.wait();
             self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
             self.output_image_view
         }
     }
 
-    pub fn build(&mut self, geometry: &GeometryBuffer, views: &[GeometryBufferView]) {
+    pub fn build(&mut self, scene: &Scene) {
+        let geometry = scene.geometry_buffer();
         self.vertex_buffer = Some(self.device.buffer(
             (geometry.vertices().len() * 4 * 3) as u64,
             MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
             BufferUsageFlags::VERTEX_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
         ));
+
+        self.vertex_buffer
+            .as_mut()
+            .unwrap()
+            .copy_to(geometry.vertices());
 
         self.index_buffer = Some(self.device.buffer(
             (geometry.indices().len() * 4) as u64,
@@ -142,7 +149,13 @@ impl Renderer {
             BufferUsageFlags::INDEX_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
         ));
 
-        self.bottom_level_acceleration_structures = views
+        self.index_buffer
+            .as_mut()
+            .unwrap()
+            .copy_to(geometry.indices());
+
+        self.bottom_level_acceleration_structures = scene
+            .geometry_buffer_views()
             .iter()
             .map(|view| {
                 BottomLevelAccelerationStructure::new(
@@ -162,16 +175,11 @@ impl Renderer {
             0,
             0xff,
             0,
-            0,
+            GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE,
             self.bottom_level_acceleration_structures[0].address(),
         )];
 
-        let tlas = TopLevelAccelerationStructure::new(
-            &self.device,
-            &self.rtx,
-            &self.bottom_level_acceleration_structures,
-            &instances,
-        );
+        let tlas = TopLevelAccelerationStructure::new(&self.device, &self.rtx, &instances);
         self.top_level_acceleration_structure = Some(tlas);
         self.update_acceleration_structure_descriptors();
     }
@@ -233,7 +241,7 @@ impl Renderer {
             );
 
             let camera_buffer = device.buffer(
-                96,
+                128,
                 MemoryPropertyFlags::HOST_COHERENT | MemoryPropertyFlags::HOST_VISIBLE,
                 BufferUsageFlags::UNIFORM_BUFFER,
             );
@@ -278,7 +286,7 @@ impl Renderer {
             65.,
             self.output_width as f32 / self.output_height as f32,
             0.1,
-            100.,
+            10000.,
         );
         let projection_matrix = glm::inverse(&projection_matrix);
         self.camera_buffer
@@ -381,21 +389,26 @@ impl Renderer {
 
     fn load_shaders_and_pipeline(&mut self) {
         unsafe {
-            let code = load_spirv("shaders/simple_pipeline/ray_gen.rgen.spv");
+            let code = load_spirv(
+                "C:/Users/danny/Documents/code/tracey/shaders/simple_pipeline/ray_gen.rgen.spv",
+            );
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let gen = self
                 .device
                 .vk_device()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray generation shader compilation failed");
-            let code = load_spirv("shaders/simple_pipeline/closest_hit.rchit.spv");
+            let code =
+                load_spirv("C:/Users/danny/Documents/code/tracey/shaders/simple_pipeline/closest_hit.rchit.spv");
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let chit = self
                 .device
                 .vk_device()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray closest hit shader compilation failed");
-            let code = load_spirv("shaders/simple_pipeline/ray_miss.rmiss.spv");
+            let code = load_spirv(
+                "C:/Users/danny/Documents/code/tracey/shaders/simple_pipeline/ray_miss.rmiss.spv",
+            );
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let miss = self
                 .device
@@ -609,7 +622,7 @@ impl Renderer {
 
     fn update_camera_descriptors(&mut self) {
         let buffer_write = [*DescriptorBufferInfo::builder()
-            .range(96)
+            .range(128)
             .buffer(self.camera_buffer.buffer)];
 
         let mut writes = [WriteDescriptorSet::builder()

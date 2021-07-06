@@ -4,10 +4,11 @@ use ash::vk::{
     AccelerationStructureBuildTypeKHR, AccelerationStructureCreateInfoKHR,
     AccelerationStructureDeviceAddressInfoKHR, AccelerationStructureGeometryDataKHR,
     AccelerationStructureGeometryInstancesDataKHR, AccelerationStructureGeometryKHR,
-    AccelerationStructureGeometryTrianglesDataKHR, AccelerationStructureKHR,
-    AccelerationStructureTypeKHR, BufferUsageFlags, BuildAccelerationStructureModeKHR,
-    DeviceAddress, DeviceOrHostAddressConstKHR, DeviceOrHostAddressKHR, Format, GeometryTypeKHR,
-    IndexType, MemoryPropertyFlags,
+    AccelerationStructureGeometryTrianglesDataKHR, AccelerationStructureInstanceKHR,
+    AccelerationStructureKHR, AccelerationStructureTypeKHR, BufferUsageFlags,
+    BuildAccelerationStructureModeKHR, DeviceAddress, DeviceOrHostAddressConstKHR,
+    DeviceOrHostAddressKHR, Format, GeometryInstanceFlagsKHR, GeometryTypeKHR, IndexType,
+    MemoryPropertyFlags,
 };
 use ash::Device;
 use vk_utils::buffer_resource::BufferResource;
@@ -39,6 +40,12 @@ impl GeometryBuffer {
             vertices: Vec::default(),
         }
     }
+
+    pub fn append(&mut self, indices: Vec<u32>, vertices: Vec<Vertex>) {
+        self.indices.extend(indices);
+        self.vertices.extend(vertices);
+    }
+
     pub fn new_with_data(indices: Vec<u32>, vertices: Vec<Vertex>) -> Self {
         Self { indices, vertices }
     }
@@ -95,11 +102,11 @@ impl GeometryInstance {
         instance_id: u32,
         mask: u8,
         hit_group_offset: u32,
-        flags: u8,
+        flags: GeometryInstanceFlagsKHR,
         acceleration_structure_handle: u64,
     ) -> Self {
-        let id_and_mask = (instance_id << 8) | mask as u32;
-        let hit_group_offset_and_flags = (hit_group_offset << 8) | flags as u32;
+        let id_and_mask = ((mask as u32) << 24) | instance_id;
+        let hit_group_offset_and_flags = ((1 as u32) << 24) | hit_group_offset;
         let transform: [f32; 12] = [1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0.];
         Self {
             transform,
@@ -111,10 +118,10 @@ impl GeometryInstance {
 }
 
 pub struct BottomLevelAccelerationStructure {
-    device: Device,
-    acceleration_structure_buffer: BufferResource,
-    acceleration_structure_scratch_buffer: BufferResource,
-    acceleration_structure: AccelerationStructureKHR,
+    _device: Device,
+    _acceleration_structure_buffer: BufferResource,
+    _acceleration_structure_scratch_buffer: BufferResource,
+    _acceleration_structure: AccelerationStructureKHR,
     address: DeviceAddress,
 }
 impl BottomLevelAccelerationStructure {
@@ -135,8 +142,8 @@ impl BottomLevelAccelerationStructure {
     ) -> Self {
         unsafe {
             let triangles = AccelerationStructureGeometryTrianglesDataKHR::builder()
-                .max_vertex(vertex_count + vertex_offset)
-                .vertex_stride(128)
+                .max_vertex(vertex_count - 1 + vertex_offset)
+                .vertex_stride(12)
                 .vertex_format(Format::R32G32B32_SFLOAT)
                 .vertex_data(DeviceOrHostAddressConstKHR {
                     device_address: vertex_buffer.device_address(),
@@ -183,15 +190,16 @@ impl BottomLevelAccelerationStructure {
             );
 
             let create_info = AccelerationStructureCreateInfoKHR::builder()
+                .size(build_sizes.acceleration_structure_size)
                 .ty(AccelerationStructureTypeKHR::BOTTOM_LEVEL)
                 .buffer(acc_buffer.buffer);
 
-            let acceleration_structure = rtx
+            let _acceleration_structure = rtx
                 .acceleration_structure_ext()
                 .create_acceleration_structure(&create_info, None)
                 .expect("Acceleration structure creation failed");
             let build_info = AccelerationStructureBuildGeometryInfoKHR::builder()
-                .dst_acceleration_structure(acceleration_structure)
+                .dst_acceleration_structure(_acceleration_structure)
                 .scratch_data(DeviceOrHostAddressKHR {
                     device_address: scratch_buffer.device_address(),
                 })
@@ -223,17 +231,17 @@ impl BottomLevelAccelerationStructure {
             }
 
             let address_info = AccelerationStructureDeviceAddressInfoKHR::builder()
-                .acceleration_structure(acceleration_structure)
+                .acceleration_structure(_acceleration_structure)
                 .build();
             let address = rtx
                 .acceleration_structure_ext()
                 .get_acceleration_structure_device_address(&address_info);
 
             Self {
-                device: device.vk_device().clone(),
-                acceleration_structure_buffer: acc_buffer,
-                acceleration_structure_scratch_buffer: scratch_buffer,
-                acceleration_structure,
+                _device: device.vk_device().clone(),
+                _acceleration_structure_buffer: acc_buffer,
+                _acceleration_structure_scratch_buffer: scratch_buffer,
+                _acceleration_structure,
                 address,
             }
         }
@@ -241,30 +249,27 @@ impl BottomLevelAccelerationStructure {
 }
 
 pub struct TopLevelAccelerationStructure {
-    device: Device,
+    _device: Device,
     pub acceleration_structure: AccelerationStructureKHR,
-    instance_buffer: BufferResource,
-    accelation_structure_buffer: BufferResource,
+    _instance_buffer: BufferResource,
+    _acceleration_structure_buffer: BufferResource,
 }
 
 impl TopLevelAccelerationStructure {
-    pub fn new(
-        device: &DeviceContext,
-        rtx: &RtxContext,
-        blases: &[BottomLevelAccelerationStructure],
-        instances: &[GeometryInstance],
-    ) -> Self {
-        let instance_buffer = device.buffer(
+    pub fn new(device: &DeviceContext, rtx: &RtxContext, instances: &[GeometryInstance]) -> Self {
+        let mut _instance_buffer = device.buffer(
             instances.len() as u64 * 64,
             MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
             BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
                 | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
         );
 
+        _instance_buffer.copy_to(instances);
+
         let data = AccelerationStructureGeometryDataKHR {
             instances: AccelerationStructureGeometryInstancesDataKHR::builder()
                 .data(DeviceOrHostAddressConstKHR {
-                    device_address: instance_buffer.device_address(),
+                    device_address: _instance_buffer.device_address(),
                 })
                 .build(),
         };
@@ -305,6 +310,7 @@ impl TopLevelAccelerationStructure {
             );
 
             let create_info = AccelerationStructureCreateInfoKHR::builder()
+                .size(build_sizes.acceleration_structure_size)
                 .ty(AccelerationStructureTypeKHR::TOP_LEVEL)
                 .buffer(acc_buffer.buffer);
 
@@ -344,10 +350,10 @@ impl TopLevelAccelerationStructure {
             }
 
             Self {
-                device: device.vk_device().clone(),
+                _device: device.vk_device().clone(),
                 acceleration_structure,
-                instance_buffer,
-                accelation_structure_buffer: acc_buffer,
+                _instance_buffer,
+                _acceleration_structure_buffer: acc_buffer,
             }
         }
     }

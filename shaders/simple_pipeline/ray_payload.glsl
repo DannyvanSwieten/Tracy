@@ -1,4 +1,4 @@
 struct RayPayload
 {
-    bool hit;
+    vec4 color;
 };

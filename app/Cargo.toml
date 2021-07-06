@@ -10,3 +10,4 @@ ui = {path = "../ui"}
 winit = "*"
 image = "*"
 glm = "*"
+gltf = "*"

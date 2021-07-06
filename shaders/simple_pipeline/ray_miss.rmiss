@@ -8,5 +8,7 @@ layout(location = 0) rayPayloadInEXT RayPayload ray;
 
 void main()
 {
-	ray.hit = false;
+	const vec3 d = normalize(gl_WorldRayDirectionEXT);
+	const float t = 0.5 * (d.y + 1.0);
+	ray.color = vec4((1.0 - t) * vec3(.75), 1);
 }

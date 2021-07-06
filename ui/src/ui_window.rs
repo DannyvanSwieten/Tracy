@@ -556,10 +556,14 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
                 let mut user_interface = UserInterface::new(ui_delegate.build("root", state));
                 user_interface.resize(state, window.inner_size().width, window.inner_size().height);
 
-                let file = std::fs::File::open("shaders/sampled_image.vert.spv")
-                    .expect("Shader file not found");
-                let meta = std::fs::metadata("shaders/sampled_image.vert.spv")
-                    .expect("No metadata found for file");
+                let file = std::fs::File::open(
+                    "C:/Users/danny/Documents/code/tracey/shaders/sampled_image.vert.spv",
+                )
+                .expect("Shader file not found");
+                let meta = std::fs::metadata(
+                    "C:/Users/danny/Documents/code/tracey/shaders/sampled_image.vert.spv",
+                )
+                .expect("No metadata found for file");
                 let mut buf_reader = std::io::BufReader::new(file);
 
                 let mut buffer = vec![0; (meta.len() / 4) as usize];
@@ -578,10 +582,14 @@ impl<'a, AppState: 'static> UIWindowDelegate<AppState> {
                         .expect("Vertex Shader module creation failed")
                 };
 
-                let file = std::fs::File::open("shaders/sampled_image.frag.spv")
-                    .expect("Shader file not found");
-                let meta = std::fs::metadata("shaders/sampled_image.frag.spv")
-                    .expect("No metadata found for file");
+                let file = std::fs::File::open(
+                    "C:/Users/danny/Documents/code/tracey/shaders/sampled_image.frag.spv",
+                )
+                .expect("Shader file not found");
+                let meta = std::fs::metadata(
+                    "C:/Users/danny/Documents/code/tracey/shaders/sampled_image.frag.spv",
+                )
+                .expect("No metadata found for file");
                 buf_reader = std::io::BufReader::new(file);
 
                 buffer = vec![0; (meta.len() / 4) as usize];

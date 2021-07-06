@@ -3,8 +3,9 @@ use crate::memory::memory_type_index;
 
 use ash::vk::{
     Buffer, BufferCreateInfo, BufferDeviceAddressInfo, BufferUsageFlags, DeviceAddress,
-    DeviceMemory, MemoryAllocateFlags, MemoryAllocateFlagsInfo, MemoryAllocateInfo, MemoryMapFlags,
-    MemoryPropertyFlags, PhysicalDeviceMemoryProperties, SharingMode,
+    DeviceMemory, MappedMemoryRange, MemoryAllocateFlags, MemoryAllocateFlagsInfo,
+    MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags, PhysicalDeviceMemoryProperties,
+    SharingMode,
 };
 
 use ash::version::{DeviceV1_0, DeviceV1_2};
@@ -15,6 +16,7 @@ pub struct BufferResource {
     pub buffer: Buffer,
     memory: DeviceMemory,
     size: u64,
+    content_size: u64,
 }
 
 impl BufferResource {
@@ -25,12 +27,17 @@ impl BufferResource {
                 .map_memory(self.memory, 0, self.size, MemoryMapFlags::default())
                 .expect("Memory map failed on buffer");
 
-            std::ptr::copy_nonoverlapping(
-                data.as_ptr(),
-                ptr as _,
-                self.size as usize / std::mem::size_of::<T>(),
-            );
+            let size = self.content_size as usize / std::mem::size_of::<T>();
 
+            std::ptr::copy_nonoverlapping(data.as_ptr(), ptr as _, size);
+
+            let ranges = [*MappedMemoryRange::builder()
+                .memory(self.memory)
+                .size(self.size)];
+
+            self.device
+                .flush_mapped_memory_ranges(&ranges)
+                .expect("Memory flush failed");
             self.device.unmap_memory(self.memory);
         }
     }
@@ -130,7 +137,8 @@ impl BufferResource {
                     device: device.clone(),
                     buffer,
                     memory,
-                    size,
+                    size: memory_requirements.size,
+                    content_size: size,
                 }
             } else {
                 panic!()

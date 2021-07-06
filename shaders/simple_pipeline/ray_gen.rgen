@@ -18,21 +18,20 @@ layout(location = 0) rayPayloadEXT RayPayload ray;
 void main()
 {
     uint rayFlags = gl_RayFlagsOpaqueEXT;
-    uint cullMask = 0xff;
     float tmin = 0.001;
     float tmax = 10000.0;
 
-    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.x + .5, gl_LaunchIDEXT.y +.5);
+    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + vec2(.5);
     const vec2 inUV = pixelCenter / vec2(gl_LaunchSizeEXT.xy);
     vec2 d = inUV * 2.0 - 1.0;
 
     vec4 origin = camera.viewInverse * vec4(0, 0, 0, 1);
-    vec4 target = camera.projInverse * vec4(d.x, d.y, 1, 1);
+    vec4 target = camera.projInverse * vec4(d.x, -d.y, 1, 1);
     vec4 direction = camera.viewInverse * vec4(normalize(target.xyz), 0);
 
     traceRayEXT(topLevelAS, 
             rayFlags, 
-            cullMask, 
+            0xff, 
             0 /*sbtRecordOffset*/, 
             0 /*sbtRecordStride*/,
             0 /*missIndex*/, 
@@ -40,5 +39,5 @@ void main()
             direction.xyz, tmax, 
             0 /*payload index*/);
 
-    imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(inUV, ray.hit, 1));
+    imageStore(image, ivec2(gl_LaunchIDEXT.xy), ray.color);
 }

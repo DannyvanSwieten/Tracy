@@ -15,7 +15,9 @@ struct MyState {
     count: u32,
 }
 
-struct Delegate {}
+struct Delegate {
+    renderer: Option<Renderer>,
+}
 
 struct MyUIDelegate {}
 impl UIDelegate<MyState> for MyUIDelegate {
@@ -57,6 +59,17 @@ impl UIDelegate<MyState> for MyUIDelegate {
 }
 
 impl ApplicationDelegate<MyState> for Delegate {
+    fn application_will_update(
+        &mut self,
+        app: &Application<MyState>,
+        state: &mut MyState,
+        window_registry: &mut WindowRegistry<MyState>,
+        target: &EventLoopWindowTarget<()>,
+    ) {
+        if let Some(renderer) = &mut self.renderer {
+            //renderer.render();
+        }
+    }
     fn application_will_start(
         &mut self,
         app: &Application<MyState>,
@@ -64,6 +77,46 @@ impl ApplicationDelegate<MyState> for Delegate {
         window_registry: &mut WindowRegistry<MyState>,
         target: &EventLoopWindowTarget<()>,
     ) {
+        let mut scene = renderer::scene::Scene::new();
+        let (document, buffers, _) = gltf::import("assets/Duck/glTF/Duck.gltf").unwrap();
+
+        for mesh in document.meshes() {
+            for primitive in mesh.primitives() {
+                let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
+                let vertices: Vec<Vertex> = reader
+                    .read_positions()
+                    .unwrap()
+                    .map(|vertex_position| {
+                        Vertex::new(vertex_position[0], vertex_position[1], vertex_position[2])
+                    })
+                    .collect();
+
+                let indices: Vec<u32> = if let Some(iter) = reader.read_indices() {
+                    iter.into_u32().collect()
+                } else {
+                    (0..vertices.len() as u32).collect()
+                };
+
+                scene.add_geometry(indices, vertices);
+            }
+        }
+
+        println!("{}", scene.geometry_count());
+
+        let gpu = &app
+            .vulkan()
+            .hardware_devices_with_queue_support(renderer::vk::QueueFlags::GRAPHICS)[0];
+        self.renderer = Some(Renderer::new(&gpu));
+        if let Some(renderer) = self.renderer.as_mut() {
+            renderer.initialize(1200, 800);
+            renderer.build(&scene);
+            renderer.set_camera(&glm::vec3(0., 0., 100.), &glm::vec3(0., 0., 0.));
+            renderer.render();
+            let output = renderer.download_image().copy_data::<u8>();
+            save_buffer("image.png", &output, 1200, 800, image::ColorType::Rgba8)
+                .expect("Image write failed");
+        }
+
         let window = window_registry.create_window(target, "Application Title", 1000, 200);
 
         let ui = match UIWindowDelegate::<MyState>::new(
@@ -75,32 +128,11 @@ impl ApplicationDelegate<MyState> for Delegate {
             Ok(ui_window_delegate) => Box::new(ui_window_delegate),
             Err(message) => panic!("{}", message),
         };
-
-        let gpu = &app
-            .vulkan()
-            .hardware_devices_with_queue_support(renderer::vk::QueueFlags::GRAPHICS)[0];
-        let mut renderer = Renderer::new(&gpu);
-        renderer.initialize(1200, 800);
-        let vertices = vec![
-            Vertex::new(0.0, 1.0, 0.0),
-            Vertex::new(1.0, -1.0, 0.0),
-            Vertex::new(-1.0, -1.0, 0.0),
-        ];
-        let indices: Vec<u32> = vec![0, 1, 2];
-        let buffer = GeometryBuffer::new_with_data(indices, vertices);
-        let views = [GeometryBufferView::new(3, 0, 3, 0)];
-        renderer.build(&buffer, &views);
-        renderer.set_camera(&glm::vec3(0., 0., -5.), &glm::vec3(0., 0., 0.));
-        renderer.render();
-        let output = renderer.download_image().copy_data::<u8>();
-        save_buffer("image.png", &output, 1200, 800, image::ColorType::Rgba8)
-            .expect("Image write failed");
-
         window_registry.register(window, ui);
     }
 }
 
 fn main() {
     let app: Application<MyState> = Application::new("My Application");
-    app.run(Box::new(Delegate {}), MyState { count: 0 });
+    app.run(Box::new(Delegate { renderer: None }), MyState { count: 0 });
 }

@@ -57,6 +57,15 @@ pub trait ApplicationDelegate<AppState> {
     ) {
     }
 
+    fn application_will_update(
+        &mut self,
+        _: &Application<AppState>,
+        _: &mut AppState,
+        _: &mut WindowRegistry<AppState>,
+        _: &EventLoopWindowTarget<()>,
+    ) {
+    }
+
     fn window_moved(
         &mut self,
         _: &winit::window::WindowId,
@@ -279,7 +288,7 @@ impl<AppState: 'static> Application<AppState> {
         let mut mouse_is_down = false;
         event_loop.run(move |e, event_loop, control_flow| {
             *control_flow = ControlFlow::Poll;
-
+            d.application_will_update(&self, &mut s, &mut window_registry, &event_loop);
             match e {
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
