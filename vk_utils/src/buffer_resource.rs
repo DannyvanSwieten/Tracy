@@ -51,24 +51,27 @@ impl BufferResource {
             };
 
             let mut data_index = 0;
-            for i in (0..self.size).step_by(stride) {
+            for i in (0..self.content_size).step_by(stride) {
                 let ptr = self
                     .device
-                    .map_memory(
-                        self.memory,
-                        i,
-                        element_size as u64,
-                        MemoryMapFlags::default(),
-                    )
+                    .map_memory(self.memory, i, stride as u64, MemoryMapFlags::default())
                     .expect("Memory map failed on buffer");
 
                 std::ptr::copy_nonoverlapping(
-                    data[data_index..data_index + 1].as_ptr(),
+                    data[data_index..data_index + element_size].as_ptr(),
                     ptr as *mut T,
                     element_size,
                 );
 
-                data_index = data_index + 1;
+                data_index = data_index + element_size;
+                let ranges = [*MappedMemoryRange::builder()
+                    .memory(self.memory)
+                    .offset(i)
+                    .size(ash::vk::WHOLE_SIZE)];
+
+                self.device
+                    .flush_mapped_memory_ranges(&ranges)
+                    .expect("Memory flush failed");
                 self.device.unmap_memory(self.memory);
             }
         }
@@ -144,6 +147,14 @@ impl BufferResource {
                 panic!()
             }
         }
+    }
+
+    pub fn size(&self) -> u64 {
+        self.size
+    }
+
+    pub fn content_size(&self) -> u64 {
+        self.content_size
     }
 
     pub fn device_address(&self) -> DeviceAddress {

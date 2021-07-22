@@ -4,11 +4,10 @@ use ash::vk::{
     AccelerationStructureBuildTypeKHR, AccelerationStructureCreateInfoKHR,
     AccelerationStructureDeviceAddressInfoKHR, AccelerationStructureGeometryDataKHR,
     AccelerationStructureGeometryInstancesDataKHR, AccelerationStructureGeometryKHR,
-    AccelerationStructureGeometryTrianglesDataKHR, AccelerationStructureInstanceKHR,
-    AccelerationStructureKHR, AccelerationStructureTypeKHR, BufferUsageFlags,
-    BuildAccelerationStructureModeKHR, DeviceAddress, DeviceOrHostAddressConstKHR,
-    DeviceOrHostAddressKHR, Format, GeometryInstanceFlagsKHR, GeometryTypeKHR, IndexType,
-    MemoryPropertyFlags,
+    AccelerationStructureGeometryTrianglesDataKHR, AccelerationStructureKHR,
+    AccelerationStructureTypeKHR, BufferUsageFlags, BuildAccelerationStructureModeKHR,
+    DeviceAddress, DeviceOrHostAddressConstKHR, DeviceOrHostAddressKHR, Format,
+    GeometryInstanceFlagsKHR, GeometryTypeKHR, IndexType, MemoryPropertyFlags,
 };
 use ash::Device;
 use vk_utils::buffer_resource::BufferResource;
@@ -114,6 +113,10 @@ impl GeometryInstance {
             hit_group_offset_and_flags,
             acceleration_structure_handle,
         }
+    }
+
+    pub fn geometry_id(&self) -> usize {
+        self.acceleration_structure_handle as usize
     }
 }
 
@@ -261,7 +264,8 @@ impl TopLevelAccelerationStructure {
             instances.len() as u64 * 64,
             MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
             BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
-                | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+                | BufferUsageFlags::SHADER_DEVICE_ADDRESS
+                | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
         );
 
         _instance_buffer.copy_to(instances);
@@ -299,14 +303,16 @@ impl TopLevelAccelerationStructure {
                 build_sizes.build_scratch_size,
                 MemoryPropertyFlags::DEVICE_LOCAL,
                 BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
-                    | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+                    | BufferUsageFlags::SHADER_DEVICE_ADDRESS
+                    | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
             );
 
             let acc_buffer = device.buffer(
                 build_sizes.acceleration_structure_size,
                 MemoryPropertyFlags::DEVICE_LOCAL,
                 BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
-                    | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+                    | BufferUsageFlags::SHADER_DEVICE_ADDRESS
+                    | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
             );
 
             let create_info = AccelerationStructureCreateInfoKHR::builder()

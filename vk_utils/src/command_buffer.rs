@@ -69,8 +69,6 @@ impl CommandBufferHandle {
                 PipelineBindPoint::GRAPHICS,
                 *pipeline.vk_handle(),
             );
-
-            //self.layout = pipeline.layout().clone()
         }
     }
 

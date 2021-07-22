@@ -67,7 +67,7 @@ impl ApplicationDelegate<MyState> for Delegate {
         target: &EventLoopWindowTarget<()>,
     ) {
         if let Some(renderer) = &mut self.renderer {
-            //renderer.render();
+            renderer.render();
         }
     }
     fn application_will_start(
@@ -78,7 +78,10 @@ impl ApplicationDelegate<MyState> for Delegate {
         target: &EventLoopWindowTarget<()>,
     ) {
         let mut scene = renderer::scene::Scene::new();
-        let (document, buffers, _) = gltf::import("assets/Duck/glTF/Duck.gltf").unwrap();
+        let (document, buffers, _) = gltf::import(
+            "C:\\Users\\danny\\Documents\\code\\tracey\\assets\\Cube\\glTF\\Cube.gltf",
+        )
+        .unwrap();
 
         for mesh in document.meshes() {
             for primitive in mesh.primitives() {
@@ -97,11 +100,10 @@ impl ApplicationDelegate<MyState> for Delegate {
                     (0..vertices.len() as u32).collect()
                 };
 
-                scene.add_geometry(indices, vertices);
+                let geometry_id = scene.add_geometry(indices, vertices);
+                scene.create_instance(geometry_id);
             }
         }
-
-        println!("{}", scene.geometry_count());
 
         let gpu = &app
             .vulkan()
@@ -110,7 +112,7 @@ impl ApplicationDelegate<MyState> for Delegate {
         if let Some(renderer) = self.renderer.as_mut() {
             renderer.initialize(1200, 800);
             renderer.build(&scene);
-            renderer.set_camera(&glm::vec3(0., 0., 100.), &glm::vec3(0., 0., 0.));
+            renderer.set_camera(&glm::vec3(0., 0., 5.), &glm::vec3(0., 0., 0.));
             renderer.render();
             let output = renderer.download_image().copy_data::<u8>();
             save_buffer("image.png", &output, 1200, 800, image::ColorType::Rgba8)
