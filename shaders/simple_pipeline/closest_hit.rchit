@@ -41,7 +41,7 @@ void main()
 
     const vec3 barycentric = vec3(1 - attribs.x - attribs.y, attribs.x, attribs.y);
 
-    const int32_t start_index = gl_PrimitiveID + offsets.data[gl_InstanceCustomIndexEXT].w;
+    const int32_t start_index = 3 * gl_PrimitiveID + offsets.data[gl_InstanceCustomIndexEXT].y;
     const int32_t i0 = indices.data[start_index];
     const int32_t i1 = indices.data[start_index + 1];
     const int32_t i2 = indices.data[start_index + 2];
@@ -54,5 +54,15 @@ void main()
     const vec3 pv1 = barycentric.y * v1;
     const vec3 pv2 = barycentric.z * v2;
 
-    ray.color = materials.data[gl_InstanceCustomIndexEXT].albedo;
+    const vec3 e10 = v1 - v0;
+    const vec3 e20 = v2 - v0;
+    const vec3 N = normalize(cross(e10, e20));
+
+    const vec3 L = normalize(vec3(1));
+    const float I = max(0, dot(L, N));
+
+    ray.hit = true;
+    ray.color = materials.data[gl_InstanceCustomIndexEXT].albedo * .5;
+    ray.normal = N;
+    ray.point = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
 }

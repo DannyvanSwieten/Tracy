@@ -89,11 +89,12 @@ impl GeometryBufferView {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct GeometryInstance {
-    transform: [f32; 12],
+    pub transform: [f32; 12],
     id_and_mask: u32,
     hit_group_offset_and_flags: u32,
-    acceleration_structure_handle: u64,
+    pub acceleration_structure_handle: u64,
 }
 
 impl GeometryInstance {

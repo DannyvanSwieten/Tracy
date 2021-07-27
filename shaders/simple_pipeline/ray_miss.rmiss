@@ -10,6 +10,7 @@ void main()
 {
 	const vec3 d = normalize(gl_WorldRayDirectionEXT);
 	const float t = 0.5 * (d.y + 1.0);
-	ray.color = vec4(0);
+	ray.color = vec4((1.0 - t) * vec3(.75) + t * vec3(0.5, 0.7, 1.0), 1);
+	ray.hit = false;
 	//ray.objectID = -1;
 }

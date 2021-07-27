@@ -9,6 +9,6 @@ renderer = {path = "../renderer"}
 ui = {path = "../ui"}
 winit = "*"
 image = "*"
-glm = "*"
+nalgebra-glm = "*"
 gltf = "*"
 legion = "*"

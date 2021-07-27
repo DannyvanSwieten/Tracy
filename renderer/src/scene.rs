@@ -13,7 +13,7 @@ impl Material {
         Self {
             color: glm::vec4(1., 1., 1., 1.),
             emission: glm::vec4(0., 0., 0., 0.),
-            maps: glm::ivec4(-1, -1, -1, -1),
+            maps: glm::vec4(-1, -1, -1, -1),
         }
     }
 }
@@ -24,6 +24,8 @@ pub struct Scene {
     geometry_instances: Vec<GeometryInstance>,
     materials: Vec<Material>,
 }
+
+unsafe impl Send for Scene {}
 
 impl Scene {
     pub fn new() -> Self {
@@ -67,6 +69,18 @@ impl Scene {
 
         self.materials.push(Material::new());
         instance_id as usize
+    }
+
+    pub fn set_position(&mut self, instance_id: usize, x: f32, y: f32, z: f32) {
+        self.geometry_instances[instance_id].transform[3] = x;
+        self.geometry_instances[instance_id].transform[7] = y;
+        self.geometry_instances[instance_id].transform[11] = z;
+    }
+
+    pub fn set_scale(&mut self, instance_id: usize, x: f32, y: f32, z: f32) {
+        self.geometry_instances[instance_id].transform[0] = x;
+        self.geometry_instances[instance_id].transform[5] = y;
+        self.geometry_instances[instance_id].transform[10] = z;
     }
 
     pub fn geometry_buffer(&self) -> &GeometryBuffer {

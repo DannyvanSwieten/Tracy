@@ -1,5 +1,5 @@
 use ash::version::DeviceV1_0;
-use ash::vk::{CommandBuffer, CommandPool, Fence, FenceCreateInfo};
+use ash::vk::{CommandBuffer, CommandPool, Fence};
 use ash::Device;
 
 pub struct WaitHandle {

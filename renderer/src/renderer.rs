@@ -2,7 +2,7 @@ use crate::context::RtxContext;
 use crate::descriptor_sets::RTXDescriptorSets;
 use crate::scene::Scene;
 use crate::scene_data::SceneData;
-use glm::Vec3;
+use nalgebra_glm::Vec3;
 
 use vk_utils::buffer_resource::BufferResource;
 use vk_utils::device_context::DeviceContext;
@@ -17,11 +17,11 @@ use ash::extensions::khr::{AccelerationStructure, RayTracingPipeline};
 
 // Extension Objects
 use ash::vk::{
-    DeferredOperationKHR, DeviceSize, PhysicalDeviceFeatures2KHR,
-    PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceRayTracingPipelinePropertiesKHR,
-    PhysicalDeviceVulkan12Features, RayTracingPipelineCreateInfoKHR,
-    RayTracingShaderGroupCreateInfoKHR, RayTracingShaderGroupTypeKHR,
-    StridedDeviceAddressRegionKHR, WriteDescriptorSetAccelerationStructureKHR, SHADER_UNUSED_KHR,
+    DeferredOperationKHR, PhysicalDeviceFeatures2KHR, PhysicalDeviceRayTracingPipelineFeaturesKHR,
+    PhysicalDeviceRayTracingPipelinePropertiesKHR, PhysicalDeviceVulkan12Features,
+    RayTracingPipelineCreateInfoKHR, RayTracingShaderGroupCreateInfoKHR,
+    RayTracingShaderGroupTypeKHR, StridedDeviceAddressRegionKHR,
+    WriteDescriptorSetAccelerationStructureKHR, SHADER_UNUSED_KHR,
 };
 // Core objects
 use ash::vk::{
@@ -50,6 +50,8 @@ pub struct Renderer {
     output_width: u32,
     output_height: u32,
 }
+
+unsafe impl Send for Renderer {}
 
 impl Renderer {
     pub fn initialize(&mut self, width: u32, height: u32) {
@@ -130,102 +132,106 @@ impl Renderer {
 }
 
 impl Renderer {
-    pub fn new(gpu: &Gpu) -> Self {
+    fn create_device_context(gpu: &Gpu) -> DeviceContext {
         unsafe {
-            let device = {
-                let mut rt_features = PhysicalDeviceRayTracingPipelineFeaturesKHR::builder()
-                    .ray_tracing_pipeline(true);
-                let mut address_features =
-                    PhysicalDeviceVulkan12Features::builder().buffer_device_address(true);
-                let mut acc_features = PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
-                    .acceleration_structure(true);
-                let mut features2 = PhysicalDeviceFeatures2KHR::default();
-                gpu.vulkan()
-                    .vk_instance()
-                    .get_physical_device_features2(*gpu.vk_physical_device(), &mut features2);
+            let mut rt_features =
+                PhysicalDeviceRayTracingPipelineFeaturesKHR::builder().ray_tracing_pipeline(true);
+            let mut address_features =
+                PhysicalDeviceVulkan12Features::builder().buffer_device_address(true);
+            let mut acc_features = PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
+                .acceleration_structure(true);
+            let mut features2 = PhysicalDeviceFeatures2KHR::default();
+            gpu.vulkan()
+                .vk_instance()
+                .get_physical_device_features2(*gpu.vk_physical_device(), &mut features2);
 
-                gpu.device_context(
-                    &[
-                        ash::extensions::khr::RayTracingPipeline::name(),
-                        ash::extensions::khr::AccelerationStructure::name(),
-                        ash::extensions::khr::DeferredHostOperations::name(),
-                    ],
-                    |builder| {
-                        builder
-                            .push_next(&mut address_features)
-                            .push_next(&mut rt_features)
-                            .push_next(&mut acc_features)
-                            .enabled_features(&features2.features)
-                    },
-                )
-            };
+            gpu.device_context(
+                &[
+                    ash::extensions::khr::RayTracingPipeline::name(),
+                    ash::extensions::khr::AccelerationStructure::name(),
+                    ash::extensions::khr::DeferredHostOperations::name(),
+                ],
+                |builder| {
+                    builder
+                        .push_next(&mut address_features)
+                        .push_next(&mut rt_features)
+                        .push_next(&mut acc_features)
+                        .enabled_features(&features2.features)
+                },
+            )
+        }
+    }
 
-            let mut physical_device_memory_properties = PhysicalDeviceMemoryProperties2::default();
+    pub fn new(gpu: &Gpu) -> Self {
+        let device = Self::create_device_context(gpu);
+        let mut physical_device_memory_properties = PhysicalDeviceMemoryProperties2::default();
+        unsafe {
             gpu.vulkan()
                 .vk_instance()
                 .get_physical_device_memory_properties2(
                     *gpu.vk_physical_device(),
                     &mut physical_device_memory_properties,
                 );
-
-            let acceleration_structure_ext =
-                AccelerationStructure::new(gpu.vulkan().vk_instance(), device.vk_device());
-            let ray_tracing_pipeline_ext =
-                RayTracingPipeline::new(gpu.vulkan().vk_instance(), device.vk_device());
-
-            let mut pipeline_properties = PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
-            let _properties =
-                gpu.extension_properties(|builder| builder.push_next(&mut pipeline_properties));
-
-            let rtx = RtxContext::new(
-                acceleration_structure_ext,
-                ray_tracing_pipeline_ext,
-                physical_device_memory_properties,
-                pipeline_properties,
-            );
-
-            let camera_buffer = device.buffer(
-                128,
-                MemoryPropertyFlags::HOST_COHERENT | MemoryPropertyFlags::HOST_VISIBLE,
-                BufferUsageFlags::UNIFORM_BUFFER,
-            );
-
-            let descriptor_sets = RTXDescriptorSets::new(&device);
-
-            let mut result = Self {
-                device,
-                rtx,
-                pipeline: Pipeline::null(),
-                accumulation_image: None,
-                output_image: None,
-                output_image_view: ImageView::null(),
-                camera_buffer,
-                shader_binding_table: None,
-                stride_addresses: Vec::new(),
-
-                descriptor_sets,
-                scene_data: None,
-
-                output_width: 0,
-                output_height: 0,
-            };
-
-            result.load_shaders_and_pipeline();
-            result.create_shader_binding_table();
-            result
         }
+
+        let acceleration_structure_ext =
+            AccelerationStructure::new(gpu.vulkan().vk_instance(), device.vk_device());
+        let ray_tracing_pipeline_ext =
+            RayTracingPipeline::new(gpu.vulkan().vk_instance(), device.vk_device());
+
+        let mut pipeline_properties = PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
+        let _properties =
+            gpu.extension_properties(|builder| builder.push_next(&mut pipeline_properties));
+
+        let rtx = RtxContext::new(
+            acceleration_structure_ext,
+            ray_tracing_pipeline_ext,
+            physical_device_memory_properties,
+            pipeline_properties,
+        );
+
+        let camera_buffer = device.buffer(
+            128,
+            MemoryPropertyFlags::HOST_COHERENT | MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::UNIFORM_BUFFER,
+        );
+
+        let descriptor_sets = RTXDescriptorSets::new(&device);
+
+        let mut result = Self {
+            device,
+            rtx,
+            pipeline: Pipeline::null(),
+            accumulation_image: None,
+            output_image: None,
+            output_image_view: ImageView::null(),
+            camera_buffer,
+            shader_binding_table: None,
+            stride_addresses: Vec::new(),
+
+            descriptor_sets,
+            scene_data: None,
+
+            output_width: 0,
+            output_height: 0,
+        };
+
+        result.load_shaders_and_pipeline();
+        result.create_shader_binding_table();
+        result
     }
 
     pub fn set_camera(&mut self, origin: &Vec3, target: &Vec3) {
-        let view_matrix = glm::ext::look_at(*origin, *target, glm::vec3(0., 1., 0.));
+        let view_matrix = glm::look_at_rh(origin, target, &glm::vec3(0., 1., 0.));
         let view_matrix = glm::inverse(&view_matrix);
 
-        let projection_matrix = glm::ext::perspective(
-            65.,
+        let projection_matrix = glm::perspective_rh(
             self.output_width as f32 / self.output_height as f32,
+            0.785398,
             0.1,
-            10000.,
+            1000.,
         );
+
         let projection_matrix = glm::inverse(&projection_matrix);
         self.camera_buffer
             .copy_to(&[view_matrix, projection_matrix]);

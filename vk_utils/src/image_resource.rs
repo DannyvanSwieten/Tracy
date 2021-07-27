@@ -2,10 +2,10 @@ use crate::device_context::DeviceContext;
 use crate::memory::memory_type_index;
 
 use ash::vk::{
-    CommandBufferBeginInfo, DeviceMemory, Extent3D, Format, Image, ImageAspectFlags,
-    ImageCreateInfo, ImageLayout, ImageMemoryBarrier, ImageSubresourceRange, ImageType,
+    DeviceMemory, Extent3D, Format, Image,
+    ImageCreateInfo, ImageLayout, ImageType,
     ImageUsageFlags, MemoryAllocateInfo, MemoryPropertyFlags, PhysicalDeviceMemoryProperties,
-    PipelineStageFlags, SampleCountFlags, SharingMode,
+    SampleCountFlags, SharingMode,
 };
 
 use ash::version::DeviceV1_0;

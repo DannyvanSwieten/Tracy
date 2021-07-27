@@ -96,13 +96,15 @@ impl SceneData {
             .iter()
             .enumerate()
             .map(|(i, instance)| {
-                GeometryInstance::new(
+                let mut ni = GeometryInstance::new(
                     i as u32,
                     0xff,
                     0,
                     GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE,
                     bottom_level_acceleration_structures[instance.geometry_id()].address(),
-                )
+                );
+                ni.transform = instance.transform;
+                ni
             })
             .collect();
 

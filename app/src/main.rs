@@ -1,74 +1,114 @@
 use image::save_buffer;
 use renderer::geometry::*;
 use renderer::renderer::*;
-use ui::{
-    application::{Application, ApplicationDelegate, WindowRegistry},
-    node::Node,
-    ui_window::UIWindowDelegate,
-    user_interface::UIDelegate,
-    widget::*,
-    window_event::MouseEventType,
-};
+use renderer::scene::*;
+use ui::application::{Application, ApplicationDelegate, WindowRegistry};
+use ui::ui_window::UIWindowDelegate;
+use user_interface::MyUIDelegate;
 use winit::event_loop::EventLoopWindowTarget;
+pub mod user_interface;
+use legion::*;
+use user_interface::MyState;
+extern crate nalgebra_glm as glm;
 
-struct MyState {
-    count: u32,
+struct Transform {
+    position: glm::Vec3,
+    scale: glm::Vec3,
+    orientation: glm::Quat,
+}
+
+impl Default for Transform {
+    fn default() -> Self {
+        Self {
+            position: glm::Vec3::default(),
+            scale: glm::vec3(1., 1., 1.),
+            orientation: glm::Quat::default(),
+        }
+    }
+}
+
+impl Transform {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_position(mut self, x: f32, y: f32, z: f32) -> Self {
+        self.position = glm::vec3(x, y, z);
+        self
+    }
+
+    pub fn with_scale(mut self, x: f32, y: f32, z: f32) -> Self {
+        self.scale = glm::vec3(x, y, z);
+        self
+    }
+}
+
+#[derive(Default)]
+struct Velocity {
+    dx: f32,
+    dy: f32,
+    dz: f32,
+}
+
+#[derive(Default)]
+struct StaticMesh {
+    geometry_id: usize,
+    instance_id: usize,
 }
 
 struct Delegate {
-    renderer: Option<Renderer>,
+    world: World,
+    resources: Resources,
 }
 
-struct MyUIDelegate {}
-impl UIDelegate<MyState> for MyUIDelegate {
-    fn build(&self, _: &str, _: &MyState) -> Node<MyState> {
-        Node::new("body")
-            .with_widget(Container::new())
-            .with_padding(25.)
-            .with_child(
-                Node::new("div")
-                    .with_name("root")
-                    .with_widget(Stack::new(Orientation::Horizontal))
-                    .with_rebuild_callback(|state| {
-                        Some(std::vec![
-                            Node::<MyState>::new("btn")
-                                .with_widget(Button::new("Up"))
-                                .with_event_callback(MouseEventType::MouseUp, |_event, state| {
-                                    state.count = state.count + 1;
-                                    Action::Layout {
-                                        nodes: vec!["root"],
-                                    }
-                                }),
-                            Node::<MyState>::new("btn")
-                                .with_widget(Button::new("Reset"))
-                                .with_event_callback(MouseEventType::MouseUp, |_event, state| {
-                                    state.count = 0;
-                                    Action::Layout {
-                                        nodes: vec!["root"],
-                                    }
-                                }),
-                            Node::new("btn").with_widget(Label::new(
-                                &(String::from("Count: ") + &state.count.to_string())
-                            )),
-                        ])
-                    })
-                    .with_padding(25.)
-                    .with_spacing(5.),
-            )
-    }
+#[system(for_each)]
+fn scene_builder(transform: &Transform, mesh: &StaticMesh, #[resource] scene: &mut Scene) {
+    scene.set_position(
+        mesh.instance_id,
+        transform.position.x,
+        transform.position.y,
+        transform.position.z,
+    );
+
+    scene.set_scale(
+        mesh.instance_id,
+        transform.scale.x,
+        transform.scale.y,
+        transform.scale.z,
+    );
+}
+
+#[system]
+fn scene_uploader(#[resource] scene: &mut Scene, #[resource] renderer: &mut Renderer) {
+    renderer.build(scene)
+}
+
+#[system]
+fn render(#[resource] renderer: &mut Renderer) {
+    renderer.set_camera(&glm::vec3(0., 0., 5.), &glm::vec3(0., 0., 0.));
+    renderer.render();
+    let output = renderer.download_image().copy_data::<u8>();
+    save_buffer("image.png", &output, 1200, 800, image::ColorType::Rgba8)
+        .expect("Image write failed");
+
+    println!("Render!");
 }
 
 impl ApplicationDelegate<MyState> for Delegate {
     fn application_will_update(
         &mut self,
-        app: &Application<MyState>,
-        state: &mut MyState,
-        window_registry: &mut WindowRegistry<MyState>,
-        target: &EventLoopWindowTarget<()>,
+        _app: &Application<MyState>,
+        _state: &mut MyState,
+        _window_registry: &mut WindowRegistry<MyState>,
+        _target: &EventLoopWindowTarget<()>,
     ) {
-        if let Some(renderer) = &mut self.renderer {
-            renderer.render();
-        }
+        let mut schedule = Schedule::builder()
+            .add_system(scene_builder_system())
+            .add_system(scene_uploader_system())
+            .add_system(render_system())
+            .build();
+
+        schedule.execute(&mut self.world, &mut self.resources)
     }
     fn application_will_start(
         &mut self,
@@ -101,23 +141,39 @@ impl ApplicationDelegate<MyState> for Delegate {
                 };
 
                 let geometry_id = scene.add_geometry(indices, vertices);
-                scene.create_instance(geometry_id);
+                let instance_id = scene.create_instance(geometry_id);
+                self.world.push((
+                    Transform::default()
+                        .with_position(0., 2., 0.)
+                        .with_scale(100., 0.1, 100.),
+                    Velocity::default(),
+                    StaticMesh {
+                        geometry_id,
+                        instance_id,
+                    },
+                ));
+
+                let instance_id = scene.create_instance(geometry_id);
+                self.world.push((
+                    Transform::default(),
+                    Velocity::default(),
+                    StaticMesh {
+                        geometry_id,
+                        instance_id,
+                    },
+                ));
             }
         }
 
         let gpu = &app
             .vulkan()
             .hardware_devices_with_queue_support(renderer::vk::QueueFlags::GRAPHICS)[0];
-        self.renderer = Some(Renderer::new(&gpu));
-        if let Some(renderer) = self.renderer.as_mut() {
-            renderer.initialize(1200, 800);
-            renderer.build(&scene);
-            renderer.set_camera(&glm::vec3(0., 0., 5.), &glm::vec3(0., 0., 0.));
-            renderer.render();
-            let output = renderer.download_image().copy_data::<u8>();
-            save_buffer("image.png", &output, 1200, 800, image::ColorType::Rgba8)
-                .expect("Image write failed");
-        }
+        let mut renderer = Renderer::new(&gpu);
+
+        renderer.initialize(1200, 800);
+
+        self.resources.insert(scene);
+        self.resources.insert(renderer);
 
         let window = window_registry.create_window(target, "Application Title", 1000, 200);
 
@@ -136,5 +192,11 @@ impl ApplicationDelegate<MyState> for Delegate {
 
 fn main() {
     let app: Application<MyState> = Application::new("My Application");
-    app.run(Box::new(Delegate { renderer: None }), MyState { count: 0 });
+    app.run(
+        Box::new(Delegate {
+            world: World::default(),
+            resources: Resources::default(),
+        }),
+        MyState { count: 0 },
+    );
 }

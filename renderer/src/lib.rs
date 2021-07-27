@@ -1,3 +1,4 @@
+extern crate nalgebra_glm as glm;
 pub mod context;
 pub mod geometry;
 pub mod renderer;

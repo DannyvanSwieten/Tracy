@@ -9,4 +9,4 @@ edition = "2018"
 vk_utils = {path = "../vk_utils"}
 ash = "*"
 byteorder = "*"
-glm = "*"
+nalgebra-glm = "*"
