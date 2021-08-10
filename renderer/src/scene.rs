@@ -22,6 +22,7 @@ pub struct Scene {
     geometry_buffer: GeometryBuffer,
     geometry_views: Vec<GeometryBufferView>,
     geometry_instances: Vec<GeometryInstance>,
+    geometry_instance_offsets: Vec<GeometryOffset>,
     materials: Vec<Material>,
 }
 
@@ -33,6 +34,7 @@ impl Scene {
             geometry_buffer: GeometryBuffer::new(),
             geometry_views: Vec::new(),
             geometry_instances: Vec::new(),
+            geometry_instance_offsets: Vec::new(),
             materials: Vec::new(),
         }
     }
@@ -68,6 +70,10 @@ impl Scene {
         ));
 
         self.materials.push(Material::new());
+        self.geometry_instance_offsets.push(GeometryOffset {
+            index: self.geometry_views[geometry_id].index_offset(),
+            vertex: self.geometry_views[geometry_id].vertex_offset(),
+        });
         instance_id as usize
     }
 
@@ -92,6 +98,10 @@ impl Scene {
 
     pub fn geometry_buffer_views(&self) -> &[GeometryBufferView] {
         &self.geometry_views
+    }
+
+    pub fn geometry_offsets(&self) -> &[GeometryOffset] {
+        &self.geometry_instance_offsets
     }
 
     pub fn geometry_instances(&self) -> &[GeometryInstance] {

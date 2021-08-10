@@ -1752,12 +1752,15 @@ dependencies = [
 name = "tracey"
 version = "0.1.0"
 dependencies = [
+ "ash",
+ "ash-window",
  "gltf",
  "image",
  "legion",
  "nalgebra-glm",
  "renderer",
  "ui",
+ "vk_utils",
  "winit",
 ]
 

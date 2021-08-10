@@ -1,7 +1,7 @@
 use crate::context::RtxContext;
 use crate::geometry::{
-    BottomLevelAccelerationStructure, GeometryBufferView, GeometryInstance,
-    TopLevelAccelerationStructure,
+    BottomLevelAccelerationStructure, GeometryInstance, GeometryOffset,
+    TopLevelAccelerationStructure, Vertex,
 };
 use crate::scene::{Material, Scene};
 use vk_utils::buffer_resource::BufferResource;
@@ -23,10 +23,9 @@ impl SceneData {
     pub fn new(device: &DeviceContext, rtx: &RtxContext, scene: &Scene) -> Self {
         let geometry = scene.geometry_buffer();
         let mut vertex_buffer = device.buffer(
-            (geometry.vertices().len() * 4 * 3) as u64,
-            MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
-            BufferUsageFlags::VERTEX_BUFFER
-                | BufferUsageFlags::SHADER_DEVICE_ADDRESS
+            (geometry.vertices().len() * std::mem::size_of::<Vertex>()) as u64,
+            MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::SHADER_DEVICE_ADDRESS
                 | BufferUsageFlags::STORAGE_BUFFER
                 | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
         );
@@ -34,10 +33,9 @@ impl SceneData {
         vertex_buffer.copy_to(geometry.vertices());
 
         let mut index_buffer = device.buffer(
-            (geometry.indices().len() * 4) as u64,
-            MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
-            BufferUsageFlags::INDEX_BUFFER
-                | BufferUsageFlags::SHADER_DEVICE_ADDRESS
+            (geometry.indices().len() * std::mem::size_of::<u32>()) as u64,
+            MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::SHADER_DEVICE_ADDRESS
                 | BufferUsageFlags::STORAGE_BUFFER
                 | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
         );
@@ -45,17 +43,16 @@ impl SceneData {
         index_buffer.copy_to(geometry.indices());
 
         let mut offset_buffer = device.buffer(
-            (scene.geometry_buffer_views().len() * std::mem::size_of::<GeometryBufferView>())
-                as u64,
-            MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
+            (scene.geometry_offsets().len() * std::mem::size_of::<GeometryOffset>()) as u64,
+            MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::STORAGE_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
         );
 
-        offset_buffer.copy_to(scene.geometry_buffer_views());
+        offset_buffer.copy_to(scene.geometry_offsets());
 
         let mut material_buffer = device.buffer(
             (scene.materials().len() * std::mem::size_of::<Material>()) as u64,
-            MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
+            MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::STORAGE_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
         );
 
@@ -63,7 +60,7 @@ impl SceneData {
 
         let mut address_buffer = device.buffer(
             32 as u64,
-            MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
+            MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::UNIFORM_BUFFER,
         );
 

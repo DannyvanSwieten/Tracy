@@ -62,13 +62,10 @@ impl CommandBufferHandle {
         }
     }
 
-    pub fn bind_graphics_pipeline(&mut self, pipeline: &GraphicsPipeline) {
+    pub fn bind_pipeline(&self, bind_point: PipelineBindPoint, pipeline: &ash::vk::Pipeline) {
         unsafe {
-            self.device.cmd_bind_pipeline(
-                *self.command_buffer(),
-                PipelineBindPoint::GRAPHICS,
-                *pipeline.vk_handle(),
-            );
+            self.device
+                .cmd_bind_pipeline(*self.command_buffer(), bind_point, *pipeline);
         }
     }
 
@@ -135,11 +132,45 @@ impl CommandBufferHandle {
         &self.submit_info
     }
 
-    pub fn image_transition(&self, image: &Image2DResource, layout: ImageLayout) {
+    pub fn color_image_resource_transition(&self, image: &Image2DResource, layout: ImageLayout) {
         let barrier = ImageMemoryBarrier::builder()
             .old_layout(image.layout())
             .new_layout(layout)
             .image(*image.vk_image())
+            .src_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
+            .dst_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
+            .subresource_range(
+                ImageSubresourceRange::builder()
+                    .aspect_mask(ImageAspectFlags::COLOR)
+                    .layer_count(1)
+                    .level_count(1)
+                    .build(),
+            )
+            .build();
+
+        unsafe {
+            self.device.cmd_pipeline_barrier(
+                self.command_buffer[0],
+                PipelineStageFlags::ALL_COMMANDS,
+                PipelineStageFlags::ALL_COMMANDS,
+                DependencyFlags::BY_REGION,
+                &[],
+                &[],
+                &[barrier],
+            );
+        }
+    }
+
+    pub fn color_image_transition(
+        &self,
+        image: &ash::vk::Image,
+        old_layout: ImageLayout,
+        new_layout: ImageLayout,
+    ) {
+        let barrier = ImageMemoryBarrier::builder()
+            .old_layout(old_layout)
+            .new_layout(new_layout)
+            .image(*image)
             .src_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
             .dst_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
             .subresource_range(
@@ -231,5 +262,9 @@ impl CommandBufferHandle {
                 SubpassContents::INLINE,
             )
         }
+    }
+
+    pub(crate) fn end_render_pass(&self) {
+        unsafe { self.device.cmd_end_render_pass(*self.command_buffer()) }
     }
 }

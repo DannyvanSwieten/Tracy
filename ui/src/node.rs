@@ -1,10 +1,8 @@
-use skia_safe::Point;
-use skia_safe::Rect;
-use skia_safe::Size;
+use skia_safe::{Color, Point, Rect, Size};
 
+use crate::canvas_2d::Canvas2D;
 use crate::widget::*;
 use crate::window_event::{MouseEvent, MouseEventType};
-use skia_safe::canvas::Canvas;
 use std::collections::HashMap;
 
 static mut NODE_ID: u32 = 0;
@@ -233,12 +231,14 @@ impl<AppState> Node<AppState> {
         self.rect.set_wh(size.width, size.height);
     }
 
-    pub fn draw(&mut self, state: &AppState, canvas: &mut Canvas, material: &Material) {
+    pub fn draw(&mut self, state: &AppState, canvas: &mut dyn Canvas2D, material: &Material) {
         self.widget.paint(
             state,
             &self.rect,
             canvas,
-            material.get_child(&self.material_tag).unwrap(),
+            material
+                .get_child(&self.material_tag)
+                .unwrap_or(&StyleSheet::default()),
         );
 
         for child in self.children.iter_mut() {

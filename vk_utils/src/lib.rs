@@ -9,5 +9,5 @@ pub mod queue;
 pub mod renderpass;
 pub mod shader_library;
 pub mod swapchain;
-pub mod vk_instance;
+pub mod vulkan;
 pub mod wait_handle;

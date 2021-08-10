@@ -17,8 +17,7 @@ use ash::extensions::khr::{AccelerationStructure, RayTracingPipeline};
 
 // Extension Objects
 use ash::vk::{
-    DeferredOperationKHR, PhysicalDeviceFeatures2KHR, PhysicalDeviceRayTracingPipelineFeaturesKHR,
-    PhysicalDeviceRayTracingPipelinePropertiesKHR, PhysicalDeviceVulkan12Features,
+    DeferredOperationKHR, PhysicalDeviceRayTracingPipelinePropertiesKHR,
     RayTracingPipelineCreateInfoKHR, RayTracingShaderGroupCreateInfoKHR,
     RayTracingShaderGroupTypeKHR, StridedDeviceAddressRegionKHR,
     WriteDescriptorSetAccelerationStructureKHR, SHADER_UNUSED_KHR,
@@ -27,14 +26,12 @@ use ash::vk::{
 use ash::vk::{
     BufferUsageFlags, DescriptorBufferInfo, DescriptorImageInfo, DescriptorType, Format,
     ImageAspectFlags, ImageLayout, ImageSubresourceRange, ImageUsageFlags, ImageView,
-    ImageViewCreateInfo, ImageViewType, MemoryPropertyFlags,
-    PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceMemoryProperties2, Pipeline,
-    PipelineBindPoint, PipelineCache, PipelineShaderStageCreateInfo, ShaderModuleCreateInfo,
-    ShaderStageFlags, WriteDescriptorSet,
+    ImageViewCreateInfo, ImageViewType, MemoryPropertyFlags, PhysicalDeviceMemoryProperties2,
+    Pipeline, PipelineBindPoint, PipelineCache, PipelineShaderStageCreateInfo,
+    ShaderModuleCreateInfo, ShaderStageFlags, WriteDescriptorSet,
 };
 
 pub struct Renderer {
-    device: DeviceContext,
     rtx: RtxContext,
     pipeline: Pipeline,
     accumulation_image: Option<Image2DResource>,
@@ -54,23 +51,15 @@ pub struct Renderer {
 unsafe impl Send for Renderer {}
 
 impl Renderer {
-    pub fn initialize(&mut self, width: u32, height: u32) {
-        self.create_images_and_views(width, height);
-        self.update_image_descriptors();
-        self.update_camera_descriptors();
-        self.output_width = width;
-        self.output_height = height;
-    }
-
-    pub fn download_image(&self) -> BufferResource {
-        self.device.wait();
-        let buffer = self.device.buffer(
+    pub fn download_image(&self, device: &DeviceContext) -> BufferResource {
+        device.wait();
+        let buffer = device.buffer(
             (self.output_width * self.output_height * 4) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::TRANSFER_DST,
         );
 
-        if let Some(queue) = self.device.graphics_queue() {
+        if let Some(queue) = device.graphics_queue() {
             queue.begin(|command_buffer| {
                 command_buffer
                     .copy_image_2d_to_buffer(&self.output_image.as_ref().unwrap(), &buffer);
@@ -80,14 +69,15 @@ impl Renderer {
         buffer
     }
 
-    pub fn render(&mut self) -> ImageView {
+    pub fn render(&mut self, device: &DeviceContext) -> &ImageView {
         unsafe {
             if let Some(_scene) = self.scene_data.as_ref() {
-                if let Some(queue) = self.device.graphics_queue() {
+                if let Some(queue) = device.graphics_queue() {
                     queue.begin(|command_buffer| {
                         if let Some(image) = self.output_image.as_ref() {
-                            command_buffer.image_transition(image, ImageLayout::GENERAL);
-                            command_buffer.clear_image_2d(image, 1., 1., 1., 1.);
+                            command_buffer
+                                .color_image_resource_transition(image, ImageLayout::GENERAL);
+                            self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
                         } else {
                             panic!()
                         }
@@ -96,7 +86,7 @@ impl Renderer {
                             PipelineBindPoint::RAY_TRACING_KHR,
                             &self.descriptor_sets.descriptor_sets,
                         );
-                        self.device.vk_device().cmd_bind_pipeline(
+                        device.vk_device().cmd_bind_pipeline(
                             *command_buffer.native_handle(),
                             PipelineBindPoint::RAY_TRACING_KHR,
                             self.pipeline,
@@ -111,59 +101,36 @@ impl Renderer {
                             self.output_height,
                             1,
                         );
+                        if let Some(image) = self.output_image.as_ref() {
+                            command_buffer.color_image_resource_transition(
+                                image,
+                                ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                            );
+                        } else {
+                            panic!()
+                        }
                         command_buffer
                     });
                 }
-                self.device.wait();
-                self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
-                self.output_image_view
+                self.output_image.as_mut().unwrap().layout = ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+                &self.output_image_view
             } else {
                 panic!("No scene")
             }
         }
     }
 
-    pub fn build(&mut self, scene: &Scene) {
-        self.scene_data = Some(SceneData::new(&self.device, &self.rtx, scene));
+    pub fn build(&mut self, device: &DeviceContext, scene: &Scene) {
+        self.scene_data = Some(SceneData::new(&device, &self.rtx, scene));
+
         self.descriptor_sets
-            .update_scene_descriptors(&self.device, self.scene_data.as_ref().unwrap());
-        self.update_acceleration_structure_descriptors();
+            .update_scene_descriptors(&device, self.scene_data.as_ref().unwrap());
+        self.update_acceleration_structure_descriptors(device);
     }
 }
 
 impl Renderer {
-    fn create_device_context(gpu: &Gpu) -> DeviceContext {
-        unsafe {
-            let mut rt_features =
-                PhysicalDeviceRayTracingPipelineFeaturesKHR::builder().ray_tracing_pipeline(true);
-            let mut address_features =
-                PhysicalDeviceVulkan12Features::builder().buffer_device_address(true);
-            let mut acc_features = PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
-                .acceleration_structure(true);
-            let mut features2 = PhysicalDeviceFeatures2KHR::default();
-            gpu.vulkan()
-                .vk_instance()
-                .get_physical_device_features2(*gpu.vk_physical_device(), &mut features2);
-
-            gpu.device_context(
-                &[
-                    ash::extensions::khr::RayTracingPipeline::name(),
-                    ash::extensions::khr::AccelerationStructure::name(),
-                    ash::extensions::khr::DeferredHostOperations::name(),
-                ],
-                |builder| {
-                    builder
-                        .push_next(&mut address_features)
-                        .push_next(&mut rt_features)
-                        .push_next(&mut acc_features)
-                        .enabled_features(&features2.features)
-                },
-            )
-        }
-    }
-
-    pub fn new(gpu: &Gpu) -> Self {
-        let device = Self::create_device_context(gpu);
+    pub fn new(gpu: &Gpu, device: &DeviceContext, width: u32, height: u32) -> Self {
         let mut physical_device_memory_properties = PhysicalDeviceMemoryProperties2::default();
         unsafe {
             gpu.vulkan()
@@ -199,7 +166,6 @@ impl Renderer {
         let descriptor_sets = RTXDescriptorSets::new(&device);
 
         let mut result = Self {
-            device,
             rtx,
             pipeline: Pipeline::null(),
             accumulation_image: None,
@@ -216,8 +182,13 @@ impl Renderer {
             output_height: 0,
         };
 
-        result.load_shaders_and_pipeline();
-        result.create_shader_binding_table();
+        result.load_shaders_and_pipeline(device);
+        result.create_shader_binding_table(device);
+        result.create_images_and_views(device, width, height);
+        result.update_image_descriptors(device);
+        result.update_camera_descriptors(device);
+        result.output_width = width;
+        result.output_height = height;
         result
     }
 
@@ -227,7 +198,7 @@ impl Renderer {
 
         let projection_matrix = glm::perspective_rh(
             self.output_width as f32 / self.output_height as f32,
-            0.785398,
+            1.134,
             0.1,
             1000.,
         );
@@ -237,22 +208,20 @@ impl Renderer {
             .copy_to(&[view_matrix, projection_matrix]);
     }
 
-    fn load_shaders_and_pipeline(&mut self) {
+    fn load_shaders_and_pipeline(&mut self, device: &DeviceContext) {
         unsafe {
             let code = load_spirv(
                 "C:/Users/danny/Documents/code/tracey/shaders/simple_pipeline/ray_gen.rgen.spv",
             );
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
-            let gen = self
-                .device
+            let gen = device
                 .vk_device()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray generation shader compilation failed");
             let code =
                 load_spirv("C:/Users/danny/Documents/code/tracey/shaders/simple_pipeline/closest_hit.rchit.spv");
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
-            let chit = self
-                .device
+            let chit = device
                 .vk_device()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray closest hit shader compilation failed");
@@ -260,8 +229,7 @@ impl Renderer {
                 "C:/Users/danny/Documents/code/tracey/shaders/simple_pipeline/ray_miss.rmiss.spv",
             );
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
-            let miss = self
-                .device
+            let miss = device
                 .vk_device()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray miss shader compilation failed");
@@ -331,7 +299,7 @@ impl Renderer {
         }
     }
 
-    fn create_shader_binding_table(&mut self) {
+    fn create_shader_binding_table(&mut self, device: &DeviceContext) {
         unsafe {
             let group_count = 3;
             let properties = self.rtx.pipeline_properties();
@@ -344,7 +312,7 @@ impl Renderer {
                 .get_ray_tracing_shader_group_handles(self.pipeline, 0, group_count, table_size)
                 .expect("Get raytracing shader group handles failed");
 
-            self.shader_binding_table = Some(self.device.buffer(
+            self.shader_binding_table = Some(device.buffer(
                 table_size as u64,
                 MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
                 BufferUsageFlags::TRANSFER_SRC
@@ -393,8 +361,8 @@ impl Renderer {
         }
     }
 
-    fn create_images_and_views(&mut self, width: u32, height: u32) {
-        self.output_image = Some(self.device.image_2d(
+    fn create_images_and_views(&mut self, device: &DeviceContext, width: u32, height: u32) {
+        self.output_image = Some(device.image_2d(
             width,
             height,
             Format::R8G8B8A8_UNORM,
@@ -405,7 +373,7 @@ impl Renderer {
                 | ImageUsageFlags::TRANSFER_DST,
         ));
 
-        self.accumulation_image = Some(self.device.image_2d(
+        self.accumulation_image = Some(device.image_2d(
             width,
             height,
             Format::R32G32B32A32_SFLOAT,
@@ -426,15 +394,14 @@ impl Renderer {
             .image(*self.output_image.as_ref().unwrap().vk_image());
 
         unsafe {
-            self.output_image_view = self
-                .device
+            self.output_image_view = device
                 .vk_device()
                 .create_image_view(&view_info, None)
                 .expect("Image View creation failed");
         }
     }
 
-    fn update_image_descriptors(&mut self) {
+    fn update_image_descriptors(&mut self, device: &DeviceContext) {
         let image_writes = [*DescriptorImageInfo::builder()
             .image_view(self.output_image_view)
             .image_layout(ImageLayout::GENERAL)];
@@ -445,11 +412,11 @@ impl Renderer {
             .descriptor_type(DescriptorType::STORAGE_IMAGE)];
 
         unsafe {
-            self.device.vk_device().update_descriptor_sets(&writes, &[]);
+            device.vk_device().update_descriptor_sets(&writes, &[]);
         }
     }
 
-    fn update_acceleration_structure_descriptors(&mut self) {
+    fn update_acceleration_structure_descriptors(&mut self, device: &DeviceContext) {
         let structures = [self
             .scene_data
             .as_ref()
@@ -469,11 +436,11 @@ impl Renderer {
         writes[0].descriptor_count = 1;
 
         unsafe {
-            self.device.vk_device().update_descriptor_sets(&writes, &[]);
+            device.vk_device().update_descriptor_sets(&writes, &[]);
         }
     }
 
-    fn update_camera_descriptors(&mut self) {
+    fn update_camera_descriptors(&mut self, device: &DeviceContext) {
         let buffer_write = [*DescriptorBufferInfo::builder()
             .range(self.camera_buffer.content_size())
             .buffer(self.camera_buffer.buffer)];
@@ -485,7 +452,7 @@ impl Renderer {
             .descriptor_type(DescriptorType::UNIFORM_BUFFER)];
 
         unsafe {
-            self.device.vk_device().update_descriptor_sets(&writes, &[]);
+            device.vk_device().update_descriptor_sets(&writes, &[]);
         }
     }
 }

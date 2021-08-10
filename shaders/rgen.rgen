@@ -59,7 +59,7 @@ void main()
 			uint rayFlags = gl_RayFlagsOpaqueEXT;
 			uint cullMask = 0xff;
 			float tmin = 0.001;
-			float tmax = 10000.0;
+			float tmax = 1000.0;
 
 			traceRayEXT(topLevelAS, 
 					rayFlags, cullMask, 

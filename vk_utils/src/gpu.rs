@@ -7,7 +7,7 @@ use ash::vk::{
 };
 
 use crate::device_context::DeviceContext;
-use crate::vk_instance::Vulkan;
+use crate::vulkan::Vulkan;
 use std::ffi::CStr;
 
 #[derive(Clone)]

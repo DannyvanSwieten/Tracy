@@ -1,7 +1,10 @@
 pub mod application;
-pub mod canvas3d;
+pub mod canvas_2d;
+pub mod image_renderer;
 pub mod node;
-pub mod ui_window;
+pub mod skia_vulkan_canvas;
+pub mod ui_application_delegate;
+pub mod ui_gpu_drawing_window_delegate;
 pub mod user_interface;
 pub mod widget;
 pub mod window_delegate;

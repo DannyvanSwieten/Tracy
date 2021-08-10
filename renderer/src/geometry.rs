@@ -64,6 +64,12 @@ pub struct GeometryBufferView {
     vertex_offset: u32,
 }
 
+#[repr(C)]
+pub struct GeometryOffset {
+    pub index: u32,
+    pub vertex: u32,
+}
+
 impl GeometryBufferView {
     pub fn new(index_count: u32, index_offset: u32, vertex_count: u32, vertex_offset: u32) -> Self {
         Self {
@@ -123,9 +129,10 @@ impl GeometryInstance {
 
 pub struct BottomLevelAccelerationStructure {
     _device: Device,
+    rtx: RtxContext,
     _acceleration_structure_buffer: BufferResource,
     _acceleration_structure_scratch_buffer: BufferResource,
-    _acceleration_structure: AccelerationStructureKHR,
+    acceleration_structure: AccelerationStructureKHR,
     address: DeviceAddress,
 }
 impl BottomLevelAccelerationStructure {
@@ -146,7 +153,7 @@ impl BottomLevelAccelerationStructure {
     ) -> Self {
         unsafe {
             let triangles = AccelerationStructureGeometryTrianglesDataKHR::builder()
-                .max_vertex(vertex_count - 1 + vertex_offset)
+                .max_vertex(index_count - 1 + index_offset)
                 .vertex_stride(12)
                 .vertex_format(Format::R32G32B32_SFLOAT)
                 .vertex_data(DeviceOrHostAddressConstKHR {
@@ -171,7 +178,7 @@ impl BottomLevelAccelerationStructure {
                 .mode(BuildAccelerationStructureModeKHR::BUILD)
                 .ty(AccelerationStructureTypeKHR::BOTTOM_LEVEL);
 
-            let max_primitives: [u32; 1] = [index_count];
+            let max_primitives: [u32; 1] = [index_count / 3];
             let build_sizes = rtx
                 .acceleration_structure_ext()
                 .get_acceleration_structure_build_sizes(
@@ -198,26 +205,24 @@ impl BottomLevelAccelerationStructure {
                 .ty(AccelerationStructureTypeKHR::BOTTOM_LEVEL)
                 .buffer(acc_buffer.buffer);
 
-            let _acceleration_structure = rtx
+            let acceleration_structure = rtx
                 .acceleration_structure_ext()
                 .create_acceleration_structure(&create_info, None)
                 .expect("Acceleration structure creation failed");
-            let build_info = AccelerationStructureBuildGeometryInfoKHR::builder()
-                .dst_acceleration_structure(_acceleration_structure)
+            let build_info = *AccelerationStructureBuildGeometryInfoKHR::builder()
+                .dst_acceleration_structure(acceleration_structure)
                 .scratch_data(DeviceOrHostAddressKHR {
                     device_address: scratch_buffer.device_address(),
                 })
                 .geometries(&geometries)
                 .mode(BuildAccelerationStructureModeKHR::BUILD)
-                .ty(AccelerationStructureTypeKHR::BOTTOM_LEVEL)
-                .build();
+                .ty(AccelerationStructureTypeKHR::BOTTOM_LEVEL);
 
             let infos = [build_info];
 
-            let range = vec![AccelerationStructureBuildRangeInfoKHR::builder()
-                .primitive_count(vertex_count)
-                .first_vertex(vertex_offset)
-                .build()];
+            let range = vec![*AccelerationStructureBuildRangeInfoKHR::builder()
+                .primitive_count(index_count / 3)
+                .first_vertex(vertex_offset)];
             let ranges = vec![&range[0..1]];
 
             if let Some(queue) = device.graphics_queue() {
@@ -230,40 +235,60 @@ impl BottomLevelAccelerationStructure {
                         );
                     command_buffer
                 });
-
-                device.wait();
             }
 
             let address_info = AccelerationStructureDeviceAddressInfoKHR::builder()
-                .acceleration_structure(_acceleration_structure)
+                .acceleration_structure(acceleration_structure)
                 .build();
             let address = rtx
                 .acceleration_structure_ext()
                 .get_acceleration_structure_device_address(&address_info);
 
             Self {
+                rtx: rtx.clone(),
                 _device: device.vk_device().clone(),
                 _acceleration_structure_buffer: acc_buffer,
                 _acceleration_structure_scratch_buffer: scratch_buffer,
-                _acceleration_structure,
+                acceleration_structure,
                 address,
             }
         }
     }
 }
 
+impl Drop for BottomLevelAccelerationStructure {
+    fn drop(&mut self) {
+        unsafe {
+            self.rtx
+                .acceleration_structure_ext()
+                .destroy_acceleration_structure(self.acceleration_structure, None)
+        }
+    }
+}
+
 pub struct TopLevelAccelerationStructure {
     _device: Device,
+    rtx: RtxContext,
     pub acceleration_structure: AccelerationStructureKHR,
     _instance_buffer: BufferResource,
     _acceleration_structure_buffer: BufferResource,
+}
+
+impl Drop for TopLevelAccelerationStructure {
+    fn drop(&mut self) {
+        unsafe {
+            self.rtx
+                .acceleration_structure_ext()
+                .destroy_acceleration_structure(self.acceleration_structure, None)
+        }
+    }
 }
 
 impl TopLevelAccelerationStructure {
     pub fn new(device: &DeviceContext, rtx: &RtxContext, instances: &[GeometryInstance]) -> Self {
         let mut _instance_buffer = device.buffer(
             instances.len() as u64 * 64,
-            MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
+            MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
                 | BufferUsageFlags::SHADER_DEVICE_ADDRESS
                 | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
@@ -339,7 +364,6 @@ impl TopLevelAccelerationStructure {
 
             let range = vec![AccelerationStructureBuildRangeInfoKHR::builder()
                 .primitive_count(instances.len() as u32)
-                .first_vertex(0)
                 .build()];
             let ranges = vec![&range[0..1]];
             if let Some(queue) = device.graphics_queue() {
@@ -352,12 +376,11 @@ impl TopLevelAccelerationStructure {
                         );
                     command_buffer
                 });
-
-                device.wait();
             }
 
             Self {
                 _device: device.vk_device().clone(),
+                rtx: rtx.clone(),
                 acceleration_structure,
                 _instance_buffer,
                 _acceleration_structure_buffer: acc_buffer,

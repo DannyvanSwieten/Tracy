@@ -2,7 +2,8 @@ use crate::command_buffer::CommandBufferHandle;
 use crate::wait_handle::WaitHandle;
 use ash::version::DeviceV1_0;
 use ash::vk::{
-    CommandBufferAllocateInfo, CommandPool, CommandPoolCreateInfo, Framebuffer, Queue, RenderPass,
+    CommandBufferAllocateInfo, CommandPool, CommandPoolCreateFlags, CommandPoolCreateInfo,
+    CommandPoolResetFlags, Framebuffer, Queue, RenderPass,
 };
 use ash::Device;
 pub struct QueueHandle {
@@ -15,6 +16,7 @@ pub struct QueueHandle {
 impl QueueHandle {
     pub(crate) fn new(device: &Device, queue: &Queue, queue_family_index: u32) -> Self {
         let pool_info = CommandPoolCreateInfo::builder()
+            .flags(CommandPoolCreateFlags::TRANSIENT)
             .queue_family_index(queue_family_index)
             .build();
         let command_pool = unsafe {
@@ -66,6 +68,7 @@ impl QueueHandle {
         command_buffer.begin();
         command_buffer.begin_render_pass(render_pass, framebuffer, width, height);
         let command_buffer = f(command_buffer);
+        command_buffer.end_render_pass();
         command_buffer.submit(&self.command_pool)
     }
 
@@ -73,6 +76,11 @@ impl QueueHandle {
     where
         F: FnOnce(CommandBufferHandle) -> CommandBufferHandle,
     {
+        unsafe {
+            self.device
+                .reset_command_pool(self.command_pool, CommandPoolResetFlags::RELEASE_RESOURCES)
+                .expect("CommandPool reset failed");
+        }
         let command_buffer = self.command_buffer();
         command_buffer.begin();
         let command_buffer = f(command_buffer);

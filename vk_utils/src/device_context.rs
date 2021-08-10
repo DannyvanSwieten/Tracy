@@ -64,8 +64,8 @@ impl DeviceContext {
         }
     }
 
-    pub fn graphics_queue(&self) -> &Option<QueueHandle> {
-        &self.graphics_queue
+    pub fn graphics_queue(&self) -> Option<&QueueHandle> {
+        self.graphics_queue.as_ref()
     }
     pub fn vk_device(&self) -> &Device {
         &self.device
@@ -109,3 +109,6 @@ impl DeviceContext {
         )
     }
 }
+
+unsafe impl Send for DeviceContext {}
+unsafe impl Sync for DeviceContext {}

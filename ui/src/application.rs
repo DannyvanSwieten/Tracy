@@ -4,9 +4,7 @@ extern crate winit;
 
 use crate::window_delegate::WindowDelegate;
 use std::collections::HashMap;
-use vk_utils::{device_context::DeviceContext, gpu::Gpu, vk_instance::Vulkan};
-
-use ash::vk::QueueFlags;
+use vk_utils::vulkan::Vulkan;
 
 use std::ffi::{CStr, CString};
 use std::path::PathBuf;
@@ -17,10 +15,7 @@ use winit::{
     window::{Window, WindowBuilder, WindowId},
 };
 
-use ash::extensions::{
-    ext::DebugUtils,
-    khr::{Surface, Swapchain},
-};
+use ash::extensions::{ext::DebugUtils, khr::Surface};
 
 #[cfg(target_os = "macos")]
 use ash::extensions::mvk::MacOSSurface;
@@ -29,7 +24,7 @@ use ash::extensions::mvk::MacOSSurface;
 use ash::vk::ExtMetalSurfaceFn;
 
 #[cfg(target_os = "macos")]
-fn surface_extension_name() -> &'static CStr {
+pub fn surface_extension_name() -> &'static CStr {
     ExtMetalSurfaceFn::name()
 }
 
@@ -37,7 +32,7 @@ fn surface_extension_name() -> &'static CStr {
 use ash::extensions::khr::Win32Surface;
 
 #[cfg(target_os = "windows")]
-fn surface_extension_name() -> &'static CStr {
+pub fn surface_extension_name() -> &'static CStr {
     Win32Surface::name()
 }
 
@@ -95,12 +90,16 @@ pub trait ApplicationDelegate<AppState> {
     }
 }
 
-pub struct WindowRegistry<AppState> {
+pub struct WindowRegistry<AppState: 'static> {
     windows: HashMap<WindowId, Window>,
     window_delegates: HashMap<WindowId, Box<dyn WindowDelegate<AppState>>>,
 }
 
 impl<AppState> WindowRegistry<AppState> {
+    pub fn get_delegate(&self, id: WindowId) -> Option<&Box<dyn WindowDelegate<AppState>>> {
+        self.window_delegates.get(&id)
+    }
+
     pub fn create_window(
         &self,
         target: &EventLoopWindowTarget<()>,
@@ -115,8 +114,16 @@ impl<AppState> WindowRegistry<AppState> {
             .unwrap()
     }
 
-    pub fn register(&mut self, window: Window, delegate: Box<dyn WindowDelegate<AppState>>) {
+    pub fn register_with_delegate(
+        &mut self,
+        window: Window,
+        delegate: Box<dyn WindowDelegate<AppState>>,
+    ) {
         self.window_delegates.insert(window.id(), delegate);
+        self.windows.insert(window.id(), window);
+    }
+
+    pub fn register(&mut self, window: Window) {
         self.windows.insert(window.id(), window);
     }
 
@@ -218,10 +225,6 @@ impl<AppState> WindowRegistry<AppState> {
 
 pub struct Application<AppState> {
     vulkan: Vulkan,
-    primary_gpu: Gpu,
-    primary_device_context: DeviceContext,
-    vulkan_surface_ext: Surface,
-    vulkan_swapchain_ext: Swapchain,
     _state: std::marker::PhantomData<AppState>,
 }
 
@@ -235,42 +238,14 @@ impl<AppState: 'static> Application<AppState> {
         ];
         let vulkan = Vulkan::new(name, &layers, &instance_extensions);
 
-        let mut gpus = vulkan.hardware_devices_with_queue_support(QueueFlags::GRAPHICS);
-        let primary_gpu = gpus.remove(0);
-        let primary_device_context =
-            primary_gpu.device_context(&[Swapchain::name()], |_builder| _builder);
-
-        let vulkan_surface_ext = Surface::new(vulkan.library(), vulkan.vk_instance());
-        let vulkan_swapchain_ext =
-            Swapchain::new(vulkan.vk_instance(), primary_device_context.vk_device());
         Self {
             vulkan,
-            primary_gpu,
-            primary_device_context,
-            vulkan_surface_ext,
-            vulkan_swapchain_ext,
             _state: std::marker::PhantomData::<AppState>::default(),
         }
     }
 
     pub fn vulkan(&self) -> &Vulkan {
         &self.vulkan
-    }
-
-    pub fn primary_gpu(&self) -> &Gpu {
-        &self.primary_gpu
-    }
-
-    pub fn primary_device_context(&self) -> &DeviceContext {
-        &self.primary_device_context
-    }
-
-    pub fn surface_extension(&self) -> &ash::extensions::khr::Surface {
-        &self.vulkan_surface_ext
-    }
-
-    pub fn swapchain_extension(&self) -> &ash::extensions::khr::Swapchain {
-        &self.vulkan_swapchain_ext
     }
 
     pub fn run(mut self, delegate: Box<dyn ApplicationDelegate<AppState>>, state: AppState) {

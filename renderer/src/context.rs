@@ -57,6 +57,7 @@ impl Context {
     }
 }
 
+#[derive(Clone)]
 pub struct RtxContext {
     acceleration_structure_ext: AccelerationStructure,
     ray_tracing_pipeline_ext: RayTracingPipeline,

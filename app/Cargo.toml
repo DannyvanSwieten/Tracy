@@ -6,9 +6,12 @@ edition = "2018"
 
 [dependencies]
 renderer = {path = "../renderer"}
+vk_utils = {path = "../vk_utils"}
 ui = {path = "../ui"}
+ash = "*"
+ash-window = "*"
 winit = "*"
 image = "*"
 nalgebra-glm = "*"
 gltf = "*"
-legion = "*"
+legion = {version = "*"}

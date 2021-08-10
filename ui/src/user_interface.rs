@@ -1,8 +1,7 @@
-use crate::canvas3d::Canvas3D;
+use crate::canvas_2d::Canvas2D;
 use crate::node::*;
 use crate::widget::*;
 use crate::window_event::MouseEvent;
-use skia_safe::canvas::Canvas;
 use skia_safe::Point;
 
 pub trait UIDelegate<AppState> {
@@ -22,16 +21,14 @@ pub struct UserInterface<AppState> {
 
 impl<AppState: 'static> UserInterface<AppState> {
     pub fn new(root: Node<AppState>) -> Self {
-        let ui = UserInterface {
+        UserInterface {
             root,
             material: Material::new(),
             hovered: 0,
             actions: Vec::new(),
             pop_up: None,
             pop_up_request: None,
-        };
-
-        ui
+        }
     }
 
     pub fn update(&mut self, state: &mut AppState) {
@@ -56,7 +53,7 @@ impl<AppState: 'static> UserInterface<AppState> {
         }
     }
 
-    pub fn build_popup(&mut self, request: PopupRequest<AppState>, position: &Point) {
+    fn build_popup(&mut self, request: PopupRequest<AppState>, position: &Point) {
         self.pop_up = Some(request.build());
         self.pop_up_request = Some(request);
         let node = self.pop_up.as_mut().unwrap();
@@ -142,14 +139,13 @@ impl<AppState: 'static> UserInterface<AppState> {
         self.root.layout(state);
     }
 
-    pub fn layout_child_with_name(&mut self, child_name: &str, state: &mut AppState) {
+    pub fn layout_child_with_name(&mut self, child_name: &str, state: &AppState) {
         self.root.layout_child_with_name(child_name, state)
     }
 
-    pub fn paint(&mut self, state: &AppState, canvas: &mut Canvas) {
+    pub fn paint(&mut self, state: &AppState, canvas: &mut dyn Canvas2D) {
         canvas.clear(
-            *self
-                .material
+            self.material
                 .get_child("body")
                 .unwrap()
                 .get("bg-color")
@@ -162,7 +158,7 @@ impl<AppState: 'static> UserInterface<AppState> {
         }
     }
 
-    pub fn paint_3d(&mut self, state: &AppState, _canvas_3d: &mut dyn Canvas3D) {
-        self.root.draw_3d(state);
-    }
+    // pub fn paint_3d(&mut self, state: &AppState, _canvas_3d: &mut dyn Canvas3D) {
+    //     self.root.draw_3d(state);
+    // }
 }

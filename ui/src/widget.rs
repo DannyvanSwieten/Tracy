@@ -1,7 +1,7 @@
+use crate::canvas_2d::Canvas2D;
 use crate::node::*;
 use crate::window_event::{MouseEvent, MouseEventType};
-
-use skia_safe::{canvas::Canvas, Color, Font, Paint, PaintStyle, Point, Rect, Size};
+use skia_safe::{Color, Font, Paint, PaintStyle, Point, Rect, Size};
 
 use std::collections::HashMap;
 
@@ -200,7 +200,7 @@ pub trait Widget<AppState> {
         &mut self,
         _state: &AppState,
         _rect: &Rect,
-        _canvas: &mut Canvas,
+        _canvas: &mut dyn Canvas2D,
         _style: &StyleSheet,
     ) {
     }
@@ -268,10 +268,10 @@ impl Container {
 }
 
 impl<AppState> Widget<AppState> for Container {
-    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
-        let bg = style.get("bg-color").unwrap();
+    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+        let bg = style.get("bg-color").unwrap_or(&Color::CYAN);
         self.paint.set_color(*bg);
-        canvas.draw_round_rect(rect, 5., 5., &self.paint);
+        canvas.draw_rounded_rect(rect, 5., 5., &self.paint);
     }
 
     fn layout(
@@ -404,15 +404,15 @@ impl<AppState> Stack<AppState> {
 }
 
 impl<AppState> Widget<AppState> for Stack<AppState> {
-    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
         self.paint.set_anti_alias(true);
         self.paint.set_color(*style.get("bg-color").unwrap());
         self.border_paint
             .set_color(*style.get("border-color").unwrap());
         self.border_paint.set_style(PaintStyle::Stroke);
-        canvas.draw_round_rect(rect, 15., 15., &self.paint);
+        canvas.draw_rounded_rect(rect, 15., 15., &self.paint);
 
-        canvas.draw_round_rect(rect, 15., 15., &self.border_paint);
+        canvas.draw_rounded_rect(rect, 15., 15., &self.border_paint);
     }
 
     fn layout(
@@ -447,12 +447,12 @@ impl Label {
 }
 
 impl<AppState> Widget<AppState> for Label {
-    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
         self.paint.set_color(*style.get("bg-color").unwrap());
         self.paint.set_anti_alias(true);
-        canvas.draw_round_rect(rect, 15., 15., &self.paint);
+        canvas.draw_rounded_rect(rect, 15., 15., &self.paint);
         self.paint.set_color(Color::WHITE);
-        canvas.draw_str(&self.text, rect.center(), &self.font, &self.paint);
+        canvas.draw_string(&self.text, &rect.center(), &self.font, &self.paint);
     }
 }
 
@@ -507,7 +507,7 @@ impl<AppState> Widget<AppState> for Button<AppState> {
         self.hovered = false;
     }
 
-    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
         self.paint.set_anti_alias(true);
         if self.hovered {
             if let Some(color) = style.get("hovered") {
@@ -525,9 +525,9 @@ impl<AppState> Widget<AppState> for Button<AppState> {
             }
         }
 
-        canvas.draw_round_rect(rect, 1., 1., &self.paint);
+        canvas.draw_rounded_rect(rect, 1., 1., &self.paint);
         self.paint.set_color(Color::WHITE);
-        canvas.draw_str(&self.text, rect.center(), &self.font, &self.paint);
+        canvas.draw_string(&self.text, &rect.center(), &self.font, &self.paint);
     }
 }
 
@@ -553,7 +553,7 @@ impl<AppState> Widget<AppState> for Button<AppState> {
 // }
 
 // impl<'a, AppState> Widget<AppState> for Table<'a> {
-//     fn paint(&mut self, _: &mut AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+//     fn paint(&mut self, _: &mut AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
 //         let e_color = style.get("even").unwrap();
 //         let u_color = style.get("uneven").unwrap();
 
@@ -649,7 +649,7 @@ impl<AppState> Slider<AppState> {
 }
 
 impl<AppState> Widget<AppState> for Slider<AppState> {
-    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
         let bg_color = style.get("bg-color");
         let fill_color = style.get("fill-color");
         let border_color = style.get("border-color");
@@ -662,8 +662,8 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
         self.fill_paint
             .set_color(*fill_color.unwrap_or(&Color::new(128)));
         self.text_paint.set_color(Color::new(255));
-        canvas.draw_round_rect(rect, 2., 2., &self.bg_paint);
-        canvas.draw_round_rect(rect, 2., 2., &self.border_paint);
+        canvas.draw_rounded_rect(rect, 2., 2., &self.bg_paint);
+        canvas.draw_rounded_rect(rect, 2., 2., &self.border_paint);
         let mut fill_rect = Rect::from_xywh(
             rect.left(),
             rect.top(),
@@ -672,10 +672,10 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
         );
         fill_rect.inset((2, 2));
 
-        canvas.draw_round_rect(fill_rect, 0., 0., &self.fill_paint);
+        canvas.draw_rounded_rect(&fill_rect, 0., 0., &self.fill_paint);
 
         let t = self.label.to_string() + ": " + &format!("{:.4}", &self.current_value.to_string());
-        canvas.draw_str(&t, rect.center(), &self.font, &self.text_paint);
+        canvas.draw_string(&t, &rect.center(), &self.font, &self.text_paint);
     }
 
     fn mouse_down(&mut self, state: &mut AppState, rect: &Rect, event: &MouseEvent) {
@@ -764,7 +764,7 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
 // }
 
 // impl<AppState> Widget<AppState> for Spinner<AppState> {
-//     fn paint(&mut self, _: &mut AppState, rect: &Rect, canvas: &mut Canvas, style: &StyleSheet) {
+//     fn paint(&mut self, _: &mut AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
 //         let bg_color = style.get("bg-color");
 //         let fill_color = style.get("fill-color");
 //         let border_color = style.get("border-color");
@@ -878,7 +878,7 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
 //         &mut self,
 //         _state: &mut AppState,
 //         rect: &Rect,
-//         canvas: &mut Canvas,
+//         canvas: &mut dyn Canvas2D,
 //         _style: &StyleSheet,
 //     ) {
 //         self.paint.set_color(&Color::from((0., 0., 0.));

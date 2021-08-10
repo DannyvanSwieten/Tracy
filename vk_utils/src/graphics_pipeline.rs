@@ -6,7 +6,7 @@ use ash::vk::{
     PipelineViewportStateCreateInfo, PolygonMode, RenderPass, ShaderModule, ShaderStageFlags,
 };
 
-use ash::Device;
+use crate::device_context::DeviceContext;
 
 use ash::version::DeviceV1_0;
 
@@ -39,6 +39,10 @@ impl GraphicsPipeline {
             render_pass: RenderPass::null(),
             pipeline: Pipeline::null(),
         }
+    }
+
+    pub fn with_polygon_mode(&mut self, mode: PolygonMode) {
+        self.rasterization_state.polygon_mode = mode
     }
 
     pub fn enable_depth_testing(&mut self) {
@@ -94,7 +98,7 @@ impl GraphicsPipeline {
         )
     }
 
-    pub fn build(&mut self, device: &Device) {
+    pub fn build(&mut self, device: &DeviceContext) {
         let create_info = GraphicsPipelineCreateInfo::builder()
             .layout(self.pipeline_layout)
             .render_pass(self.render_pass)
@@ -110,12 +114,13 @@ impl GraphicsPipeline {
 
         unsafe {
             self.pipeline = device
+                .vk_device()
                 .create_graphics_pipelines(PipelineCache::null(), &[create_info], None)
                 .expect("Pipeline creation failed")[0];
         }
     }
 
-    pub fn vk_handle(&self) -> &Pipeline {
+    pub fn vk_pipeline(&self) -> &Pipeline {
         &self.pipeline
     }
 

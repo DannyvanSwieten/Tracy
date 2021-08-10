@@ -1,7 +1,11 @@
+use crate::device_context::DeviceContext;
+use crate::gpu::Gpu;
+use crate::vulkan::Vulkan;
 use ash::version::DeviceV1_0;
 
 pub struct Swapchain {
     swapchain_loader: ash::extensions::khr::Swapchain,
+    surface: ash::vk::SurfaceKHR,
     handle: ash::vk::SwapchainKHR,
     images: Vec<ash::vk::Image>,
     image_views: Vec<ash::vk::ImageView>,
@@ -11,8 +15,11 @@ pub struct Swapchain {
     current_index: u32,
     format: ash::vk::Format,
 
-    width: u32,
-    height: u32,
+    logical_width: u32,
+    logical_height: u32,
+
+    physical_width: u32,
+    physical_height: u32,
 }
 
 fn create_swapchain(
@@ -20,7 +27,7 @@ fn create_swapchain(
     gpu: &ash::vk::PhysicalDevice,
     ctx: &ash::Device,
     surface_loader: &ash::extensions::khr::Surface,
-    surface: &ash::vk::SurfaceKHR,
+    surface: ash::vk::SurfaceKHR,
     swapchain_loader: &ash::extensions::khr::Swapchain,
     old_swapchain: Option<&ash::vk::SwapchainKHR>,
     queue_index: u32,
@@ -31,16 +38,18 @@ fn create_swapchain(
     Vec<ash::vk::Image>,
     Vec<ash::vk::ImageView>,
     ash::vk::SurfaceFormatKHR,
+    u32,
+    u32,
 ) {
     let _ = unsafe {
         surface_loader
-            .get_physical_device_surface_support(*gpu, queue_index, *surface)
+            .get_physical_device_surface_support(*gpu, queue_index, surface)
             .expect("Query physical device queue surface support failed")
     };
 
     let formats = unsafe {
         surface_loader
-            .get_physical_device_surface_formats(*gpu, *surface)
+            .get_physical_device_surface_formats(*gpu, surface)
             .expect("No surface formats found for surface / device combination")
     };
 
@@ -48,7 +57,7 @@ fn create_swapchain(
     let format = formats[0];
     let capabilities = unsafe {
         surface_loader
-            .get_physical_device_surface_capabilities(*gpu, *surface)
+            .get_physical_device_surface_capabilities(*gpu, surface)
             .expect("No surface capabilities found for surface / device combination")
     };
     let mut desired_image_count = capabilities.min_image_count + 1;
@@ -69,7 +78,7 @@ fn create_swapchain(
     };
     let present_modes = unsafe {
         surface_loader
-            .get_physical_device_surface_present_modes(*gpu, *surface)
+            .get_physical_device_surface_present_modes(*gpu, surface)
             .expect("No present modes found")
     };
     let present_mode = present_modes
@@ -83,7 +92,7 @@ fn create_swapchain(
         old = *old_swapchain.unwrap();
     }
     let swapchain_create_info = ash::vk::SwapchainCreateInfoKHR::builder()
-        .surface(*surface)
+        .surface(surface)
         .min_image_count(desired_image_count)
         .image_color_space(format.color_space)
         .image_format(format.format)
@@ -136,34 +145,44 @@ fn create_swapchain(
         })
         .collect();
 
-    (swapchain, images, image_views, format)
+    (
+        swapchain,
+        images,
+        image_views,
+        format,
+        surface_resolution.width,
+        surface_resolution.height,
+    )
 }
 
 impl Swapchain {
     pub fn new(
-        instance: &ash::Instance,
-        gpu: &ash::vk::PhysicalDevice,
-        ctx: &ash::Device,
-        surface_loader: &ash::extensions::khr::Surface,
-        surface: &ash::vk::SurfaceKHR,
-        swapchain_loader: &ash::extensions::khr::Swapchain,
+        vulkan: &Vulkan,
+        gpu: &Gpu,
+        device: &DeviceContext,
+        surface: ash::vk::SurfaceKHR,
         old_swapchain: Option<&ash::vk::SwapchainKHR>,
         queue_index: u32,
         width: u32,
         height: u32,
     ) -> Self {
-        let (swapchain, images, image_views, format) = create_swapchain(
-            instance,
-            gpu,
-            ctx,
-            surface_loader,
-            surface,
-            swapchain_loader,
-            old_swapchain,
-            queue_index,
-            width,
-            height,
-        );
+        let surface_loader =
+            ash::extensions::khr::Surface::new(vulkan.library(), vulkan.vk_instance());
+        let swapchain_loader =
+            ash::extensions::khr::Swapchain::new(vulkan.vk_instance(), device.vk_device());
+        let (swapchain, images, image_views, format, physical_width, physical_height) =
+            create_swapchain(
+                vulkan.vk_instance(),
+                gpu.vk_physical_device(),
+                device.vk_device(),
+                &surface_loader,
+                surface.clone(),
+                &swapchain_loader,
+                old_swapchain,
+                queue_index,
+                width,
+                height,
+            );
 
         let attachments = [ash::vk::AttachmentDescription {
             format: format.format,
@@ -199,7 +218,9 @@ impl Swapchain {
             .dependencies(&dependencies);
 
         let renderpass = unsafe {
-            ctx.create_render_pass(&renderpass_create_info, None)
+            device
+                .vk_device()
+                .create_render_pass(&renderpass_create_info, None)
                 .expect("Renderpass creation failed for swapchain")
         };
 
@@ -210,11 +231,13 @@ impl Swapchain {
                 let create_info = ash::vk::FramebufferCreateInfo::builder()
                     .render_pass(renderpass)
                     .attachments(&attachments)
-                    .width(width)
-                    .height(height)
+                    .width(physical_width)
+                    .height(physical_height)
                     .layers(1);
                 unsafe {
-                    ctx.create_framebuffer(&create_info, None)
+                    device
+                        .vk_device()
+                        .create_framebuffer(&create_info, None)
                         .expect("Framebuffer creation failed for swapchain images")
                 }
             })
@@ -224,13 +247,18 @@ impl Swapchain {
 
         let mut present_semaphores = Vec::new();
         for _ in 0..images.len() {
-            present_semaphores
-                .push(unsafe { ctx.create_semaphore(&semaphore_create_info, None).unwrap() });
+            present_semaphores.push(unsafe {
+                device
+                    .vk_device()
+                    .create_semaphore(&semaphore_create_info, None)
+                    .unwrap()
+            });
         }
 
         Self {
+            surface,
             handle: swapchain,
-            swapchain_loader: ash::extensions::khr::Swapchain::new(instance, ctx),
+            swapchain_loader,
             images,
             image_views,
             present_semaphores,
@@ -238,8 +266,10 @@ impl Swapchain {
             framebuffers,
             current_index: 0,
             format: format.format,
-            width,
-            height,
+            logical_width: width,
+            logical_height: height,
+            physical_width,
+            physical_height,
         }
     }
 
@@ -272,12 +302,20 @@ impl Swapchain {
         };
     }
 
-    pub fn width(&self) -> u32 {
-        self.width
+    pub fn logical_width(&self) -> u32 {
+        self.logical_width
     }
 
-    pub fn height(&self) -> u32 {
-        self.height
+    pub fn logical_height(&self) -> u32 {
+        self.logical_height
+    }
+
+    pub fn physical_width(&self) -> u32 {
+        self.physical_width
+    }
+
+    pub fn physical_height(&self) -> u32 {
+        self.physical_height
     }
 
     pub fn render_pass(&self) -> &ash::vk::RenderPass {
