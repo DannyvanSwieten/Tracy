@@ -5,7 +5,7 @@ pub trait WindowDelegate<AppState> {
         true
     }
     fn mouse_moved(&mut self, _state: &mut AppState, _x: f32, _y: f32) {}
-    fn mouse_dragged(&mut self, _state: &mut AppState, _x: f32, _y: f32) {}
+    fn mouse_dragged(&mut self, _state: &mut AppState, _x: f32, _y: f32, _dx: f32, dy: f32) {}
     fn mouse_down(&mut self, _state: &mut AppState, _x: f32, _y: f32) {}
     fn mouse_up(&mut self, _state: &mut AppState, _x: f32, _y: f32) {}
     fn resized(

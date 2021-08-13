@@ -1759,6 +1759,7 @@ dependencies = [
  "legion",
  "nalgebra-glm",
  "renderer",
+ "skia-safe",
  "ui",
  "vk_utils",
  "winit",

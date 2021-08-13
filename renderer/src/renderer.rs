@@ -9,6 +9,7 @@ use vk_utils::device_context::DeviceContext;
 use vk_utils::gpu::Gpu;
 use vk_utils::image_resource::Image2DResource;
 use vk_utils::shader_library::load_spirv;
+use vk_utils::wait_handle::WaitHandle;
 
 // Version traits
 use ash::version::{DeviceV1_0, InstanceV1_1};
@@ -24,7 +25,7 @@ use ash::vk::{
 };
 // Core objects
 use ash::vk::{
-    BufferUsageFlags, DescriptorBufferInfo, DescriptorImageInfo, DescriptorType, Format,
+    BufferUsageFlags, DescriptorBufferInfo, DescriptorImageInfo, DescriptorType, Format, Image,
     ImageAspectFlags, ImageLayout, ImageSubresourceRange, ImageUsageFlags, ImageView,
     ImageViewCreateInfo, ImageViewType, MemoryPropertyFlags, PhysicalDeviceMemoryProperties2,
     Pipeline, PipelineBindPoint, PipelineCache, PipelineShaderStageCreateInfo,
@@ -46,6 +47,12 @@ pub struct Renderer {
 
     output_width: u32,
     output_height: u32,
+
+    wait_handles: [Option<WaitHandle>; 3],
+    current_frame_index: usize,
+
+    camera_position: Vec3,
+    camera_target: Vec3,
 }
 
 unsafe impl Send for Renderer {}
@@ -69,51 +76,58 @@ impl Renderer {
         buffer
     }
 
-    pub fn render(&mut self, device: &DeviceContext) -> &ImageView {
+    pub fn render(&mut self, device: &DeviceContext) -> (Image, ImageView) {
         unsafe {
             if let Some(_scene) = self.scene_data.as_ref() {
                 if let Some(queue) = device.graphics_queue() {
-                    queue.begin(|command_buffer| {
-                        if let Some(image) = self.output_image.as_ref() {
-                            command_buffer
-                                .color_image_resource_transition(image, ImageLayout::GENERAL);
-                            self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
-                        } else {
-                            panic!()
-                        }
-                        command_buffer.bind_descriptor_sets(
-                            &self.descriptor_sets.pipeline_layout,
-                            PipelineBindPoint::RAY_TRACING_KHR,
-                            &self.descriptor_sets.descriptor_sets,
-                        );
-                        device.vk_device().cmd_bind_pipeline(
-                            *command_buffer.native_handle(),
-                            PipelineBindPoint::RAY_TRACING_KHR,
-                            self.pipeline,
-                        );
-                        self.rtx.pipeline_ext().cmd_trace_rays(
-                            *command_buffer.native_handle(),
-                            &self.stride_addresses[0],
-                            &self.stride_addresses[1],
-                            &self.stride_addresses[2],
-                            &self.stride_addresses[3],
-                            self.output_width,
-                            self.output_height,
-                            1,
-                        );
-                        if let Some(image) = self.output_image.as_ref() {
-                            command_buffer.color_image_resource_transition(
-                                image,
-                                ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    self.wait_handles[self.current_frame_index] =
+                        Some(queue.begin(|command_buffer| {
+                            if let Some(image) = self.output_image.as_ref() {
+                                command_buffer
+                                    .color_image_resource_transition(image, ImageLayout::GENERAL);
+                                self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
+                            } else {
+                                panic!()
+                            }
+                            command_buffer.bind_descriptor_sets(
+                                &self.descriptor_sets.pipeline_layout,
+                                PipelineBindPoint::RAY_TRACING_KHR,
+                                &self.descriptor_sets.descriptor_sets,
                             );
-                        } else {
-                            panic!()
-                        }
-                        command_buffer
-                    });
+                            device.vk_device().cmd_bind_pipeline(
+                                *command_buffer.native_handle(),
+                                PipelineBindPoint::RAY_TRACING_KHR,
+                                self.pipeline,
+                            );
+                            self.rtx.pipeline_ext().cmd_trace_rays(
+                                *command_buffer.native_handle(),
+                                &self.stride_addresses[0],
+                                &self.stride_addresses[1],
+                                &self.stride_addresses[2],
+                                &self.stride_addresses[3],
+                                self.output_width,
+                                self.output_height,
+                                1,
+                            );
+                            if let Some(image) = self.output_image.as_ref() {
+                                command_buffer.color_image_resource_transition(
+                                    image,
+                                    ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                                );
+                            } else {
+                                panic!()
+                            }
+                            command_buffer
+                        }));
+
+                    self.current_frame_index += 1;
+                    self.current_frame_index %= 3;
                 }
                 self.output_image.as_mut().unwrap().layout = ImageLayout::SHADER_READ_ONLY_OPTIMAL;
-                &self.output_image_view
+                (
+                    *self.output_image.as_mut().unwrap().vk_image(),
+                    self.output_image_view,
+                )
             } else {
                 panic!("No scene")
             }
@@ -180,6 +194,12 @@ impl Renderer {
 
             output_width: 0,
             output_height: 0,
+
+            wait_handles: [None, None, None],
+            current_frame_index: 0,
+
+            camera_position: Vec3::new(0., 0., 10.),
+            camera_target: Vec3::default(),
         };
 
         result.load_shaders_and_pipeline(device);
@@ -187,13 +207,18 @@ impl Renderer {
         result.create_images_and_views(device, width, height);
         result.update_image_descriptors(device);
         result.update_camera_descriptors(device);
+        result.build_camera_buffer();
         result.output_width = width;
         result.output_height = height;
         result
     }
 
-    pub fn set_camera(&mut self, origin: &Vec3, target: &Vec3) {
-        let view_matrix = glm::look_at_rh(origin, target, &glm::vec3(0., 1., 0.));
+    fn build_camera_buffer(&mut self) {
+        let view_matrix = glm::look_at_rh(
+            &self.camera_position,
+            &self.camera_target,
+            &glm::vec3(0., 1., 0.),
+        );
         let view_matrix = glm::inverse(&view_matrix);
 
         let projection_matrix = glm::perspective_rh(
@@ -206,6 +231,17 @@ impl Renderer {
         let projection_matrix = glm::inverse(&projection_matrix);
         self.camera_buffer
             .copy_to(&[view_matrix, projection_matrix]);
+    }
+
+    pub fn move_camera(&mut self, delta: &Vec3) {
+        self.camera_position += delta;
+        self.build_camera_buffer()
+    }
+
+    pub fn set_camera(&mut self, origin: &Vec3, target: &Vec3) {
+        self.camera_position = *origin;
+        self.camera_target = *target;
+        self.build_camera_buffer()
     }
 
     fn load_shaders_and_pipeline(&mut self, device: &DeviceContext) {
@@ -236,55 +272,48 @@ impl Renderer {
 
             let shader_groups = vec![
                 // group0 = [ raygen ]
-                RayTracingShaderGroupCreateInfoKHR::builder()
+                *RayTracingShaderGroupCreateInfoKHR::builder()
                     .ty(RayTracingShaderGroupTypeKHR::GENERAL)
                     .general_shader(0)
                     .closest_hit_shader(SHADER_UNUSED_KHR)
                     .any_hit_shader(SHADER_UNUSED_KHR)
-                    .intersection_shader(SHADER_UNUSED_KHR)
-                    .build(),
+                    .intersection_shader(SHADER_UNUSED_KHR),
                 // group1 = [ chit ]
-                RayTracingShaderGroupCreateInfoKHR::builder()
+                *RayTracingShaderGroupCreateInfoKHR::builder()
                     .ty(RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP)
                     .general_shader(SHADER_UNUSED_KHR)
                     .closest_hit_shader(1)
                     .any_hit_shader(SHADER_UNUSED_KHR)
-                    .intersection_shader(SHADER_UNUSED_KHR)
-                    .build(),
+                    .intersection_shader(SHADER_UNUSED_KHR),
                 // group2 = [ miss ]
-                RayTracingShaderGroupCreateInfoKHR::builder()
+                *RayTracingShaderGroupCreateInfoKHR::builder()
                     .ty(RayTracingShaderGroupTypeKHR::GENERAL)
                     .general_shader(2)
                     .closest_hit_shader(SHADER_UNUSED_KHR)
                     .any_hit_shader(SHADER_UNUSED_KHR)
-                    .intersection_shader(SHADER_UNUSED_KHR)
-                    .build(),
+                    .intersection_shader(SHADER_UNUSED_KHR),
             ];
 
             let shader_stages = vec![
-                PipelineShaderStageCreateInfo::builder()
+                *PipelineShaderStageCreateInfo::builder()
                     .stage(ShaderStageFlags::RAYGEN_KHR)
                     .module(gen)
-                    .name(std::ffi::CStr::from_bytes_with_nul(b"main\0").unwrap())
-                    .build(),
-                PipelineShaderStageCreateInfo::builder()
+                    .name(std::ffi::CStr::from_bytes_with_nul(b"main\0").unwrap()),
+                *PipelineShaderStageCreateInfo::builder()
                     .stage(ShaderStageFlags::CLOSEST_HIT_KHR)
                     .module(chit)
-                    .name(std::ffi::CStr::from_bytes_with_nul(b"main\0").unwrap())
-                    .build(),
-                PipelineShaderStageCreateInfo::builder()
+                    .name(std::ffi::CStr::from_bytes_with_nul(b"main\0").unwrap()),
+                *PipelineShaderStageCreateInfo::builder()
                     .stage(ShaderStageFlags::MISS_KHR)
                     .module(miss)
-                    .name(std::ffi::CStr::from_bytes_with_nul(b"main\0").unwrap())
-                    .build(),
+                    .name(std::ffi::CStr::from_bytes_with_nul(b"main\0").unwrap()),
             ];
 
-            let infos = [RayTracingPipelineCreateInfoKHR::builder()
+            let infos = [*RayTracingPipelineCreateInfoKHR::builder()
                 .stages(&shader_stages)
                 .groups(&shader_groups)
                 .max_pipeline_ray_recursion_depth(1)
-                .layout(self.descriptor_sets.pipeline_layout)
-                .build()];
+                .layout(self.descriptor_sets.pipeline_layout)];
 
             self.pipeline = self
                 .rtx
@@ -361,7 +390,19 @@ impl Renderer {
         }
     }
 
+    pub fn resize(&mut self, device: &DeviceContext, width: u32, height: u32) {
+        if width == self.output_width && height == self.output_height {
+            return;
+        }
+        device.wait();
+        self.create_images_and_views(device, width, height);
+        self.update_image_descriptors(device);
+    }
+
     fn create_images_and_views(&mut self, device: &DeviceContext, width: u32, height: u32) {
+        self.output_width = width;
+        self.output_height = height;
+
         self.output_image = Some(device.image_2d(
             width,
             height,

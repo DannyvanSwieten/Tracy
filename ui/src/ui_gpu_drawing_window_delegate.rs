@@ -6,9 +6,12 @@ use crate::window_delegate::WindowDelegate;
 
 use vk_utils::device_context::DeviceContext;
 use vk_utils::swapchain::Swapchain;
+use vk_utils::wait_handle::WaitHandle;
 
 use super::user_interface::{UIDelegate, UserInterface};
 use super::window_event::MouseEvent;
+
+use std::rc::Rc;
 
 struct UI<AppState> {
     canvas: SkiaGpuCanvas2D,
@@ -18,17 +21,19 @@ struct UI<AppState> {
 }
 
 pub struct UIGpuDrawingWindowDelegate<AppState> {
-    device: DeviceContext,
+    device: Rc<DeviceContext>,
     ui: Option<UI<AppState>>,
     ui_delegate: Box<dyn UIDelegate<AppState>>,
+    fences: Vec<Vec<Option<WaitHandle>>>,
 }
 
 impl<'a, AppState: 'static> UIGpuDrawingWindowDelegate<AppState> {
-    pub fn new(device: DeviceContext, ui_delegate: Box<dyn UIDelegate<AppState>>) -> Self {
+    pub fn new(device: Rc<DeviceContext>, ui_delegate: Box<dyn UIDelegate<AppState>>) -> Self {
         Self {
             device,
             ui: None,
             ui_delegate,
+            fences: vec![Vec::new(), Vec::new(), Vec::new()],
         }
     }
 }
@@ -42,11 +47,12 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
         }
     }
 
-    fn mouse_dragged(&mut self, state: &mut AppState, x: f32, y: f32) {
+    fn mouse_dragged(&mut self, state: &mut AppState, x: f32, y: f32, dx: f32, dy: f32) {
         let p = skia_safe::Point::from((x, y));
+        let d = skia_safe::Point::from((dx, dy));
         if let Some(ui) = self.ui.as_mut() {
             ui.user_interface
-                .mouse_drag(state, &MouseEvent::new(0, &p, &p));
+                .mouse_drag(state, &MouseEvent::new_with_delta(0, &p, &p, &d));
         }
     }
 
@@ -74,8 +80,9 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
         width: u32,
         height: u32,
     ) {
-        if let Some(ui) = self.ui.as_mut() {
-            ui.user_interface.resize(state, width, height);
+        self.device.wait();
+        let (surface, old_swapchain) = if let Some(ui) = &self.ui {
+            (*ui.swapchain.surface(), Some(ui.swapchain.handle()))
         } else {
             let surface = unsafe {
                 ash_window::create_surface(
@@ -86,43 +93,48 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
                 )
                 .expect("Surface creation failed")
             };
-            let swapchain = Swapchain::new(
-                self.device.gpu().vulkan(),
-                self.device.gpu(),
-                &self.device,
-                surface,
-                None,
-                0,
-                width,
-                height,
-            );
-            let mut user_interface = UserInterface::new(self.ui_delegate.build("root", state));
-            let image_renderer = ImageRenderer::new(
-                &self.device,
-                swapchain.render_pass(),
-                swapchain.image_count(),
-                swapchain.physical_width(),
-                swapchain.physical_height(),
-            );
-            let canvas = SkiaGpuCanvas2D::new(
-                &self.device,
-                swapchain.image_count(),
-                swapchain.physical_width(),
-                swapchain.physical_height(),
-            );
-            user_interface.resize(
-                state,
-                swapchain.physical_width(),
-                swapchain.physical_height(),
-            );
+            (surface, None)
+        };
 
-            self.ui = Some(UI {
-                canvas,
-                swapchain,
-                user_interface,
-                image_renderer,
-            });
-        }
+        let swapchain = Swapchain::new(
+            self.device.gpu().vulkan(),
+            self.device.gpu(),
+            &self.device,
+            surface,
+            old_swapchain,
+            0,
+            width,
+            height,
+        );
+        let mut user_interface = UserInterface::new(self.ui_delegate.build("root", state));
+        let image_renderer = ImageRenderer::new(
+            &self.device,
+            swapchain.render_pass(),
+            swapchain.image_count(),
+            swapchain.physical_width(),
+            swapchain.physical_height(),
+        );
+        let canvas = SkiaGpuCanvas2D::new(
+            &self.device,
+            swapchain.image_count(),
+            swapchain.physical_width(),
+            swapchain.physical_height(),
+        );
+
+        user_interface.resize(
+            state,
+            swapchain.physical_width(),
+            swapchain.physical_height(),
+        );
+
+        user_interface.resized(state);
+
+        self.ui = Some(UI {
+            canvas,
+            swapchain,
+            user_interface,
+            image_renderer,
+        });
     }
 
     fn update(&mut self, state: &mut AppState) {
@@ -142,8 +154,10 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
                 .next_frame_buffer()
                 .expect("Acquire next image failed");
 
+            self.fences[index as usize].clear();
+
             if let Some(queue) = self.device.graphics_queue() {
-                queue.begin(|commands| {
+                self.fences[index as usize].push(Some(queue.begin(|commands| {
                     commands.color_image_transition(
                         &image,
                         ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
@@ -151,9 +165,9 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
                     );
 
                     commands
-                });
+                })));
 
-                queue.begin_render_pass(
+                self.fences[index as usize].push(Some(queue.begin_render_pass(
                     ui.swapchain.render_pass(),
                     &framebuffer,
                     ui.swapchain.physical_width(),
@@ -163,9 +177,9 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
                             .render(&commands, &image_view, index as usize);
                         commands
                     },
-                );
+                )));
 
-                queue.begin(|commands| {
+                self.fences[index as usize].push(Some(queue.begin(|commands| {
                     commands.color_image_transition(
                         &image,
                         ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
@@ -173,7 +187,7 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
                     );
 
                     commands
-                });
+                })));
             }
 
             ui.swapchain.swap(

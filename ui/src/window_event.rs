@@ -14,6 +14,7 @@ pub struct MouseEvent {
     modifiers: u32,
     global_position: Point,
     local_position: Point,
+    delta_position: Point,
 }
 
 impl MouseEvent {
@@ -22,6 +23,21 @@ impl MouseEvent {
             modifiers,
             global_position: *global_position,
             local_position: *local_position,
+            delta_position: Point::new(0., 0.),
+        }
+    }
+
+    pub fn new_with_delta(
+        modifiers: u32,
+        global_position: &Point,
+        local_position: &Point,
+        delta_position: &Point,
+    ) -> Self {
+        Self {
+            modifiers,
+            global_position: *global_position,
+            local_position: *local_position,
+            delta_position: *delta_position,
         }
     }
 
@@ -43,5 +59,9 @@ impl MouseEvent {
 
     pub fn local_position(&self) -> &Point {
         &self.local_position
+    }
+
+    pub fn delta_position(&self) -> &Point {
+        &self.delta_position
     }
 }

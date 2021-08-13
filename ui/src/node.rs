@@ -128,7 +128,7 @@ impl<AppState> Node<AppState> {
         self
     }
 
-    pub fn with_event_callback<F>(mut self, event: MouseEventType, cb: F) -> Self
+    pub fn with_mouse_event_callback<F>(mut self, event: MouseEventType, cb: F) -> Self
     where
         F: FnMut(&MouseEvent, &mut AppState) -> Action<AppState> + 'static,
     {
@@ -166,6 +166,13 @@ impl<AppState> Node<AppState> {
         }
 
         None
+    }
+
+    pub fn resized(&mut self, state: &mut AppState) {
+        self.widget.resized(state, &self.rect);
+        for child in self.children.iter_mut() {
+            child.resized(state);
+        }
     }
 
     pub fn send_mouse_enter(&mut self, state: &mut AppState, uid: u32, event: &MouseEvent) {

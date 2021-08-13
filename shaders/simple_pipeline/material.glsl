@@ -1,5 +1,3 @@
-#pragma once
-
 struct Material
 {
     vec4 albedo;

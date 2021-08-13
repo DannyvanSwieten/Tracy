@@ -6,6 +6,8 @@ use ash::vk::{
     CommandPoolResetFlags, Framebuffer, Queue, RenderPass,
 };
 use ash::Device;
+
+#[derive(Clone)]
 pub struct QueueHandle {
     device: Device,
     queue: Queue,
@@ -76,11 +78,11 @@ impl QueueHandle {
     where
         F: FnOnce(CommandBufferHandle) -> CommandBufferHandle,
     {
-        unsafe {
-            self.device
-                .reset_command_pool(self.command_pool, CommandPoolResetFlags::RELEASE_RESOURCES)
-                .expect("CommandPool reset failed");
-        }
+        // unsafe {
+        //     self.device
+        //         .reset_command_pool(self.command_pool, CommandPoolResetFlags::RELEASE_RESOURCES)
+        //         .expect("CommandPool reset failed");
+        // }
         let command_buffer = self.command_buffer();
         command_buffer.begin();
         let command_buffer = f(command_buffer);

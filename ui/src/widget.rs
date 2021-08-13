@@ -22,7 +22,7 @@ impl Material {
         let mut body = StyleSheet::new();
         body.insert(String::from("bg-color"), Color::BLACK);
 
-        body.insert(String::from("border-color"), Color::WHITE);
+        body.insert(String::from("border-color"), Color::BLACK);
 
         let mut div = StyleSheet::new();
         div.insert(String::from("bg-color"), Color::DARK_GRAY);
@@ -205,6 +205,9 @@ pub trait Widget<AppState> {
     ) {
     }
     fn paint_3d(&mut self, _state: &AppState, _rect: &Rect) {}
+
+    fn resized(&mut self, _state: &mut AppState, _rect: &Rect) {}
+
     fn layout(
         &mut self,
         _state: &AppState,
@@ -336,7 +339,7 @@ impl<AppState> Stack<AppState> {
         }
 
         let child_width = available_width / unconstrained_children as f32;
-        let mut child_pos = padding;
+        let mut child_pos = rect.left() + padding;
 
         for child in children.iter_mut() {
             if !child.constraints.is_width_constraint() {
@@ -387,17 +390,16 @@ impl<AppState> Stack<AppState> {
         }
 
         let child_height = available_height / unconstrained_children as f32;
-        let mut child_pos = rect.bottom() + padding;
+        let mut child_pos = rect.top() + padding;
 
         for child in children.iter_mut() {
             if !child.constraints.is_height_constraint() {
-                let w = child_height - padding_compensation;
-                let h = rect.width() - padding * 2.;
+                let h = child_height - padding_compensation;
+                let w = rect.width() - padding * 2.;
                 child.rect.set_wh(w, h);
             }
 
-            child.rect.bottom = child_pos;
-            child.rect.left = rect.left() + padding;
+            child.rect.offset((rect.left() + padding, child_pos));
             child_pos += child.rect.height() + spacing;
         }
     }
@@ -410,9 +412,9 @@ impl<AppState> Widget<AppState> for Stack<AppState> {
         self.border_paint
             .set_color(*style.get("border-color").unwrap());
         self.border_paint.set_style(PaintStyle::Stroke);
-        canvas.draw_rounded_rect(rect, 15., 15., &self.paint);
+        canvas.draw_rounded_rect(rect, 1., 1., &self.paint);
 
-        canvas.draw_rounded_rect(rect, 15., 15., &self.border_paint);
+        canvas.draw_rounded_rect(rect, 1., 1., &self.border_paint);
     }
 
     fn layout(
@@ -974,7 +976,7 @@ impl<AppState: 'static> PopupRequest<AppState> {
             b.add_child(
                 Node::new("btn")
                     .with_widget(Button::new(&item.name))
-                    .with_event_callback(MouseEventType::MouseUp, move |_, _| {
+                    .with_mouse_event_callback(MouseEventType::MouseUp, move |_, _| {
                         Action::TriggerPopupMenu {
                             menu: 0,
                             sub_menu: s,

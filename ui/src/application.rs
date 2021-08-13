@@ -179,9 +179,16 @@ impl<AppState> WindowRegistry<AppState> {
         state: &mut AppState,
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
+        delta: &winit::dpi::PhysicalPosition<f64>,
     ) {
         if let Some(delegate) = self.window_delegates.get_mut(id) {
-            delegate.mouse_dragged(state, position.x as f32, position.y as f32);
+            delegate.mouse_dragged(
+                state,
+                position.x as f32,
+                position.y as f32,
+                delta.x as f32,
+                delta.y as f32,
+            );
         }
     }
 
@@ -262,7 +269,7 @@ impl<AppState: 'static> Application<AppState> {
         let mut last_mouse_position = winit::dpi::PhysicalPosition::<f64>::new(0., 0.);
         let mut mouse_is_down = false;
         event_loop.run(move |e, event_loop, control_flow| {
-            *control_flow = ControlFlow::Poll;
+            *control_flow = ControlFlow::Wait;
             d.application_will_update(&self, &mut s, &mut window_registry, &event_loop);
             match e {
                 Event::WindowEvent {
@@ -319,12 +326,17 @@ impl<AppState: 'static> Application<AppState> {
                         },
                     window_id,
                 } => {
-                    last_mouse_position = position;
                     if mouse_is_down {
-                        window_registry.mouse_dragged(&mut s, &window_id, &position)
+                        let delta = winit::dpi::PhysicalPosition::<f64>::new(
+                            position.x - last_mouse_position.x,
+                            position.y - last_mouse_position.y,
+                        );
+                        window_registry.mouse_dragged(&mut s, &window_id, &position, &delta)
                     } else {
                         window_registry.mouse_moved(&mut s, &window_id, &position)
                     }
+
+                    last_mouse_position = position;
                 }
 
                 Event::WindowEvent {

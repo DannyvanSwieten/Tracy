@@ -66,6 +66,10 @@ impl<AppState: 'static> UserInterface<AppState> {
         self.layout(state);
     }
 
+    pub fn resized(&mut self, state: &mut AppState) {
+        self.root.resized(state);
+    }
+
     pub fn mouse_down(&mut self, state: &mut AppState, event: &MouseEvent) {
         let mut dismiss_popup = false;
         if let Some(popup) = self.pop_up.as_mut() {

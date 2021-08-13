@@ -2,6 +2,7 @@ use crate::device_context::DeviceContext;
 use crate::gpu::Gpu;
 use crate::vulkan::Vulkan;
 use ash::version::DeviceV1_0;
+use ash::vk::SurfaceKHR;
 
 pub struct Swapchain {
     swapchain_loader: ash::extensions::khr::Swapchain,
@@ -271,6 +272,10 @@ impl Swapchain {
             physical_width,
             physical_height,
         }
+    }
+
+    pub fn surface(&self) -> &SurfaceKHR {
+        &self.surface
     }
 
     pub fn next_frame_buffer(

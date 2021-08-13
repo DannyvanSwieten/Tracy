@@ -29,7 +29,6 @@ pub struct SkiaGpuCanvas2D {
     surface_images: Vec<ash::vk::Image>,
     surface_image_views: Vec<ash::vk::ImageView>,
     current_image_index: usize,
-    semaphores: Vec<SemaphoresSubmitted>,
 }
 
 impl SkiaGpuCanvas2D {
@@ -130,7 +129,6 @@ impl SkiaGpuCanvas2D {
             surface_images,
             surface_image_views,
             current_image_index: 0,
-            semaphores,
         }
     }
 }
@@ -162,10 +160,100 @@ impl Canvas2D for SkiaGpuCanvas2D {
     }
 
     fn draw_string(&mut self, text: &str, center: &Point, font: &Font, paint: &Paint) {
-        self.surfaces[self.current_image_index]
-            .canvas()
-            .draw_str(text, *center, font, paint);
+        let blob = skia_safe::TextBlob::from_str(text.to_string(), font);
+        if let Some(b) = blob {
+            let rect = b.bounds();
+            let left = *center - rect.center();
+            self.surfaces[self.current_image_index]
+                .canvas()
+                .draw_str(text, left, font, paint);
+        }
     }
+
+    fn draw_vk_image(&mut self, image: &ash::vk::Image, width: u32, height: u32) {
+        let sk_vk_image: vk::Image = unsafe { std::mem::transmute(*image) };
+        let info = unsafe {
+            vk::ImageInfo::new(
+                sk_vk_image,
+                vk::Alloc::default(),
+                vk::ImageTiling::OPTIMAL,
+                vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                vk::Format::R8G8B8A8_UNORM,
+                1,
+                0,
+                None,
+                None,
+                None,
+            )
+        };
+
+        let backend_texture = unsafe {
+            skia_safe::gpu::BackendTexture::new_vulkan((width as i32, height as i32), &info)
+        };
+
+        let sk_image = Image::from_texture(
+            &mut self.context,
+            &backend_texture,
+            skia_safe::gpu::SurfaceOrigin::TopLeft,
+            skia_safe::ColorType::RGBA8888,
+            skia_safe::AlphaType::Premul,
+            skia_safe::ColorSpace::new_srgb_linear(),
+        );
+
+        if let Some(image) = sk_image {
+            self.surfaces[self.current_image_index]
+                .canvas()
+                .draw_image(image, (0., 0.), None);
+        }
+    }
+
+    fn draw_vk_image_rect(&mut self, src_rect: &Rect, dst_rect: &Rect, image: &ash::vk::Image) {
+        let sk_vk_image: vk::Image = unsafe { std::mem::transmute(*image) };
+        let info = unsafe {
+            vk::ImageInfo::new(
+                sk_vk_image,
+                vk::Alloc::default(),
+                vk::ImageTiling::OPTIMAL,
+                vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                vk::Format::R8G8B8A8_UNORM,
+                1,
+                0,
+                None,
+                None,
+                None,
+            )
+        };
+
+        let backend_texture = unsafe {
+            skia_safe::gpu::BackendTexture::new_vulkan(
+                (src_rect.width() as i32, src_rect.height() as i32),
+                &info,
+            )
+        };
+
+        let sk_image = Image::from_texture(
+            &mut self.context,
+            &backend_texture,
+            skia_safe::gpu::SurfaceOrigin::TopLeft,
+            skia_safe::ColorType::RGBA8888,
+            skia_safe::AlphaType::Premul,
+            skia_safe::ColorSpace::new_srgb_linear(),
+        );
+
+        let constraint = skia_safe::canvas::SrcRectConstraint::Fast;
+
+        if let Some(image) = sk_image {
+            self.surfaces[self.current_image_index]
+                .canvas()
+                .draw_image_rect(
+                    image,
+                    Some((src_rect, constraint)),
+                    dst_rect,
+                    &Paint::default(),
+                );
+        }
+    }
+
     fn flush(&mut self) -> (ash::vk::Image, ash::vk::ImageView) {
         if let Some(direct) = self.context.as_direct_context().as_mut() {
             direct.flush_submit_and_sync_cpu();
