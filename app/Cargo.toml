@@ -16,3 +16,5 @@ nalgebra-glm = "*"
 gltf = "*"
 legion = {version = "*"}
 skia-safe = "*"
+rapier3d = "*"
+rand = "*"

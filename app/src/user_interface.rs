@@ -41,9 +41,9 @@ impl Widget<MyState> for ViewPortWidget {
     fn mouse_drag(&mut self, state: &mut MyState, _: &Rect, event: &MouseEvent) {
         if let Some(game) = &mut state.game {
             game.renderer.move_camera(&Vec3::new(
-                event.delta_position().x * 0.025,
+                event.delta_position().x * 0.1,
                 0.,
-                event.delta_position().y * 0.025,
+                event.delta_position().y * 0.1,
             ));
         }
     }

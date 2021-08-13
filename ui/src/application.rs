@@ -110,6 +110,7 @@ impl<AppState> WindowRegistry<AppState> {
         WindowBuilder::new()
             .with_title(title)
             .with_inner_size(winit::dpi::LogicalSize { width, height })
+            .with_maximized(true)
             .build(target)
             .unwrap()
     }
@@ -269,7 +270,7 @@ impl<AppState: 'static> Application<AppState> {
         let mut last_mouse_position = winit::dpi::PhysicalPosition::<f64>::new(0., 0.);
         let mut mouse_is_down = false;
         event_loop.run(move |e, event_loop, control_flow| {
-            *control_flow = ControlFlow::Wait;
+            *control_flow = ControlFlow::Poll;
             d.application_will_update(&self, &mut s, &mut window_registry, &event_loop);
             match e {
                 Event::WindowEvent {

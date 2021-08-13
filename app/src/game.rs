@@ -1,10 +1,68 @@
 extern crate nalgebra_glm as glm;
-
 use legion::*;
+use rand::Rng;
+use rapier3d::prelude::*;
 use renderer::geometry::Vertex;
 use renderer::{renderer::Renderer, scene::Scene};
 use std::rc::Rc;
 use vk_utils::{device_context::DeviceContext, gpu::Gpu, swapchain::Swapchain};
+
+pub struct Physics {
+    gravity: nalgebra::Vector3<Real>,
+    body_set: RigidBodySet,
+    collider_set: ColliderSet,
+    integration_parameters: IntegrationParameters,
+    physics_pipeline: PhysicsPipeline,
+    island_manager: IslandManager,
+    broad_phase: BroadPhase,
+    narrow_phase: NarrowPhase,
+    joint_set: JointSet,
+    ccd_solver: CCDSolver,
+    physics_hooks: (),
+    event_handler: (),
+}
+
+impl Physics {
+    pub fn new() -> Self {
+        Self {
+            gravity: vector![0.0, -9.81, 0.0],
+            body_set: RigidBodySet::new(),
+            collider_set: ColliderSet::new(),
+            integration_parameters: IntegrationParameters::default(),
+            physics_pipeline: PhysicsPipeline::new(),
+            island_manager: IslandManager::new(),
+            broad_phase: BroadPhase::new(),
+            narrow_phase: NarrowPhase::new(),
+            joint_set: JointSet::new(),
+            ccd_solver: CCDSolver::new(),
+            physics_hooks: (),
+            event_handler: (),
+        }
+    }
+
+    pub fn tick(&mut self) {
+        self.physics_pipeline.step(
+            &self.gravity,
+            &self.integration_parameters,
+            &mut self.island_manager,
+            &mut self.broad_phase,
+            &mut self.narrow_phase,
+            &mut self.body_set,
+            &mut self.collider_set,
+            &mut self.joint_set,
+            &mut self.ccd_solver,
+            &self.physics_hooks,
+            &self.event_handler,
+        )
+    }
+
+    pub fn insert_rigid_body(&mut self, body: RigidBody) -> RigidBodyHandle {
+        self.body_set.insert(body)
+    }
+}
+
+unsafe impl Send for Physics {}
+unsafe impl Sync for Physics {}
 
 struct Transform {
     position: glm::Vec3,
@@ -17,7 +75,7 @@ impl Default for Transform {
         Self {
             position: glm::Vec3::default(),
             scale: glm::vec3(1., 1., 1.),
-            orientation: glm::Quat::default(),
+            orientation: glm::Quat::identity(),
         }
     }
 }
@@ -38,6 +96,16 @@ impl Transform {
     }
 }
 
+struct RigidBodyComponent {
+    pub body_handle: RigidBodyHandle,
+}
+
+impl RigidBodyComponent {
+    pub fn new(body_handle: RigidBodyHandle) -> Self {
+        Self { body_handle }
+    }
+}
+
 #[derive(Default)]
 struct StaticMesh {
     geometry_id: usize,
@@ -45,20 +113,46 @@ struct StaticMesh {
 }
 
 #[system(for_each)]
-fn scene_builder(transform: &Transform, mesh: &StaticMesh, #[resource] scene: &mut Scene) {
-    scene.set_position(
-        mesh.instance_id,
-        transform.position.x,
-        transform.position.y,
-        transform.position.z,
-    );
+fn scene_builder(
+    body: Option<&RigidBodyComponent>,
+    transform: &mut Transform,
+    mesh: &StaticMesh,
+    #[resource] scene: &mut Scene,
+    #[resource] physics: &Physics,
+) {
+    if let Some(rb) = &body {
+        let b = &physics.body_set[rb.body_handle];
+        transform.position.x = b.translation().x;
+        transform.position.y = b.translation().y;
+        transform.position.z = b.translation().z;
 
-    scene.set_scale(
-        mesh.instance_id,
-        transform.scale.x,
-        transform.scale.y,
-        transform.scale.z,
-    );
+        if let Some(_) = b.rotation().axis() {
+            let scaled = b.rotation().scaled_axis();
+            transform.orientation.coords[0] = scaled.x;
+            transform.orientation.coords[1] = scaled.y;
+            transform.orientation.coords[2] = scaled.z;
+        } else {
+            transform.orientation.coords[0] = 0.;
+            transform.orientation.coords[1] = 0.;
+            transform.orientation.coords[2] = 0.;
+        }
+
+        transform.orientation.coords[3] = 1.;
+    }
+
+    let id = glm::Mat4x4::identity();
+    let s = glm::scaling(&transform.scale);
+    let t = glm::translation(&transform.position);
+    let r = glm::quat_to_mat4(&glm::quat_normalize(&transform.orientation));
+
+    let result = t * r * s * id;
+    //t *= glm::translation(&transform.position);
+    let m43 = glm::make_mat4x3(glm::transpose(&result).as_slice());
+    scene.set_transform(mesh.instance_id, &m43);
+
+    // scene.set_scale(mesh.instance_id, &transform.scale);
+    // scene.set_position(mesh.instance_id, &transform.position);
+    // scene.set_orientation(mesh.instance_id, &transform.orientation);
 }
 
 #[system]
@@ -115,12 +209,15 @@ pub struct Game {
 impl Game {
     pub fn new(gpu: &Gpu, device: Rc<DeviceContext>) -> Self {
         let mut world = legion::World::default();
+        let mut physics = Physics::new();
         let mut renderer = Renderer::new(gpu, &device, 1920, 1080);
         let mut scene = renderer::scene::Scene::new();
         let (document, buffers, _) = gltf::import(
             "C:\\Users\\danny\\Documents\\code\\tracey\\assets\\Cube\\glTF\\Cube.gltf",
         )
         .unwrap();
+
+        let restitution: f32 = 0.5;
 
         for mesh in document.meshes() {
             for primitive in mesh.primitives() {
@@ -141,35 +238,108 @@ impl Game {
 
                 let geometry_id = scene.add_geometry(indices, vertices);
                 let instance_id = scene.create_instance(geometry_id);
+                let collider = ColliderBuilder::cuboid(100.0, 0.5, 100.0).build();
+                physics.collider_set.insert(collider);
                 world.push((
                     Transform::default()
-                        .with_position(0., -2., 0.)
-                        .with_scale(50., 0.1, 50.),
+                        .with_position(0., -0.5, 0.)
+                        .with_scale(100., 0.5, 100.),
                     StaticMesh {
                         geometry_id,
                         instance_id,
                     },
                 ));
-
+                let mut rng = rand::thread_rng();
                 for i in 0..10 {
+                    let s = rng.gen_range(5.0..10.0);
+                    let body = RigidBodyBuilder::new_dynamic()
+                        .translation(vector![-50. + (i as f32 * 11.), 25., 3.])
+                        .additional_mass(s)
+                        .build();
+                    let body_handle = physics.insert_rigid_body(body);
+                    let collider = ColliderBuilder::cuboid(s, s, s)
+                        .restitution(restitution)
+                        .build();
+                    physics.collider_set.insert_with_parent(
+                        collider,
+                        body_handle,
+                        &mut physics.body_set,
+                    );
                     let instance_id = scene.create_instance(geometry_id);
                     world.push((
                         Transform::default()
-                            .with_position(-5. + i as f32, 0., -3.)
-                            .with_scale(0.4, 0.4, 0.4),
+                            .with_position(-50. + (i as f32 * 11.), 25., 3.)
+                            .with_scale(s, s, s),
                         StaticMesh {
                             geometry_id,
                             instance_id,
                         },
+                        RigidBodyComponent::new(body_handle),
+                    ));
+                }
+
+                for i in 0..10 {
+                    let s = rng.gen_range(3.0..5.0);
+                    let body = RigidBodyBuilder::new_dynamic()
+                        .translation(vector![-50. + (i as f32 * 11.), 50., 3.])
+                        .additional_mass(s)
+                        .build();
+                    let body_handle = physics.insert_rigid_body(body);
+                    let collider = ColliderBuilder::cuboid(s, s, s)
+                        .restitution(restitution)
+                        .build();
+                    physics.collider_set.insert_with_parent(
+                        collider,
+                        body_handle,
+                        &mut physics.body_set,
+                    );
+                    let instance_id = scene.create_instance(geometry_id);
+                    world.push((
+                        Transform::default()
+                            .with_position(-50. + (i as f32 * 11.), 50., 3.)
+                            .with_scale(s, s, s),
+                        StaticMesh {
+                            geometry_id,
+                            instance_id,
+                        },
+                        RigidBodyComponent::new(body_handle),
+                    ));
+                }
+
+                for i in 0..10 {
+                    let s = rng.gen_range(1.0..3.0);
+                    let body = RigidBodyBuilder::new_dynamic()
+                        .translation(vector![-50. + (i as f32 * 11.), 75., 3.])
+                        .additional_mass(s)
+                        .build();
+                    let body_handle = physics.insert_rigid_body(body);
+                    let collider = ColliderBuilder::cuboid(s, s, s)
+                        .restitution(restitution)
+                        .build();
+                    physics.collider_set.insert_with_parent(
+                        collider,
+                        body_handle,
+                        &mut physics.body_set,
+                    );
+                    let instance_id = scene.create_instance(geometry_id);
+                    world.push((
+                        Transform::default()
+                            .with_position(-50. + (i as f32 * 11.), 75., 3.)
+                            .with_scale(s, s, s),
+                        StaticMesh {
+                            geometry_id,
+                            instance_id,
+                        },
+                        RigidBodyComponent::new(body_handle),
                     ));
                 }
             }
         }
 
         renderer.build(&device, &scene);
-
         let mut resources = Resources::default();
         resources.insert(scene);
+        resources.insert(physics);
 
         let this = Self {
             device,
@@ -191,6 +361,13 @@ impl Game {
     }
 
     pub fn tick(&mut self) {
+        {
+            let op = self.resources.get_mut::<Physics>();
+            if let Some(mut physics) = op {
+                (*physics).tick()
+            }
+        }
+
         self.schedule.execute(&mut self.world, &mut self.resources);
         self.renderer
             .build(&self.device, &*self.resources.get::<Scene>().unwrap());

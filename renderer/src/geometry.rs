@@ -97,7 +97,7 @@ impl GeometryBufferView {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct GeometryInstance {
-    pub transform: [f32; 12],
+    pub transform: glm::Mat4x3,
     id_and_mask: u32,
     hit_group_offset_and_flags: u32,
     pub acceleration_structure_handle: u64,
@@ -113,7 +113,7 @@ impl GeometryInstance {
     ) -> Self {
         let id_and_mask = ((mask as u32) << 24) | instance_id;
         let hit_group_offset_and_flags = ((1 as u32) << 24) | hit_group_offset;
-        let transform: [f32; 12] = [1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0.];
+        let transform = glm::Mat4x3::default();
         Self {
             transform,
             id_and_mask,

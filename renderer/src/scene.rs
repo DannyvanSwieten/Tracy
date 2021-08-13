@@ -77,16 +77,25 @@ impl Scene {
         instance_id as usize
     }
 
-    pub fn set_position(&mut self, instance_id: usize, x: f32, y: f32, z: f32) {
-        self.geometry_instances[instance_id].transform[3] = x;
-        self.geometry_instances[instance_id].transform[7] = y;
-        self.geometry_instances[instance_id].transform[11] = z;
+    pub fn set_transform(&mut self, instance_id: usize, transform: &glm::Mat4x3) {
+        self.geometry_instances[instance_id].transform = *transform;
     }
 
-    pub fn set_scale(&mut self, instance_id: usize, x: f32, y: f32, z: f32) {
-        self.geometry_instances[instance_id].transform[0] = x;
-        self.geometry_instances[instance_id].transform[5] = y;
-        self.geometry_instances[instance_id].transform[10] = z;
+    pub fn set_orientation(&mut self, instance_id: usize, orientation: &glm::Quat) {
+        let rotation_matrix = glm::quat_to_mat4(orientation);
+        //self.geometry_instances[instance_id].transform *= &rotation_matrix;
+    }
+
+    pub fn set_position(&mut self, instance_id: usize, position: &glm::Vec3) {
+        self.geometry_instances[instance_id].transform[3] = position.x;
+        self.geometry_instances[instance_id].transform[7] = position.y;
+        self.geometry_instances[instance_id].transform[11] = position.z;
+    }
+
+    pub fn set_scale(&mut self, instance_id: usize, scale: &glm::Vec3) {
+        self.geometry_instances[instance_id].transform[0] = scale.x;
+        self.geometry_instances[instance_id].transform[5] = scale.y;
+        self.geometry_instances[instance_id].transform[10] = scale.z;
     }
 
     pub fn geometry_buffer(&self) -> &GeometryBuffer {

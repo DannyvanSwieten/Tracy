@@ -198,7 +198,7 @@ impl Renderer {
             wait_handles: [None, None, None],
             current_frame_index: 0,
 
-            camera_position: Vec3::new(0., 0., 10.),
+            camera_position: Vec3::new(70., 30., 100.),
             camera_target: Vec3::default(),
         };
 

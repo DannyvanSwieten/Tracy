@@ -43,9 +43,9 @@ void main()
     const int32_t i2 = indices.data[start_index + 2];
 
     const int32_t start_vertex = offsets.data[gl_InstanceCustomIndexEXT].y;
-    const vec3 v0 = vertices.data[start_vertex + i0];
-    const vec3 v1 = vertices.data[start_vertex + i1];
-    const vec3 v2 = vertices.data[start_vertex + i2];
+    const vec3 v0 = gl_ObjectToWorldEXT * vec4(vertices.data[start_vertex + i0], 1);
+    const vec3 v1 = gl_ObjectToWorldEXT * vec4(vertices.data[start_vertex + i1], 1);
+    const vec3 v2 = gl_ObjectToWorldEXT * vec4(vertices.data[start_vertex + i2], 1);
 
     const vec3 pv0 = barycentric.x * v0;
     const vec3 pv1 = barycentric.y * v1;
