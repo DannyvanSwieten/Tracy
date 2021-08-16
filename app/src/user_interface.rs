@@ -3,9 +3,50 @@ use ui::{
     canvas_2d::Canvas2D, node::Node, user_interface::UIDelegate, widget::StyleSheet, widget::*,
     window_event::MouseEvent, window_event::MouseEventType,
 };
-pub struct MyState {
-    pub count: u32,
+
+use std::collections::HashMap;
+
+pub struct EditorState {
+    selected_entity: Option<legion::Entity>,
+    entities: HashMap<legion::Entity, String>,
+}
+
+impl EditorState {
+    pub fn new() -> Self {
+        Self {
+            selected_entity: None,
+            entities: HashMap::new(),
+        }
+    }
+
+    pub fn add_entity(&mut self, entity: legion::Entity, name: &str) {
+        self.entities.insert(entity, name.to_string());
+    }
+
+    pub fn entities(&self) -> &HashMap<legion::Entity, String>{
+        &self.entities
+    }
+}
+
+pub struct GameEditor {
+    pub editor_state: EditorState,
     pub game: Option<Game>,
+}
+
+impl GameEditor {
+    pub fn new() -> Self {
+        Self {
+            editor_state: EditorState::new(),
+            game: None,
+        }
+    }
+
+    pub fn create_entity(&mut self, name: &str) {
+        if let Some(game) = &mut self.game {
+            let e = game.create_entity();
+            self.editor_state.add_entity(e, name);
+        }
+    }
 }
 
 use skia_safe::Rect;
@@ -14,10 +55,10 @@ struct ViewPortWidget {}
 
 use nalgebra_glm::Vec3;
 
-impl Widget<MyState> for ViewPortWidget {
+impl Widget<GameEditor> for ViewPortWidget {
     fn paint(
         &mut self,
-        state: &MyState,
+        state: &GameEditor,
         rect: &Rect,
         canvas: &mut dyn Canvas2D,
         _style: &StyleSheet,
@@ -29,7 +70,7 @@ impl Widget<MyState> for ViewPortWidget {
         }
     }
 
-    fn resized(&mut self, state: &mut MyState, rect: &Rect) {
+    fn resized(&mut self, state: &mut GameEditor, rect: &Rect) {
         if let Some(game) = &mut state.game {
             game.renderer
                 .resize(&game.device, rect.width() as u32, rect.height() as u32);
@@ -38,7 +79,7 @@ impl Widget<MyState> for ViewPortWidget {
         }
     }
 
-    fn mouse_drag(&mut self, state: &mut MyState, _: &Rect, event: &MouseEvent) {
+    fn mouse_drag(&mut self, state: &mut GameEditor, _: &Rect, event: &MouseEvent) {
         if let Some(game) = &mut state.game {
             game.renderer.move_camera(&Vec3::new(
                 event.delta_position().x * 0.1,
@@ -49,24 +90,44 @@ impl Widget<MyState> for ViewPortWidget {
     }
 }
 
-fn build_top_bar() -> Node<MyState> {
+struct EntityTableDelegate {}
+
+impl TableDelegate<GameEditor> for EntityTableDelegate {
+    fn row_selected(&mut self, id: usize, state: &mut GameEditor) -> Action<GameEditor> {
+        if let Some(game) = &state.game {}
+        Action::Layout {
+            nodes: vec!["root"],
+        }
+    }
+    fn row_count(&self, state: &GameEditor) -> usize {
+        if let Some(game) = &state.game {
+            game.world.len()
+        } else {
+            0
+        }
+    }
+}
+
+fn build_top_bar() -> Node<GameEditor> {
     Node::new("div")
 }
 
-fn build_left_side_bar() -> Node<MyState> {
-    Node::new("div")
+fn build_left_side_bar() -> Node<GameEditor> {
+    Node::new("div").with_child(
+        Node::new("table").with_widget(Table::<GameEditor>::new(Box::new(EntityTableDelegate {}))),
+    )
 }
 
-fn build_view_port() -> Node<MyState> {
+fn build_view_port() -> Node<GameEditor> {
     Node::new_with_widget("viewport", Box::new(ViewPortWidget {}))
         .with_relative_max_constraints(Some(70.), None)
 }
 
-fn build_right_side_bar() -> Node<MyState> {
+fn build_right_side_bar() -> Node<GameEditor> {
     Node::new("div")
 }
 
-fn build_middle() -> Node<MyState> {
+fn build_middle() -> Node<GameEditor> {
     Node::new_with_widget("body", Box::new(Stack::new(Orientation::Horizontal)))
         .with_rebuild_callback(|_| {
             Some(vec![
@@ -79,13 +140,13 @@ fn build_middle() -> Node<MyState> {
         .with_spacing(5.)
 }
 
-fn build_bottom() -> Node<MyState> {
+fn build_bottom() -> Node<GameEditor> {
     Node::new("div")
 }
 
 pub struct MyUIDelegate {}
-impl UIDelegate<MyState> for MyUIDelegate {
-    fn build(&self, _: &str, _: &MyState) -> Node<MyState> {
+impl UIDelegate<GameEditor> for MyUIDelegate {
+    fn build(&self, _: &str, _: &GameEditor) -> Node<GameEditor> {
         Node::new("body").with_widget(Container::new()).with_child(
             Node::new("body")
                 .with_widget(Stack::new(Orientation::Vertical))

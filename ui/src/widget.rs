@@ -46,6 +46,11 @@ impl Material {
         menu.insert(String::from("bg-color"), Color::BLACK);
         menu.insert(String::from("border-color"), Color::BLACK);
 
+        let mut table = StyleSheet::new();
+        table.insert(String::from("bg-color"), Color::BLACK);
+        table.insert(String::from("even"), Color::from_rgb(89, 89, 89));
+        table.insert(String::from("uneven"), Color::from_rgb(77, 77, 77));
+
         let mut data = HashMap::new();
         data.insert(String::from("body"), body);
         data.insert(String::from("div"), div);
@@ -53,6 +58,7 @@ impl Material {
         data.insert(String::from("slider"), slider);
         data.insert(String::from("label"), label);
         data.insert(String::from("menu"), menu);
+        data.insert(String::from("table"), table);
 
         Material { data: data }
     }
@@ -287,7 +293,7 @@ impl<AppState> Widget<AppState> for Container {
     ) {
         for child in children.iter_mut() {
             let s = child.constraints.size(&rect.size());
-            child.rect = Rect::from_wh(s.width, s.height);
+            child.rect = Rect::from_xywh(rect.left(), rect.top(), s.width, s.height);
             child.rect.inset((padding, padding));
         }
     }
@@ -399,7 +405,9 @@ impl<AppState> Stack<AppState> {
                 child.rect.set_wh(w, h);
             }
 
-            child.rect.offset((rect.left() + padding, child_pos));
+            child
+                .rect
+                .offset((rect.left() + padding, child_pos + rect.top()));
             child_pos += child.rect.height() + spacing;
         }
     }
@@ -533,63 +541,82 @@ impl<AppState> Widget<AppState> for Button<AppState> {
     }
 }
 
-// pub trait TableDelegate {
-//     fn row_selected(&mut self, id: u32);
-// }
+pub trait TableDelegate<AppState> {
+    fn row_selected(&mut self, id: usize, state: &mut AppState) -> Action<AppState>;
+    fn row_count(&self, state: &AppState) -> usize;
+}
 
-// pub struct Table<'a> {
-//     row_count: usize,
-//     paint: Paint,
-//     delegate: Option<&'a mut dyn TableDelegate>,
-// }
+pub struct Table<AppState> {
+    paint: Paint,
+    delegate: Box<dyn TableDelegate<AppState>>,
+}
 
-// impl<'a> Table<'a> {
-//     pub fn new(row_count: usize, delegate: Option<&'a mut dyn TableDelegate>) -> Self {
-//         let w = Table {
-//             row_count,
-//             paint: Paint::default(),
-//             delegate,
-//         };
-//         w
-//     }
-// }
+impl<AppState> Table<AppState> {
+    pub fn new(delegate: Box<dyn TableDelegate<AppState>>) -> Self {
+        Table {
+            paint: Paint::default(),
+            delegate,
+        }
+    }
+}
 
-// impl<'a, AppState> Widget<AppState> for Table<'a> {
-//     fn paint(&mut self, _: &mut AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
-//         let e_color = style.get("even").unwrap();
-//         let u_color = style.get("uneven").unwrap();
+impl<AppState> Widget<AppState> for Table<AppState> {
+    fn paint(
+        &mut self,
+        state: &AppState,
+        rect: &Rect,
+        canvas: &mut dyn Canvas2D,
+        style: &StyleSheet,
+    ) {
+        let e_color = *style.get("even").unwrap_or(&Color::CYAN);
+        let u_color = *style.get("uneven").unwrap_or(&Color::RED);
 
-//         let height = rect.height() / self.row_count as f32;
+        let row_count = self.delegate.row_count(state);
+        let height = rect.height() / row_count as f32;
 
-//         for i in 0..self.row_count {
-//             if i % 2 == 0 {
-//                 self.paint.set_color(e_color);
-//             } else {
-//                 self.paint.set_color(u_color);
-//             }
+        for i in 0..row_count {
+            if i % 2 == 0 {
+                self.paint.set_color(e_color);
+            } else {
+                self.paint.set_color(u_color);
+            }
 
-//             canvas.draw_rounded_rect(
-//                 rect.left(),
-//                 rect.bottom() + height * i as f32,
-//                 rect.width(),
-//                 height,
-//                 0.,
-//                 0.,
-//                 &self.paint,
-//             )
-//         }
-//     }
+            canvas.draw_rounded_rect(
+                &Rect::from_point_and_size(
+                    (rect.left(), rect.top() + i as f32 * height),
+                    (rect.width(), height),
+                ),
+                1.,
+                1.,
+                &self.paint,
+            )
+        }
+    }
 
-//     fn mouse_down(&mut self, _: &mut AppState, rect: &Rect, event: &MouseEvent) {
-//         let y = (event.global_position.y - rect.bottom()) / self.row_count as f32;
-//         let row_size = rect.height() / self.row_count as f32;
-//         let row = y / row_size;
+    fn mouse_up(
+        &mut self,
+        state: &mut AppState,
+        rect: &Rect,
+        event: &MouseEvent,
+    ) -> Action<AppState> {
+        let row_count = self.delegate.row_count(state);
+        let y = (event.global_position().y - rect.bottom()) / row_count as f32;
+        let row_size = rect.height() / row_count as f32;
+        let row = y / row_size;
 
-//         if let Some(d) = &mut self.delegate {
-//             d.row_selected(row as u32)
-//         }
-//     }
-// }
+        self.delegate.row_selected(row as usize, state)
+    }
+
+    fn layout(
+        &mut self,
+        _state: &AppState,
+        _rect: &Rect,
+        _spacing: f32,
+        _padding: f32,
+        _children: &mut [Node<AppState>],
+    ) {
+    }
+}
 
 pub struct Slider<AppState> {
     label: String,

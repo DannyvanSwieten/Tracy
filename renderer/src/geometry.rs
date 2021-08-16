@@ -14,7 +14,7 @@ use vk_utils::buffer_resource::BufferResource;
 use vk_utils::device_context::DeviceContext;
 
 #[repr(C)]
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Vertex {
     x: f32,
     y: f32,
@@ -27,6 +27,7 @@ impl Vertex {
     }
 }
 
+#[derive(Clone)]
 pub struct GeometryBuffer {
     indices: Vec<u32>,
     vertices: Vec<Vertex>,

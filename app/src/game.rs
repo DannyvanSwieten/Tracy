@@ -64,13 +64,13 @@ impl Physics {
 unsafe impl Send for Physics {}
 unsafe impl Sync for Physics {}
 
-struct Transform {
+struct TransformComponent {
     position: glm::Vec3,
     scale: glm::Vec3,
     orientation: glm::Quat,
 }
 
-impl Default for Transform {
+impl Default for TransformComponent {
     fn default() -> Self {
         Self {
             position: glm::Vec3::default(),
@@ -80,7 +80,7 @@ impl Default for Transform {
     }
 }
 
-impl Transform {
+impl TransformComponent {
     pub fn new() -> Self {
         Self::default()
     }
@@ -115,7 +115,7 @@ struct StaticMesh {
 #[system(for_each)]
 fn scene_builder(
     body: Option<&RigidBodyComponent>,
-    transform: &mut Transform,
+    transform: &mut TransformComponent,
     mesh: &StaticMesh,
     #[resource] scene: &mut Scene,
     #[resource] physics: &Physics,
@@ -193,7 +193,7 @@ struct FrameIndex {
 
 pub struct Game {
     pub device: Rc<DeviceContext>,
-    world: World,
+    pub world: World,
     pub renderer: Renderer,
     resources: Resources,
     schedule: Schedule,
@@ -206,7 +206,7 @@ impl Game {
     pub fn new(gpu: &Gpu, device: Rc<DeviceContext>) -> Self {
         let mut world = legion::World::default();
         let mut physics = Physics::new();
-        let mut renderer = Renderer::new(gpu, &device, 1920, 1080);
+        let renderer = Renderer::new(gpu, &device, 1920, 1080);
         let mut scene = renderer::scene::Scene::new();
         let (document, buffers, _) = gltf::import(
             "C:\\Users\\danny\\Documents\\code\\tracey\\assets\\Cube\\glTF\\Cube.gltf",
@@ -232,12 +232,12 @@ impl Game {
                     (0..vertices.len() as u32).collect()
                 };
 
-                let geometry_id = scene.add_geometry(indices, vertices);
+                let geometry_id = scene.add_geometry(indices.clone(), vertices.clone());
                 let instance_id = scene.create_instance(geometry_id);
                 let collider = ColliderBuilder::cuboid(100.0, 0.5, 100.0).build();
                 physics.collider_set.insert(collider);
                 world.push((
-                    Transform::default()
+                    TransformComponent::default()
                         .with_position(0., -0.5, 0.)
                         .with_scale(100., 0.5, 100.),
                     StaticMesh {
@@ -263,7 +263,7 @@ impl Game {
                     );
                     let instance_id = scene.create_instance(geometry_id);
                     world.push((
-                        Transform::default()
+                        TransformComponent::default()
                             .with_position(-50. + (i as f32 * 11.), 25., 3.)
                             .with_scale(s, s, s),
                         StaticMesh {
@@ -291,7 +291,7 @@ impl Game {
                     );
                     let instance_id = scene.create_instance(geometry_id);
                     world.push((
-                        Transform::default()
+                        TransformComponent::default()
                             .with_position(-50. + (i as f32 * 11.), 50., 3.)
                             .with_scale(s, s, s),
                         StaticMesh {
@@ -319,7 +319,7 @@ impl Game {
                     );
                     let instance_id = scene.create_instance(geometry_id);
                     world.push((
-                        Transform::default()
+                        TransformComponent::default()
                             .with_position(-50. + (i as f32 * 11.), 75., 3.)
                             .with_scale(s, s, s),
                         StaticMesh {
@@ -332,7 +332,6 @@ impl Game {
             }
         }
 
-        renderer.build(&device, &scene);
         let mut resources = Resources::default();
         resources.insert(scene);
         resources.insert(physics);
@@ -351,6 +350,10 @@ impl Game {
         };
 
         this
+    }
+
+    pub fn create_entity(&mut self) -> Entity {
+        self.world.push((TransformComponent::new(),))
     }
 
     pub fn resources(&mut self) -> &mut Resources {

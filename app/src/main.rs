@@ -8,15 +8,15 @@ use ash::vk::{
 
 use ash::version::InstanceV1_1;
 
-use user_interface::{MyState, MyUIDelegate};
+use user_interface::{GameEditor, MyUIDelegate};
 
 use ui::application::Application;
 use ui::ui_application_delegate::UIApplicationDelegate;
 
 fn main() {
-    let app: Application<MyState> = Application::new("My Application");
+    let app: Application<GameEditor> = Application::new("My Application");
     let app_delegate = UIApplicationDelegate::new()
-        .on_update(|_, state: &mut MyState| {
+        .on_update(|_, state: &mut GameEditor| {
             if let Some(game) = &mut state.game {
                 game.tick()
             }
@@ -50,11 +50,5 @@ fn main() {
             })
         });
 
-    app.run(
-        Box::new(app_delegate),
-        MyState {
-            count: 0,
-            game: None,
-        },
-    );
+    app.run(Box::new(app_delegate), GameEditor::new());
 }
