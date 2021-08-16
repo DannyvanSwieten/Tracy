@@ -85,7 +85,7 @@ fn create_swapchain(
     let present_mode = present_modes
         .iter()
         .cloned()
-        .find(|&mode| mode == ash::vk::PresentModeKHR::FIFO)
+        .find(|&mode| mode == ash::vk::PresentModeKHR::MAILBOX)
         .unwrap_or(ash::vk::PresentModeKHR::FIFO);
     let swapchain_loader = ash::extensions::khr::Swapchain::new(instance, ctx);
     let mut old = ash::vk::SwapchainKHR::null();

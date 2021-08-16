@@ -213,7 +213,7 @@ impl Game {
         )
         .unwrap();
 
-        let restitution: f32 = 0.5;
+        let restitution: f32 = 0.25;
 
         for mesh in document.meshes() {
             for primitive in mesh.primitives() {
@@ -359,8 +359,6 @@ impl Game {
 
     pub fn tick(&mut self) {
         {
-            let elapsed_seconds = self.instant.elapsed().as_secs_f64();
-            let frames_per_second = 1. / elapsed_seconds;
             self.iteration += 1;
             let op = self.resources.get_mut::<Physics>();
             if let Some(mut physics) = op {

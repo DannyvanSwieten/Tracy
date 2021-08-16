@@ -1,4 +1,4 @@
-use skia_safe::{Color, Font, Image, Paint, Point, Rect};
+use skia_safe::{Color, Font, Paint, Point, Rect};
 
 pub trait Canvas2D {
     fn clear(&mut self, color: &Color);
