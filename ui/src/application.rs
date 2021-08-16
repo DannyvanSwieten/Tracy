@@ -110,7 +110,7 @@ impl<AppState> WindowRegistry<AppState> {
         WindowBuilder::new()
             .with_title(title)
             .with_inner_size(winit::dpi::LogicalSize { width, height })
-            .with_maximized(true)
+            //.with_maximized(true)
             .build(target)
             .unwrap()
     }
@@ -269,8 +269,10 @@ impl<AppState: 'static> Application<AppState> {
         d.application_will_start(&self, &mut s, &mut window_registry, &event_loop);
         let mut last_mouse_position = winit::dpi::PhysicalPosition::<f64>::new(0., 0.);
         let mut mouse_is_down = false;
+        let mut iteration = 0;
         event_loop.run(move |e, event_loop, control_flow| {
-            *control_flow = ControlFlow::Poll;
+            *control_flow = winit::event_loop::ControlFlow::Poll;
+            let n = std::time::Instant::now();
             d.application_will_update(&self, &mut s, &mut window_registry, &event_loop);
             match e {
                 Event::WindowEvent {
@@ -359,17 +361,22 @@ impl<AppState: 'static> Application<AppState> {
                         window_registry.mouse_up(&mut s, &window_id, &last_mouse_position)
                     }
                 },
-
                 _ => (),
             }
 
             match control_flow {
                 ControlFlow::Exit => d.application_will_quit(&mut self, &event_loop),
                 _ => {
-                    window_registry.update(&mut s);
-                    window_registry.draw(&mut self, &mut s);
+                    iteration += 1;
+                    if iteration % 5 == 0 {
+                        window_registry.update(&mut s);
+                        window_registry.draw(&mut self, &mut s);
+                    }
                 }
             }
+
+            let milli = n.elapsed().as_millis();
+            println!("{}", milli);
         });
     }
 }

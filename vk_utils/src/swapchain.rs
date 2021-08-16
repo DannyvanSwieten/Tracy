@@ -292,7 +292,7 @@ impl Swapchain {
             match result {
                 Ok((index, sub_optimal)) => {
                     let result = (
-                        true,
+                        sub_optimal,
                         index,
                         self.framebuffers[index as usize],
                         self.present_semaphores[index as usize],

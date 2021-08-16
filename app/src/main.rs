@@ -21,7 +21,7 @@ fn main() {
                 game.tick()
             }
         })
-        .with_window("My Window", 1920, 1080, Box::new(MyUIDelegate {}))
+        .with_window("My Window", 1280, 720, Box::new(MyUIDelegate {}))
         .on_device_created(|gpu, device, state| state.game = Some(game::Game::new(gpu, device)))
         .with_device_builder(|gpu, mut extensions| {
             extensions.push(ash::extensions::khr::RayTracingPipeline::name());

@@ -9,6 +9,6 @@ edition = "2018"
 vk_utils = {path = "../vk_utils"}
 ash = "*"
 ash-window = "*"
-winit = "*"
+winit = "0.25.0"
 byteorder = "*"
 skia-safe = { version = "*", features = ["vulkan", "gpu"] }

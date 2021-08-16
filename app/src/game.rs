@@ -146,13 +146,8 @@ fn scene_builder(
     let r = glm::quat_to_mat4(&glm::quat_normalize(&transform.orientation));
 
     let result = t * r * s * id;
-    //t *= glm::translation(&transform.position);
     let m43 = glm::make_mat4x3(glm::transpose(&result).as_slice());
     scene.set_transform(mesh.instance_id, &m43);
-
-    // scene.set_scale(mesh.instance_id, &transform.scale);
-    // scene.set_position(mesh.instance_id, &transform.position);
-    // scene.set_orientation(mesh.instance_id, &transform.orientation);
 }
 
 #[system]
@@ -362,9 +357,12 @@ impl Game {
 
     pub fn tick(&mut self) {
         {
+            self.iteration += 1;
             let op = self.resources.get_mut::<Physics>();
             if let Some(mut physics) = op {
-                (*physics).tick()
+                if self.iteration % 2 == 0 {
+                    (*physics).tick()
+                }
             }
         }
 

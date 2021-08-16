@@ -25,6 +25,7 @@ pub struct UIGpuDrawingWindowDelegate<AppState> {
     ui: Option<UI<AppState>>,
     ui_delegate: Box<dyn UIDelegate<AppState>>,
     fences: Vec<Vec<Option<WaitHandle>>>,
+    sub_optimal_swapchain: bool,
 }
 
 impl<'a, AppState: 'static> UIGpuDrawingWindowDelegate<AppState> {
@@ -34,7 +35,30 @@ impl<'a, AppState: 'static> UIGpuDrawingWindowDelegate<AppState> {
             ui: None,
             ui_delegate,
             fences: vec![Vec::new(), Vec::new(), Vec::new()],
+            sub_optimal_swapchain: false,
         }
+    }
+
+    fn rebuild_swapchain(&mut self, state: &AppState) {
+        self.device.wait();
+        let new_swapchain = {
+            if let Some(ui) = &self.ui {
+                Swapchain::new(
+                    self.device.gpu().vulkan(),
+                    self.device.gpu(),
+                    &self.device,
+                    *ui.swapchain.surface(),
+                    Some(ui.swapchain.handle()),
+                    0,
+                    ui.swapchain.logical_width(),
+                    ui.swapchain.logical_height(),
+                )
+            } else {
+                panic!()
+            }
+        };
+
+        self.ui.as_mut().unwrap().swapchain = new_swapchain;
     }
 }
 
@@ -145,17 +169,34 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
 
     fn draw(&mut self, _: &Application<AppState>, state: &AppState) {
         // draw user interface
+
+        if self.ui.is_none() {
+            return;
+        }
+
+        if self.sub_optimal_swapchain {
+            self.rebuild_swapchain(state)
+        }
+
+        let (image, view, (sub_optimal, index, framebuffer, semaphore)) = {
+            if let Some(ui) = self.ui.as_mut() {
+                ui.user_interface.paint(state, &mut ui.canvas);
+                let (image, image_view) = ui.canvas.flush();
+                (
+                    image,
+                    image_view,
+                    ui.swapchain
+                        .next_frame_buffer()
+                        .expect("Acquire next image failed"),
+                )
+            } else {
+                return;
+            }
+        };
+
+        self.sub_optimal_swapchain = sub_optimal;
+        self.fences[index as usize].clear();
         if let Some(ui) = self.ui.as_mut() {
-            ui.user_interface.paint(state, &mut ui.canvas);
-            let (image, image_view) = ui.canvas.flush();
-
-            let (sub_optimal, index, framebuffer, semaphore) = ui
-                .swapchain
-                .next_frame_buffer()
-                .expect("Acquire next image failed");
-
-            self.fences[index as usize].clear();
-
             if let Some(queue) = self.device.graphics_queue() {
                 self.fences[index as usize].push(Some(queue.begin(|commands| {
                     commands.color_image_transition(
@@ -173,8 +214,7 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
                     ui.swapchain.physical_width(),
                     ui.swapchain.physical_height(),
                     |commands| {
-                        ui.image_renderer
-                            .render(&commands, &image_view, index as usize);
+                        ui.image_renderer.render(&commands, &view, index as usize);
                         commands
                     },
                 )));
@@ -198,3 +238,4 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
         }
     }
 }
+// }
