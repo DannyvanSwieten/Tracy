@@ -199,6 +199,7 @@ pub struct Game {
     schedule: Schedule,
     iteration: u32,
     pub output_image: Option<ash::vk::Image>,
+    instant: std::time::Instant,
 }
 
 impl Game {
@@ -346,6 +347,7 @@ impl Game {
                 .build(),
             iteration: 0,
             output_image: None,
+            instant: std::time::Instant::now(),
         };
 
         this
@@ -357,12 +359,13 @@ impl Game {
 
     pub fn tick(&mut self) {
         {
+            let elapsed_seconds = self.instant.elapsed().as_secs_f64();
+            let frames_per_second = 1. / elapsed_seconds;
             self.iteration += 1;
             let op = self.resources.get_mut::<Physics>();
             if let Some(mut physics) = op {
-                if self.iteration % 2 == 0 {
-                    (*physics).tick()
-                }
+                //(*physics).integration_parameters.dt = 1. / frames_per_second as f32;
+                (*physics).tick()
             }
         }
 
@@ -371,5 +374,7 @@ impl Game {
             .build(&self.device, &*self.resources.get::<Scene>().unwrap());
         let (image, _) = self.renderer.render(&self.device);
         self.output_image = Some(image);
+
+        self.instant = std::time::Instant::now();
     }
 }

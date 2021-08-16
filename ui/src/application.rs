@@ -96,10 +96,6 @@ pub struct WindowRegistry<AppState: 'static> {
 }
 
 impl<AppState> WindowRegistry<AppState> {
-    pub fn get_delegate(&self, id: WindowId) -> Option<&Box<dyn WindowDelegate<AppState>>> {
-        self.window_delegates.get(&id)
-    }
-
     pub fn create_window(
         &self,
         target: &EventLoopWindowTarget<()>,
@@ -269,11 +265,8 @@ impl<AppState: 'static> Application<AppState> {
         d.application_will_start(&self, &mut s, &mut window_registry, &event_loop);
         let mut last_mouse_position = winit::dpi::PhysicalPosition::<f64>::new(0., 0.);
         let mut mouse_is_down = false;
-        let mut iteration = 0;
         event_loop.run(move |e, event_loop, control_flow| {
             *control_flow = winit::event_loop::ControlFlow::Poll;
-            let n = std::time::Instant::now();
-            d.application_will_update(&self, &mut s, &mut window_registry, &event_loop);
             match e {
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
@@ -361,22 +354,18 @@ impl<AppState: 'static> Application<AppState> {
                         window_registry.mouse_up(&mut s, &window_id, &last_mouse_position)
                     }
                 },
+                Event::MainEventsCleared => {
+                    d.application_will_update(&self, &mut s, &mut window_registry, &event_loop);
+                    window_registry.update(&mut s);
+                    window_registry.draw(&mut self, &mut s);
+                }
                 _ => (),
             }
 
             match control_flow {
                 ControlFlow::Exit => d.application_will_quit(&mut self, &event_loop),
-                _ => {
-                    iteration += 1;
-                    if iteration % 5 == 0 {
-                        window_registry.update(&mut s);
-                        window_registry.draw(&mut self, &mut s);
-                    }
-                }
+                _ => (),
             }
-
-            let milli = n.elapsed().as_millis();
-            println!("{}", milli);
         });
     }
 }

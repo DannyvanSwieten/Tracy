@@ -31,7 +31,7 @@ void main()
   uint pixelSeed = rand_seed(rand_seed(gl_LaunchIDEXT.x, gl_LaunchIDEXT.y), 1);
   ray.seed = pixelSeed;
 
-  const int ssp = 16;
+  const int ssp = 32;
   for(int s = 0; s < ssp; ++s)
   {       
     const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + float(ssp > 1) * vec2(rand_float(pixelSeed), rand_float(pixelSeed));
