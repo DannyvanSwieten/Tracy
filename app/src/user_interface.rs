@@ -2,40 +2,51 @@ use crate::game::Game;
 use legion::*;
 use ui::{
     canvas_2d::Canvas2D, node::Node, user_interface::UIDelegate, widget::StyleSheet, widget::*,
-    window_event::MouseEvent, window_event::MouseEventType,
+    window_event::MouseEvent,
 };
-
-use std::collections::HashMap;
 
 pub struct EditorState {
     selected_entity: Option<Entity>,
-    entities: HashMap<Entity, String>,
+    entities: Vec<Entity>,
 }
 
 impl EditorState {
     pub fn new() -> Self {
         Self {
             selected_entity: None,
-            entities: HashMap::new(),
+            entities: Vec::new(),
         }
     }
 
     pub fn add_entity(&mut self, entity: Entity, name: &str) {
-        self.entities.insert(entity, name.to_string());
+        self.entities.push(entity);
     }
 
     pub fn remove_entity(&mut self, entity: Entity) {
-        self.entities.remove(&entity);
+        //self.entities.remove(&entity);
     }
 
-    pub fn entities(&self) -> &HashMap<Entity, String> {
+    pub fn entities(&self) -> &Vec<Entity> {
         &self.entities
+    }
+
+    pub fn get_entity_by_index(&self, index: usize) -> Option<Entity> {
+        if index < self.entities.len() {
+            Some(self.entities[index])
+        } else {
+            None
+        }
+    }
+
+    pub fn select_entity(&mut self, index: usize) {
+        self.selected_entity = self.get_entity_by_index(index)
     }
 }
 
 pub struct GameEditor {
     pub editor_state: EditorState,
     pub game: Option<Game>,
+    pub playing: bool,
 }
 
 impl GameEditor {
@@ -43,7 +54,18 @@ impl GameEditor {
         Self {
             editor_state: EditorState::new(),
             game: None,
+            playing: false,
         }
+    }
+
+    pub fn play(&mut self) {
+        //todo serialize gamestate
+        self.playing = true
+    }
+
+    pub fn stop(&mut self) {
+        //todo deserialize old gamestate
+        self.playing = false
     }
 
     pub fn create_entity(&mut self, name: &str) {
@@ -59,6 +81,14 @@ impl GameEditor {
             game.remove_entity(entity)
         } else {
             false
+        }
+    }
+
+    pub fn tick(&mut self) {
+        if let Some(game) = &mut self.game {
+            if self.playing {
+                game.tick()
+            }
         }
     }
 }
@@ -107,8 +137,10 @@ impl Widget<GameEditor> for ViewPortWidget {
 struct EntityTableDelegate {}
 
 impl TableDelegate<GameEditor> for EntityTableDelegate {
-    fn row_selected(&mut self, id: usize, state: &mut GameEditor) -> Action<GameEditor> {
-        if let Some(game) = &state.game {}
+    fn row_selected(&mut self, index: usize, state: &mut GameEditor) -> Action<GameEditor> {
+        if let Some(_) = &state.game {
+            state.editor_state.select_entity(index)
+        }
         Action::Layout {
             nodes: vec!["root"],
         }
