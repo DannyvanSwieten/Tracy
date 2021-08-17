@@ -356,6 +356,10 @@ impl Game {
         self.world.push((TransformComponent::new(),))
     }
 
+    pub fn remove_entity(&mut self, entity: Entity) -> bool {
+        self.world.remove(entity)
+    }
+
     pub fn resources(&mut self) -> &mut Resources {
         &mut self.resources
     }

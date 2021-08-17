@@ -1,4 +1,5 @@
 use crate::game::Game;
+use legion::*;
 use ui::{
     canvas_2d::Canvas2D, node::Node, user_interface::UIDelegate, widget::StyleSheet, widget::*,
     window_event::MouseEvent, window_event::MouseEventType,
@@ -7,8 +8,8 @@ use ui::{
 use std::collections::HashMap;
 
 pub struct EditorState {
-    selected_entity: Option<legion::Entity>,
-    entities: HashMap<legion::Entity, String>,
+    selected_entity: Option<Entity>,
+    entities: HashMap<Entity, String>,
 }
 
 impl EditorState {
@@ -19,11 +20,15 @@ impl EditorState {
         }
     }
 
-    pub fn add_entity(&mut self, entity: legion::Entity, name: &str) {
+    pub fn add_entity(&mut self, entity: Entity, name: &str) {
         self.entities.insert(entity, name.to_string());
     }
 
-    pub fn entities(&self) -> &HashMap<legion::Entity, String>{
+    pub fn remove_entity(&mut self, entity: Entity) {
+        self.entities.remove(&entity);
+    }
+
+    pub fn entities(&self) -> &HashMap<Entity, String> {
         &self.entities
     }
 }
@@ -45,6 +50,15 @@ impl GameEditor {
         if let Some(game) = &mut self.game {
             let e = game.create_entity();
             self.editor_state.add_entity(e, name);
+        }
+    }
+
+    pub fn remove_entity(&mut self, entity: Entity) -> bool {
+        if let Some(game) = &mut self.game {
+            self.editor_state.remove_entity(entity);
+            game.remove_entity(entity)
+        } else {
+            false
         }
     }
 }
