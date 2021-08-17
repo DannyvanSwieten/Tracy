@@ -208,8 +208,8 @@ impl Game {
         let mut physics = Physics::new();
         let renderer = Renderer::new(gpu, &device, 1920, 1080);
         let mut scene = renderer::scene::Scene::new();
-        let (document, buffers, _) = gltf::import(
-            "C:\\Users\\danny\\Documents\\code\\tracey\\assets\\Cube\\glTF\\Cube.gltf",
+        let dir = std::env::current_exe().expect("current dir check failed").parent().unwrap().parent().unwrap().parent().unwrap().join("assets");
+        let (document, buffers, _) = gltf::import(dir.join("Cube").join("gltf").join("Cube.gltf").to_str().unwrap()
         )
         .unwrap();
 

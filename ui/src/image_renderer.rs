@@ -29,8 +29,9 @@ impl ImageRenderer {
         width: u32,
         height: u32,
     ) -> Self {
+        let dir = std::env::current_exe().expect("current dir check failed").parent().unwrap().parent().unwrap().parent().unwrap().join("shaders");
         let buffer =
-            load_spirv("C:/Users/danny/Documents/code/tracey/shaders/sampled_image.vert.spv");
+            load_spirv(dir.join("sampled_image.vert.spv").to_str().unwrap());
         let vertex_shader_module_create_info = ash::vk::ShaderModuleCreateInfo::builder()
             .code(&buffer)
             .build();
@@ -43,7 +44,7 @@ impl ImageRenderer {
         };
 
         let buffer =
-            load_spirv("C:/Users/danny/Documents/code/tracey/shaders/sampled_image.frag.spv");
+            load_spirv(dir.join("sampled_image.frag.spv").to_str().unwrap());
 
         let fragment_shader_module_create_info = ash::vk::ShaderModuleCreateInfo::builder()
             .code(&buffer)

@@ -7,7 +7,7 @@ use byteorder::ReadBytesExt;
 use std::fs::File;
 
 pub fn load_spirv(path: &str) -> Vec<u32> {
-    let file = File::open(path).expect("File not found");
+    let file = File::open(path).expect(&(String::from("File not found at: ") + &path.to_string()));
     let meta = std::fs::metadata(path).expect("No metadata found for file");
     let mut buf_reader = std::io::BufReader::new(file);
 

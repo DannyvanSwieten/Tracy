@@ -245,9 +245,11 @@ impl Renderer {
     }
 
     fn load_shaders_and_pipeline(&mut self, device: &DeviceContext) {
+
+        let dir = std::env::current_exe().expect("current dir check failed").parent().unwrap().parent().unwrap().parent().unwrap().join("shaders").join("simple_pipeline");
         unsafe {
             let code = load_spirv(
-                "C:/Users/danny/Documents/code/tracey/shaders/simple_pipeline/ray_gen.rgen.spv",
+                 dir.join("ray_gen.rgen.spv").to_str().unwrap(),
             );
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let gen = device
@@ -255,14 +257,14 @@ impl Renderer {
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray generation shader compilation failed");
             let code =
-                load_spirv("C:/Users/danny/Documents/code/tracey/shaders/simple_pipeline/closest_hit.rchit.spv");
+                load_spirv(dir.join("closest_hit.rchit.spv").to_str().unwrap());
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let chit = device
                 .vk_device()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray closest hit shader compilation failed");
             let code = load_spirv(
-                "C:/Users/danny/Documents/code/tracey/shaders/simple_pipeline/ray_miss.rmiss.spv",
+                dir.join("ray_miss.rmiss.spv").to_str().unwrap(),
             );
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let miss = device

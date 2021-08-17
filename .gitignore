@@ -1,1 +1,5 @@
-/target
+app/target/**
+renderer/target/**
+target/**
+ui/target**
+vk_utils/target/**
