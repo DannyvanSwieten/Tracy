@@ -2,7 +2,7 @@ use crate::game::Game;
 use legion::*;
 use ui::{
     canvas_2d::Canvas2D, node::Node, user_interface::UIDelegate, widget::StyleSheet, widget::*,
-    window_event::MouseEvent,
+    window_event::MouseEvent, window_event::MouseEventType,
 };
 
 pub struct EditorState {
@@ -126,9 +126,9 @@ impl Widget<GameEditor> for ViewPortWidget {
     fn mouse_drag(&mut self, state: &mut GameEditor, _: &Rect, event: &MouseEvent) {
         if let Some(game) = &mut state.game {
             game.renderer.move_camera(&Vec3::new(
-                event.delta_position().x * 0.1,
+                event.delta_position().x * 0.25,
                 0.,
-                event.delta_position().y * 0.1,
+                event.delta_position().y * 0.25,
             ));
         }
     }
@@ -155,7 +155,21 @@ impl TableDelegate<GameEditor> for EntityTableDelegate {
 }
 
 fn build_top_bar() -> Node<GameEditor> {
-    Node::new("div")
+    Node::new("div").with_mouse_event_callback(MouseEventType::MouseUp, |event, state| {
+        let menu = ui::widget::PopupMenu::new(0, "root").with_item(1, "New Entity");
+        let request =
+            ui::widget::PopupRequest::new(menu, |menu, submenu, state: &mut GameEditor| {
+                state.create_entity("New Entity");
+                ui::widget::Action::Layout {
+                    nodes: vec!["root"],
+                }
+            });
+
+        ui::widget::Action::PopupRequest {
+            request: request,
+            position: *event.global_position(),
+        }
+    })
 }
 
 fn build_left_side_bar() -> Node<GameEditor> {

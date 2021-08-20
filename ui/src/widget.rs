@@ -600,7 +600,7 @@ impl<AppState> Widget<AppState> for Table<AppState> {
         event: &MouseEvent,
     ) -> Action<AppState> {
         let row_count = self.delegate.row_count(state);
-        let y = (event.global_position().y - rect.bottom()) / row_count as f32;
+        let y = event.global_position().y - rect.top();
         let row_size = rect.height() / row_count as f32;
         let row = y / row_size;
 
