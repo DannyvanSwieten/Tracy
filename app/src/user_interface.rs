@@ -174,7 +174,7 @@ fn build_top_bar() -> Node<GameEditor> {
 
 fn build_left_side_bar() -> Node<GameEditor> {
     Node::new("div").with_child(
-        Node::new("table").with_widget(Table::<GameEditor>::new(Box::new(EntityTableDelegate {}))),
+        Node::new("table").with_widget(Table::<GameEditor>::new(EntityTableDelegate {})),
     )
 }
 

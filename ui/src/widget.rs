@@ -552,10 +552,13 @@ pub struct Table<AppState> {
 }
 
 impl<AppState> Table<AppState> {
-    pub fn new(delegate: Box<dyn TableDelegate<AppState>>) -> Self {
+    pub fn new<D>(delegate: D) -> Self
+    where
+        D: TableDelegate<AppState> + 'static,
+    {
         Table {
             paint: Paint::default(),
-            delegate,
+            delegate: Box::new(delegate),
         }
     }
 }

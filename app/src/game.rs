@@ -208,8 +208,21 @@ impl Game {
         let mut physics = Physics::new();
         let renderer = Renderer::new(gpu, &device, 1920, 1080);
         let mut scene = renderer::scene::Scene::new();
-        let dir = std::env::current_exe().expect("current dir check failed").parent().unwrap().parent().unwrap().parent().unwrap().join("assets");
-        let (document, buffers, _) = gltf::import(dir.join("Cube").join("gltf").join("Cube.gltf").to_str().unwrap()
+        let dir = std::env::current_exe()
+            .expect("current dir check failed")
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("assets");
+        let (document, buffers, _) = gltf::import(
+            dir.join("Cube")
+                .join("gltf")
+                .join("Cube.gltf")
+                .to_str()
+                .unwrap(),
         )
         .unwrap();
 
@@ -245,90 +258,90 @@ impl Game {
                         instance_id,
                     },
                 ));
-                let mut rng = rand::thread_rng();
-                for i in 0..10 {
-                    let s = rng.gen_range(5.0..10.0);
-                    let body = RigidBodyBuilder::new_dynamic()
-                        .translation(vector![-50. + (i as f32 * 11.), 25., 3.])
-                        .additional_mass(s)
-                        .build();
-                    let body_handle = physics.insert_rigid_body(body);
-                    let collider = ColliderBuilder::cuboid(s, s, s)
-                        .restitution(restitution)
-                        .build();
-                    physics.collider_set.insert_with_parent(
-                        collider,
-                        body_handle,
-                        &mut physics.body_set,
-                    );
-                    let instance_id = scene.create_instance(geometry_id);
-                    world.push((
-                        TransformComponent::default()
-                            .with_position(-50. + (i as f32 * 11.), 25., 3.)
-                            .with_scale(s, s, s),
-                        StaticMesh {
-                            geometry_id,
-                            instance_id,
-                        },
-                        RigidBodyComponent::new(body_handle),
-                    ));
-                }
+                //         let mut rng = rand::thread_rng();
+                //         for i in 0..10 {
+                //             let s = rng.gen_range(5.0..10.0);
+                //             let body = RigidBodyBuilder::new_dynamic()
+                //                 .translation(vector![-50. + (i as f32 * 11.), 25., 3.])
+                //                 .additional_mass(s)
+                //                 .build();
+                //             let body_handle = physics.insert_rigid_body(body);
+                //             let collider = ColliderBuilder::cuboid(s, s, s)
+                //                 .restitution(restitution)
+                //                 .build();
+                //             physics.collider_set.insert_with_parent(
+                //                 collider,
+                //                 body_handle,
+                //                 &mut physics.body_set,
+                //             );
+                //             let instance_id = scene.create_instance(geometry_id);
+                //             world.push((
+                //                 TransformComponent::default()
+                //                     .with_position(-50. + (i as f32 * 11.), 25., 3.)
+                //                     .with_scale(s, s, s),
+                //                 StaticMesh {
+                //                     geometry_id,
+                //                     instance_id,
+                //                 },
+                //                 RigidBodyComponent::new(body_handle),
+                //             ));
+                //         }
 
-                for i in 0..10 {
-                    let s = rng.gen_range(3.0..5.0);
-                    let body = RigidBodyBuilder::new_dynamic()
-                        .translation(vector![-50. + (i as f32 * 11.), 50., 3.])
-                        .additional_mass(s)
-                        .build();
-                    let body_handle = physics.insert_rigid_body(body);
-                    let collider = ColliderBuilder::cuboid(s, s, s)
-                        .restitution(restitution)
-                        .build();
-                    physics.collider_set.insert_with_parent(
-                        collider,
-                        body_handle,
-                        &mut physics.body_set,
-                    );
-                    let instance_id = scene.create_instance(geometry_id);
-                    world.push((
-                        TransformComponent::default()
-                            .with_position(-50. + (i as f32 * 11.), 50., 3.)
-                            .with_scale(s, s, s),
-                        StaticMesh {
-                            geometry_id,
-                            instance_id,
-                        },
-                        RigidBodyComponent::new(body_handle),
-                    ));
-                }
+                //         for i in 0..10 {
+                //             let s = rng.gen_range(3.0..5.0);
+                //             let body = RigidBodyBuilder::new_dynamic()
+                //                 .translation(vector![-50. + (i as f32 * 11.), 50., 3.])
+                //                 .additional_mass(s)
+                //                 .build();
+                //             let body_handle = physics.insert_rigid_body(body);
+                //             let collider = ColliderBuilder::cuboid(s, s, s)
+                //                 .restitution(restitution)
+                //                 .build();
+                //             physics.collider_set.insert_with_parent(
+                //                 collider,
+                //                 body_handle,
+                //                 &mut physics.body_set,
+                //             );
+                //             let instance_id = scene.create_instance(geometry_id);
+                //             world.push((
+                //                 TransformComponent::default()
+                //                     .with_position(-50. + (i as f32 * 11.), 50., 3.)
+                //                     .with_scale(s, s, s),
+                //                 StaticMesh {
+                //                     geometry_id,
+                //                     instance_id,
+                //                 },
+                //                 RigidBodyComponent::new(body_handle),
+                //             ));
+                //         }
 
-                for i in 0..10 {
-                    let s = rng.gen_range(1.0..3.0);
-                    let body = RigidBodyBuilder::new_dynamic()
-                        .translation(vector![-50. + (i as f32 * 11.), 75., 3.])
-                        .additional_mass(s)
-                        .build();
-                    let body_handle = physics.insert_rigid_body(body);
-                    let collider = ColliderBuilder::cuboid(s, s, s)
-                        .restitution(restitution)
-                        .build();
-                    physics.collider_set.insert_with_parent(
-                        collider,
-                        body_handle,
-                        &mut physics.body_set,
-                    );
-                    let instance_id = scene.create_instance(geometry_id);
-                    world.push((
-                        TransformComponent::default()
-                            .with_position(-50. + (i as f32 * 11.), 75., 3.)
-                            .with_scale(s, s, s),
-                        StaticMesh {
-                            geometry_id,
-                            instance_id,
-                        },
-                        RigidBodyComponent::new(body_handle),
-                    ));
-                }
+                //         for i in 0..10 {
+                //             let s = rng.gen_range(1.0..3.0);
+                //             let body = RigidBodyBuilder::new_dynamic()
+                //                 .translation(vector![-50. + (i as f32 * 11.), 75., 3.])
+                //                 .additional_mass(s)
+                //                 .build();
+                //             let body_handle = physics.insert_rigid_body(body);
+                //             let collider = ColliderBuilder::cuboid(s, s, s)
+                //                 .restitution(restitution)
+                //                 .build();
+                //             physics.collider_set.insert_with_parent(
+                //                 collider,
+                //                 body_handle,
+                //                 &mut physics.body_set,
+                //             );
+                //             let instance_id = scene.create_instance(geometry_id);
+                //             world.push((
+                //                 TransformComponent::default()
+                //                     .with_position(-50. + (i as f32 * 11.), 75., 3.)
+                //                     .with_scale(s, s, s),
+                //                 StaticMesh {
+                //                     geometry_id,
+                //                     instance_id,
+                //                 },
+                //                 RigidBodyComponent::new(body_handle),
+                //             ));
+                //         }
             }
         }
 
