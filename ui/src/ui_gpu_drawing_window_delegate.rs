@@ -39,7 +39,7 @@ impl<'a, AppState: 'static> UIGpuDrawingWindowDelegate<AppState> {
         }
     }
 
-    fn rebuild_swapchain(&mut self, state: &AppState) {
+    fn rebuild_swapchain(&mut self, _: &AppState) {
         self.device.wait();
         let new_swapchain = {
             if let Some(ui) = &self.ui {
@@ -167,6 +167,12 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
         }
     }
 
+    fn file_dropped(&mut self, state: &mut AppState, path: &std::path::PathBuf) {
+        if let Some(ui) = self.ui.as_mut() {
+            ui.user_interface.file_dropped(state, path)
+        }
+    }
+
     fn draw(&mut self, _: &Application<AppState>, state: &AppState) {
         // draw user interface
 
@@ -238,4 +244,3 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
         }
     }
 }
-// }

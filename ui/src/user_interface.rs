@@ -31,6 +31,8 @@ impl<AppState: 'static> UserInterface<AppState> {
         }
     }
 
+    pub fn file_dropped(&mut self, state: &mut AppState, path: &std::path::PathBuf) {}
+
     pub fn update(&mut self, state: &mut AppState) {
         while let Some(a) = self.actions.pop() {
             match a {

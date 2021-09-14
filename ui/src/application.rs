@@ -224,7 +224,9 @@ impl<AppState> WindowRegistry<AppState> {
         self.window_delegates.remove(id);
     }
 
-    fn file_dropped(&mut self, _: &WindowId, _: &PathBuf) {}
+    fn file_dropped(&mut self, _: &WindowId, file: &PathBuf) {
+        println!("{}", file.to_str().unwrap())
+    }
 }
 
 pub struct Application<AppState> {
