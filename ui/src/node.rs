@@ -1,4 +1,4 @@
-use skia_safe::{Color, Point, Rect, Size};
+use skia_safe::{Point, Rect, Size};
 
 use crate::canvas_2d::Canvas2D;
 use crate::widget::*;
@@ -30,6 +30,8 @@ pub struct Node<AppState> {
     mouse_callbacks:
         HashMap<MouseEventType, Box<dyn FnMut(&MouseEvent, &mut AppState) -> Action<AppState>>>,
     build_callback: Option<Box<dyn FnMut(&AppState) -> Option<Vec<Node<AppState>>>>>,
+    file_drop_handler:
+        Option<Box<dyn FnMut(&mut AppState, &std::path::PathBuf) -> Action<AppState>>>,
 }
 
 impl<AppState> Node<AppState> {
@@ -46,6 +48,7 @@ impl<AppState> Node<AppState> {
             uid: next_node_id(),
             mouse_callbacks: HashMap::new(),
             build_callback: None,
+            file_drop_handler: None,
             style: Material::new(),
         }
     }
@@ -63,6 +66,7 @@ impl<AppState> Node<AppState> {
             uid: next_node_id(),
             mouse_callbacks: HashMap::new(),
             build_callback: None,
+            file_drop_handler: None,
             style: Material::new(),
         }
     }
@@ -144,6 +148,14 @@ impl<AppState> Node<AppState> {
         self
     }
 
+    pub fn with_file_drop_handler<F>(mut self, handler: F) -> Self
+    where
+        F: FnMut(&mut AppState, &std::path::PathBuf) -> Action<AppState> + 'static,
+    {
+        self.file_drop_handler = Some(Box::new(handler));
+        self
+    }
+
     pub fn add_child(&mut self, child: Node<AppState>) -> &mut Self {
         self.children.push(child);
         return self;
@@ -193,6 +205,33 @@ impl<AppState> Node<AppState> {
                 child.send_mouse_leave(state, uid, event);
             }
         }
+    }
+
+    pub fn file_dropped(
+        &mut self,
+        state: &mut AppState,
+        file: &std::path::PathBuf,
+        position: &Point,
+    ) -> Action<AppState> {
+        let mut action = Action::None;
+
+        if self.hit_test(position) {
+            let mut consume = true;
+            for child in self.children.iter_mut() {
+                if child.hit_test(position) {
+                    action = child.file_dropped(state, file, position);
+                    consume = false;
+                }
+            }
+
+            if consume {
+                if let Some(cb) = &mut self.file_drop_handler {
+                    action = cb(state, file);
+                }
+            }
+        }
+
+        action
     }
 
     pub fn layout(&mut self, state: &AppState) {

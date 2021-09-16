@@ -12,6 +12,7 @@
 #include "material.glsl"
 #include "scatter.glsl"
 #include "random.glsl"
+//#include "object.glsl"
 
 hitAttributeEXT vec2 attribs;
 layout(location = 0) rayPayloadInEXT RayPayload ray;

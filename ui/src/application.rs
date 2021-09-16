@@ -224,8 +224,28 @@ impl<AppState> WindowRegistry<AppState> {
         self.window_delegates.remove(id);
     }
 
-    fn file_dropped(&mut self, _: &WindowId, file: &PathBuf) {
-        println!("{}", file.to_str().unwrap())
+    fn file_dropped(
+        &mut self,
+        id: &WindowId,
+        state: &mut AppState,
+        file: &PathBuf,
+        position: &winit::dpi::PhysicalPosition<f64>,
+    ) {
+        if let Some(delegate) = self.window_delegates.get_mut(id) {
+            delegate.file_dropped(state, file, position.x as f32, position.y as f32)
+        }
+    }
+
+    fn file_hovered(
+        &mut self,
+        id: &WindowId,
+        state: &mut AppState,
+        file: &PathBuf,
+        position: &winit::dpi::PhysicalPosition<f64>,
+    ) {
+        if let Some(delegate) = self.window_delegates.get_mut(id) {
+            delegate.file_hovered(state, file, position.x as f32, position.y as f32)
+        }
     }
 }
 
@@ -266,6 +286,8 @@ impl<AppState: 'static> Application<AppState> {
 
         d.application_will_start(&self, &mut s, &mut window_registry, &event_loop);
         let mut last_mouse_position = winit::dpi::PhysicalPosition::<f64>::new(0., 0.);
+        let mut last_file_drop: Vec<std::path::PathBuf> = Vec::new();
+        let mut file_was_dropped = false;
         let mut mouse_is_down = false;
         event_loop.run(move |e, event_loop, control_flow| {
             *control_flow = winit::event_loop::ControlFlow::Poll;
@@ -298,8 +320,16 @@ impl<AppState: 'static> Application<AppState> {
                 Event::WindowEvent {
                     event: WindowEvent::DroppedFile(path_buffer),
                     window_id,
-                } => window_registry.file_dropped(&window_id, &path_buffer),
-
+                } => last_file_drop.push(path_buffer),
+                Event::WindowEvent {
+                    event: WindowEvent::HoveredFile(path_buffer),
+                    window_id,
+                } => window_registry.file_hovered(
+                    &window_id,
+                    &mut s,
+                    &path_buffer,
+                    &last_mouse_position,
+                ),
                 Event::WindowEvent {
                     event: WindowEvent::Focused(f),
                     window_id,
@@ -332,6 +362,17 @@ impl<AppState: 'static> Application<AppState> {
                         window_registry.mouse_dragged(&mut s, &window_id, &position, &delta)
                     } else {
                         window_registry.mouse_moved(&mut s, &window_id, &position)
+                    }
+
+                    if last_file_drop.len() > 0 {
+                        window_registry.file_dropped(
+                            &window_id,
+                            &mut s,
+                            &last_file_drop[0],
+                            &position,
+                        );
+
+                        last_file_drop.clear();
                     }
 
                     last_mouse_position = position;

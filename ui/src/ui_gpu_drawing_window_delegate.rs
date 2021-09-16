@@ -167,9 +167,17 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
         }
     }
 
-    fn file_dropped(&mut self, state: &mut AppState, path: &std::path::PathBuf) {
+    fn file_dropped(&mut self, state: &mut AppState, path: &std::path::PathBuf, x: f32, y: f32) {
         if let Some(ui) = self.ui.as_mut() {
-            ui.user_interface.file_dropped(state, path)
+            ui.user_interface
+                .file_dropped(state, path, &skia_safe::Point::new(x, y))
+        }
+    }
+
+    fn file_hovered(&mut self, state: &mut AppState, path: &std::path::PathBuf, x: f32, y: f32) {
+        if let Some(ui) = self.ui.as_mut() {
+            ui.user_interface
+                .file_hovered(state, path, &skia_safe::Point::new(x, y))
         }
     }
 

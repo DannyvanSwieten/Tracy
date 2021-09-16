@@ -258,90 +258,6 @@ impl Game {
                         instance_id,
                     },
                 ));
-                //         let mut rng = rand::thread_rng();
-                //         for i in 0..10 {
-                //             let s = rng.gen_range(5.0..10.0);
-                //             let body = RigidBodyBuilder::new_dynamic()
-                //                 .translation(vector![-50. + (i as f32 * 11.), 25., 3.])
-                //                 .additional_mass(s)
-                //                 .build();
-                //             let body_handle = physics.insert_rigid_body(body);
-                //             let collider = ColliderBuilder::cuboid(s, s, s)
-                //                 .restitution(restitution)
-                //                 .build();
-                //             physics.collider_set.insert_with_parent(
-                //                 collider,
-                //                 body_handle,
-                //                 &mut physics.body_set,
-                //             );
-                //             let instance_id = scene.create_instance(geometry_id);
-                //             world.push((
-                //                 TransformComponent::default()
-                //                     .with_position(-50. + (i as f32 * 11.), 25., 3.)
-                //                     .with_scale(s, s, s),
-                //                 StaticMesh {
-                //                     geometry_id,
-                //                     instance_id,
-                //                 },
-                //                 RigidBodyComponent::new(body_handle),
-                //             ));
-                //         }
-
-                //         for i in 0..10 {
-                //             let s = rng.gen_range(3.0..5.0);
-                //             let body = RigidBodyBuilder::new_dynamic()
-                //                 .translation(vector![-50. + (i as f32 * 11.), 50., 3.])
-                //                 .additional_mass(s)
-                //                 .build();
-                //             let body_handle = physics.insert_rigid_body(body);
-                //             let collider = ColliderBuilder::cuboid(s, s, s)
-                //                 .restitution(restitution)
-                //                 .build();
-                //             physics.collider_set.insert_with_parent(
-                //                 collider,
-                //                 body_handle,
-                //                 &mut physics.body_set,
-                //             );
-                //             let instance_id = scene.create_instance(geometry_id);
-                //             world.push((
-                //                 TransformComponent::default()
-                //                     .with_position(-50. + (i as f32 * 11.), 50., 3.)
-                //                     .with_scale(s, s, s),
-                //                 StaticMesh {
-                //                     geometry_id,
-                //                     instance_id,
-                //                 },
-                //                 RigidBodyComponent::new(body_handle),
-                //             ));
-                //         }
-
-                //         for i in 0..10 {
-                //             let s = rng.gen_range(1.0..3.0);
-                //             let body = RigidBodyBuilder::new_dynamic()
-                //                 .translation(vector![-50. + (i as f32 * 11.), 75., 3.])
-                //                 .additional_mass(s)
-                //                 .build();
-                //             let body_handle = physics.insert_rigid_body(body);
-                //             let collider = ColliderBuilder::cuboid(s, s, s)
-                //                 .restitution(restitution)
-                //                 .build();
-                //             physics.collider_set.insert_with_parent(
-                //                 collider,
-                //                 body_handle,
-                //                 &mut physics.body_set,
-                //             );
-                //             let instance_id = scene.create_instance(geometry_id);
-                //             world.push((
-                //                 TransformComponent::default()
-                //                     .with_position(-50. + (i as f32 * 11.), 75., 3.)
-                //                     .with_scale(s, s, s),
-                //                 StaticMesh {
-                //                     geometry_id,
-                //                     instance_id,
-                //                 },
-                //                 RigidBodyComponent::new(body_handle),
-                //             ));
-                //         }
             }
         }
 
@@ -349,7 +265,7 @@ impl Game {
         resources.insert(scene);
         resources.insert(physics);
 
-        let this = Self {
+        Self {
             device,
             world,
             resources,
@@ -360,9 +276,7 @@ impl Game {
             iteration: 0,
             output_image: None,
             instant: std::time::Instant::now(),
-        };
-
-        this
+        }
     }
 
     pub fn create_entity(&mut self) -> Entity {
@@ -375,6 +289,45 @@ impl Game {
 
     pub fn resources(&mut self) -> &mut Resources {
         &mut self.resources
+    }
+
+    pub fn import_gltf(&mut self, file: &std::path::PathBuf) {
+        let scene = &mut *self.resources.get_mut::<Scene>().unwrap();
+        match gltf::import(file.to_str().unwrap()) {
+            Ok((document, buffers, _)) => {
+                for mesh in document.meshes() {
+                    for primitive in mesh.primitives() {
+                        let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
+                        let vertices: Vec<Vertex> = reader
+                            .read_positions()
+                            .unwrap()
+                            .map(|vertex_position| {
+                                Vertex::new(
+                                    vertex_position[0],
+                                    vertex_position[1],
+                                    vertex_position[2],
+                                )
+                            })
+                            .collect();
+                        let indices: Vec<u32> = if let Some(iter) = reader.read_indices() {
+                            iter.into_u32().collect()
+                        } else {
+                            (0..vertices.len() as u32).collect()
+                        };
+                        let geometry_id = scene.add_geometry(indices.clone(), vertices.clone());
+                        let instance_id = scene.create_instance(geometry_id);
+                        self.world.push((
+                            TransformComponent::default(),
+                            StaticMesh {
+                                geometry_id,
+                                instance_id,
+                            },
+                        ));
+                    }
+                }
+            }
+            Err(_) => {}
+        }
     }
 
     pub fn tick(&mut self) {

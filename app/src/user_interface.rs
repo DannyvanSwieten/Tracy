@@ -91,6 +91,12 @@ impl GameEditor {
             }
         }
     }
+
+    pub fn import_gltf(&mut self, file: &std::path::PathBuf) {
+        if let Some(game) = &mut self.game {
+            game.import_gltf(file)
+        }
+    }
 }
 
 use skia_safe::Rect;
@@ -181,6 +187,10 @@ fn build_left_side_bar() -> Node<GameEditor> {
 fn build_view_port() -> Node<GameEditor> {
     Node::new_with_widget("viewport", Box::new(ViewPortWidget {}))
         .with_relative_max_constraints(Some(70.), None)
+        .with_file_drop_handler(|state, file| {
+            state.import_gltf(file);
+            Action::None
+        })
 }
 
 fn build_right_side_bar() -> Node<GameEditor> {

@@ -42,8 +42,8 @@ impl Scene {
     pub fn add_geometry(&mut self, indices: Vec<u32>, vertices: Vec<Vertex>) -> usize {
         let (index_offset, vertex_offset) = if let Some(view) = self.geometry_views.last() {
             (
-                view.index_offset() + indices.len() as u32,
-                view.vertex_offset() + vertices.len() as u32,
+                view.index_offset() + view.index_count(),
+                view.vertex_offset() + view.vertex_count(),
             )
         } else {
             (0, 0)

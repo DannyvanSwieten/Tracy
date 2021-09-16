@@ -91,15 +91,14 @@ pub struct Constraints {
 
 impl Constraints {
     pub fn default() -> Self {
-        let c = Constraints {
+        Constraints {
             min_width: None,
             max_width: None,
             min_height: None,
             max_height: None,
             flex: 1.0,
             unit_type: UnitType::Absolute,
-        };
-        c
+        }
     }
 
     pub fn new(
@@ -110,15 +109,14 @@ impl Constraints {
         flex: f32,
         unit_type: UnitType,
     ) -> Self {
-        let c = Constraints {
+        Constraints {
             min_width,
             max_width,
             min_height,
             max_height,
             flex,
             unit_type,
-        };
-        c
+        }
     }
 
     pub fn is_height_constraint(&self) -> bool {
@@ -196,7 +194,6 @@ pub enum Action<AppState> {
 }
 
 pub trait AppAction<AppState> {
-    fn perform(&self, _state: &mut AppState);
     fn undo(&self, _state: &mut AppState);
     fn redo(&self, _state: &mut AppState);
 }
@@ -223,16 +220,13 @@ pub trait Widget<AppState> {
         _children: &mut [Node<AppState>],
     ) {
     }
-    fn mouse_down(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {
-        println!("Mouse Down");
-    }
+    fn mouse_down(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {}
     fn mouse_up(
         &mut self,
         _state: &mut AppState,
         _rect: &Rect,
         _event: &MouseEvent,
     ) -> Action<AppState> {
-        println!("Mouse Up");
         return Action::None;
     }
     fn double_click(
@@ -241,21 +235,12 @@ pub trait Widget<AppState> {
         _rect: &Rect,
         _event: &MouseEvent,
     ) -> Action<AppState> {
-        println!("Mouse Double Click");
         return Action::None;
     }
-    fn mouse_drag(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {
-        println!("Mouse Drag");
-    }
-    fn mouse_moved(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {
-        println!("Mouse Moved");
-    }
-    fn mouse_enter(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {
-        println!("Mouse Enter");
-    }
-    fn mouse_leave(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {
-        println!("Mouse Leave");
-    }
+    fn mouse_drag(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {}
+    fn mouse_moved(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {}
+    fn mouse_enter(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {}
+    fn mouse_leave(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {}
     fn needs_gpu(&self) -> bool {
         false
     }

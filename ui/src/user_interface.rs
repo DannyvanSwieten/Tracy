@@ -31,7 +31,23 @@ impl<AppState: 'static> UserInterface<AppState> {
         }
     }
 
-    pub fn file_dropped(&mut self, state: &mut AppState, path: &std::path::PathBuf) {}
+    pub fn file_dropped(
+        &mut self,
+        state: &mut AppState,
+        path: &std::path::PathBuf,
+        position: &Point,
+    ) {
+        self.actions
+            .push(self.root.file_dropped(state, path, position))
+    }
+
+    pub fn file_hovered(
+        &mut self,
+        state: &mut AppState,
+        path: &std::path::PathBuf,
+        position: &Point,
+    ) {
+    }
 
     pub fn update(&mut self, state: &mut AppState) {
         while let Some(a) = self.actions.pop() {
