@@ -154,7 +154,7 @@ impl BottomLevelAccelerationStructure {
     ) -> Self {
         unsafe {
             let triangles = AccelerationStructureGeometryTrianglesDataKHR::builder()
-                .max_vertex(vertex_count - 1 + vertex_offset)
+                .max_vertex(index_count - 1 + index_offset)
                 .vertex_stride(12)
                 .vertex_format(Format::R32G32B32_SFLOAT)
                 .vertex_data(DeviceOrHostAddressConstKHR {

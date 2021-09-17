@@ -341,19 +341,6 @@ impl<AppState> Stack<AppState> {
 
             child.rect.offset((child_pos, padding));
             let s = child.rect.size();
-
-            // match self.vertical_justification {
-            //     VerticalJustification::Center => {
-            //         child.rect.bottom() += (rect.height() - self.margin * 2. - s.height) / 2.;
-            //     },
-            //     VerticalJustification::Bottom => {
-            //         child.rect.bottom() += rect.height() - s.height;
-            //     },
-            //     VerticalJustification::Top => {
-
-            //     }
-            // }
-
             child_pos += s.width + spacing;
         }
     }
@@ -833,32 +820,32 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
 //     }
 // }
 
-// pub struct ViewPort {
-//     scroll_bar_rect: Rect,
-//     orientation: Orientation,
-//     paint: Paint,
-//     scroll_bar_paint: Paint,
-//     scroll_bar_position: f32,
-//     scroll_bar_ratio: f32,
-// }
+pub struct ViewPort {
+    scroll_bar_rect: Rect,
+    orientation: Orientation,
+    paint: Paint,
+    scroll_bar_paint: Paint,
+    scroll_bar_position: f32,
+    scroll_bar_ratio: f32,
+}
 
-// impl ViewPort {
-//     pub fn new(orientation: Orientation) -> Self {
-//         ViewPort {
-//             scroll_bar_rect: Rect::default(),
-//             orientation,
-//             paint: Paint::new(),
-//             scroll_bar_paint: Paint::new(),
-//             scroll_bar_position: 0.,
-//             scroll_bar_ratio: 0.,
-//         }
-//     }
-// }
+impl ViewPort {
+    pub fn new(orientation: Orientation) -> Self {
+        ViewPort {
+            scroll_bar_rect: Rect::default(),
+            orientation,
+            paint: Paint::default(),
+            scroll_bar_paint: Paint::default(),
+            scroll_bar_position: 0.,
+            scroll_bar_ratio: 0.,
+        }
+    }
+}
 
 // impl<AppState> Widget<AppState> for ViewPort {
 //     fn layout(
 //         &mut self,
-//         _state: &mut AppState,
+//         _state: &AppState,
 //         rect: &Rect,
 //         _spacing: f32,
 //         _padding: f32,
@@ -867,8 +854,8 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
 //         assert_eq!(1, children.len());
 
 //         self.scroll_bar_rect = *rect;
-//         children[0].rect.set_wh(rect.size().width, rect.size.height);
-//         children[0].rect.size = children[0].constraints.size(&rect.size);
+//         children[0].rect.set_wh(rect.size().width, rect.size().height);
+//         children[0].rect.set_wh(children[0].constraints.size(&rect.size()));
 
 //         match self.orientation {
 //             Orientation::Horizontal => {
@@ -893,29 +880,29 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
 
 //     fn paint(
 //         &mut self,
-//         _state: &mut AppState,
+//         _state: &AppState,
 //         rect: &Rect,
 //         canvas: &mut dyn Canvas2D,
 //         _style: &StyleSheet,
 //     ) {
-//         self.paint.set_color(&Color::from((0., 0., 0.));
-//         canvas.draw_rect(rect, &self.paint);
+//         // self.paint.set_color(&Color::from((0., 0., 0.));
+//         // canvas.draw_rect(rect, &self.paint);
 
-//         self.scroll_bar_paint
-//             .set_color(&Color::new(0.3, 0.3, 0.3, 1.));
-//         canvas.draw_rect(self.scroll_bar_rect, &self.scroll_bar_paint);
+//         // self.scroll_bar_paint
+//         //     .set_color(&Color::new(0.3, 0.3, 0.3, 1.));
+//         // canvas.draw_rect(self.scroll_bar_rect, &self.scroll_bar_paint);
 
-//         self.scroll_bar_paint
-//             .set_color(&Color::new(0.2, 0.2, 0.2, 1.));
+//         // self.scroll_bar_paint
+//         //     .set_color(&Color::new(0.2, 0.2, 0.2, 1.));
 
-//         let r = Rect::from_xywh(
-//             self.scroll_bar_rect.left() + 1. + self.scroll_bar_position,
-//             self.scroll_bar_rect.bottom() + 1.,
-//             self.scroll_bar_rect.width(),
-//             self.scroll_bar_rect.height() * self.scroll_bar_ratio,
-//         );
+//         // let r = Rect::from_xywh(
+//         //     self.scroll_bar_rect.left() + 1. + self.scroll_bar_position,
+//         //     self.scroll_bar_rect.bottom() + 1.,
+//         //     self.scroll_bar_rect.width(),
+//         //     self.scroll_bar_rect.height() * self.scroll_bar_ratio,
+//         // );
 
-//         canvas.draw_rect(r, &self.scroll_bar_paint);
+//         // canvas.draw_rect(r, &self.scroll_bar_paint);
 //     }
 // }
 
