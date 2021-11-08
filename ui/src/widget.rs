@@ -81,83 +81,41 @@ pub enum UnitType {
 
 #[derive(Clone)]
 pub struct Constraints {
-    pub min_width: Option<f32>,
-    pub max_width: Option<f32>,
-    pub min_height: Option<f32>,
-    pub max_height: Option<f32>,
-    pub flex: f32,
-    pub unit_type: UnitType,
+    pub min_width: f32,
+    pub max_width: f32,
+    pub min_height: f32,
+    pub max_height: f32,
 }
 
 impl Constraints {
     pub fn default() -> Self {
         Constraints {
-            min_width: None,
-            max_width: None,
-            min_height: None,
-            max_height: None,
-            flex: 1.0,
-            unit_type: UnitType::Absolute,
+            min_width: 0.0,
+            max_width: 0.0,
+            min_height: 0.0,
+            max_height: 0.0,
         }
     }
 
-    pub fn new(
-        min_width: Option<f32>,
-        max_width: Option<f32>,
-        min_height: Option<f32>,
-        max_height: Option<f32>,
-        flex: f32,
-        unit_type: UnitType,
-    ) -> Self {
+    pub fn new(min_width: f32, max_width: f32, min_height: f32, max_height: f32) -> Self {
         Constraints {
             min_width,
             max_width,
             min_height,
             max_height,
-            flex,
-            unit_type,
         }
     }
 
     pub fn is_height_constraint(&self) -> bool {
-        match self.max_height {
-            Some(_) => true,
-            None => false,
-        }
+        self.min_height == self.max_height
     }
 
     pub fn is_width_constraint(&self) -> bool {
-        match self.max_width {
-            Some(_) => true,
-            None => false,
-        }
+        self.min_width == self.max_width
     }
 
     pub fn size(&self, input: &Size) -> Size {
-        let mut width_out = input.width;
-        if let Some(mh) = self.max_width {
-            if UnitType::Relative == self.unit_type {
-                width_out = mh * 0.01 * input.width;
-            } else {
-                width_out = std::cmp::min(input.width as i32, mh as i32) as f32;
-            }
-        }
-
-        let mut height_out = input.height;
-        if let Some(mh) = self.max_height {
-            if UnitType::Relative == self.unit_type {
-                height_out = mh * 0.01 * input.height;
-            } else {
-                height_out = std::cmp::min(input.height as i32, mh as i32) as f32;
-            }
-        }
-
-        if let Some(min_h) = self.min_height {
-            height_out = height_out.max(min_h);
-        }
-
-        let s = Size::new(width_out, height_out);
-        s
+        *input
     }
 }
 
@@ -166,13 +124,13 @@ pub enum Orientation {
     Vertical,
 }
 
-pub enum HorizontalJustification {
-    Left,
+pub enum HorizontalAlignment {
+    Leading,
     Center,
-    Right,
+    Trailing,
 }
 
-pub enum VerticalJustification {
+pub enum VerticalAlignment {
     Top,
     Center,
     Bottom,
@@ -211,6 +169,32 @@ pub trait Widget<AppState> {
 
     fn resized(&mut self, _state: &mut AppState, _rect: &Rect) {}
 
+    fn calculate_size(
+        &self,
+        preferred_width: Option<f32>,
+        preferred_height: Option<f32>,
+        constraints: &Constraints,
+        _children: &[Node<AppState>],
+    ) -> (Size, Vec<Constraints>) {
+        let w = if let Some(preferred_width) = preferred_width {
+            let width = constraints.min_width;
+            let width = width.max(preferred_width).min(constraints.max_width);
+            width
+        } else {
+            constraints.max_width
+        };
+
+        let h = if let Some(preferred_height) = preferred_height {
+            let height = constraints.min_height;
+            let height = height.max(preferred_height).min(constraints.max_height);
+            height
+        } else {
+            constraints.max_height
+        };
+
+        (Size::new(w, h), vec![Constraints::new(0.0, w, 0.0, h)])
+    }
+
     fn layout(
         &mut self,
         _state: &AppState,
@@ -241,9 +225,6 @@ pub trait Widget<AppState> {
     fn mouse_moved(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {}
     fn mouse_enter(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {}
     fn mouse_leave(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {}
-    fn needs_gpu(&self) -> bool {
-        false
-    }
 }
 
 #[derive(Default)]
@@ -263,6 +244,8 @@ impl Container {
 
 impl<AppState> Widget<AppState> for Container {
     fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+        assert_ne!(rect.width(), 0f32);
+        assert_ne!(rect.height(), 0f32);
         let bg = style.get("bg-color").unwrap_or(&Color::CYAN);
         self.paint.set_color(*bg);
         canvas.draw_rounded_rect(rect, 5., 5., &self.paint);
@@ -273,32 +256,56 @@ impl<AppState> Widget<AppState> for Container {
         _state: &AppState,
         rect: &Rect,
         _spacing: f32,
-        padding: f32,
+        _padding: f32,
         children: &mut [Node<AppState>],
     ) {
-        for child in children.iter_mut() {
-            let s = child.constraints.size(&rect.size());
-            child.rect = Rect::from_xywh(rect.left(), rect.top(), s.width, s.height);
-            child.rect.inset((padding, padding));
+        assert_eq!(children.len() < 2, true);
+        if children.len() != 0 {
+            let x = (rect.size().width - children[0].rect.width()) / 2.0;
+            let y = (rect.size().height - children[0].rect.height()) / 2.0;
+            children[0].rect.offset((x, y))
         }
+    }
+
+    fn calculate_size(
+        &self,
+        preferred_width: Option<f32>,
+        preferred_height: Option<f32>,
+        constraints: &Constraints,
+        children: &[Node<AppState>],
+    ) -> (Size, Vec<Constraints>) {
+        assert_eq!(children.len() < 2, true);
+        let w = if let Some(preferred_width) = preferred_width {
+            let width = constraints.min_width;
+            let width = width.max(preferred_width).min(constraints.max_width);
+            width
+        } else {
+            constraints.max_width
+        };
+
+        let h = if let Some(preferred_height) = preferred_height {
+            let height = constraints.min_height;
+            let height = height.max(preferred_height).min(constraints.max_height);
+            height
+        } else {
+            constraints.max_height
+        };
+
+        (Size::new(w, h), vec![Constraints::new(0.0, w, 0.0, h)])
     }
 }
 
-pub struct Stack<AppState> {
-    orientation: Orientation,
-    horizontal_justification: HorizontalJustification,
-    vertical_justification: VerticalJustification,
+pub struct HStack<AppState> {
+    vertical_alignment: VerticalAlignment,
     paint: Paint,
     border_paint: Paint,
     phantom: std::marker::PhantomData<AppState>,
 }
 
-impl<AppState> Stack<AppState> {
-    pub fn new(orientation: Orientation) -> Self {
-        Stack {
-            orientation,
-            horizontal_justification: HorizontalJustification::Center,
-            vertical_justification: VerticalJustification::Center,
+impl<AppState> HStack<AppState> {
+    pub fn new() -> Self {
+        HStack {
+            vertical_alignment: VerticalAlignment::Center,
             paint: Paint::default(),
             border_paint: Paint::default(),
             phantom: std::marker::PhantomData {},
@@ -314,34 +321,51 @@ impl<AppState> Stack<AppState> {
     ) {
         let total_spacing = spacing * (children.len() as f32 - 1.);
         let total_padding = padding * 2.;
-        let mut available_width = rect.width() - total_spacing - total_padding;
+        //let mut available_width = rect.width() - total_spacing - total_padding;
 
-        let padding_compensation = (padding * 2.) / children.len() as f32;
+        //let padding_compensation = (padding * 2.) / children.len() as f32;
 
-        let mut unconstrained_children = children.len();
-        for child in children.iter_mut() {
-            if child.constraints.is_width_constraint() {
-                let s = child.constraints.size(&rect.size());
-                available_width -= s.width + padding_compensation;
-                child.rect.set_xywh(rect.left, rect.top, s.width, s.height);
-                child.rect.inset((0., padding));
-                unconstrained_children = unconstrained_children - 1;
-            }
-        }
+        //let mut unconstrained_children = children.len();
+        // for child in children.iter_mut() {
+        //     if child.constraints.is_width_constraint() {
+        //         let s = child.constraints.size(&rect.size());
+        //         available_width -= s.width + padding_compensation;
+        //         child.rect.set_xywh(rect.left, rect.top, s.width, s.height);
+        //         // child.rect.inset((0., padding));
+        //         unconstrained_children = unconstrained_children - 1;
+        //     }
+        // }
 
-        let child_width = available_width / unconstrained_children as f32;
+        //let child_width = available_width / unconstrained_children as f32;
         let mut child_pos = rect.left() + padding;
 
         for child in children.iter_mut() {
-            if !child.constraints.is_width_constraint() {
-                let w = child_width; // - padding_compensation;
-                let h = rect.height() - total_padding;
-                child.rect.set_xywh(rect.left, rect.top, w, h);
-            }
+            // if !child.constraints.is_width_constraint() {
+            //     let w = child_width; // - padding_compensation;
+            //     let h = rect.height() - total_padding;
+            //     child.rect.set_xywh(rect.left, rect.top, w, h);
+            // }
 
-            child.rect.offset((child_pos, padding));
-            let s = child.rect.size();
-            child_pos += s.width + spacing;
+            child.rect.offset((child_pos, padding + rect.top()));
+            child_pos += child.rect.width() + spacing;
+        }
+    }
+}
+
+pub struct VStack<AppState> {
+    horizontal_alignment: HorizontalAlignment,
+    paint: Paint,
+    border_paint: Paint,
+    phantom: std::marker::PhantomData<AppState>,
+}
+
+impl<AppState> VStack<AppState> {
+    pub fn new() -> Self {
+        VStack {
+            horizontal_alignment: HorizontalAlignment::Center,
+            paint: Paint::default(),
+            border_paint: Paint::default(),
+            phantom: std::marker::PhantomData {},
         }
     }
 
@@ -352,30 +376,30 @@ impl<AppState> Stack<AppState> {
         spacing: f32,
         padding: f32,
     ) {
-        let mut available_height =
-            rect.height() - spacing * (children.len() as f32 - 1.) - (padding * 2.);
-        let mut unconstrained_children = children.len();
+        // let mut available_height =
+        //     rect.height() - spacing * (children.len() as f32 - 1.) - (padding * 2.);
+        // let mut unconstrained_children = children.len();
 
-        let padding_compensation = (padding * 2.) / children.len() as f32;
+        // let padding_compensation = (padding * 2.) / children.len() as f32;
 
-        for child in children.iter_mut() {
-            if child.constraints.is_height_constraint() {
-                let s = child.constraints.size(&rect.size());
-                available_height -= s.height + padding_compensation;
-                child.rect.set_wh(s.width - padding * 2., s.height);
-                unconstrained_children = unconstrained_children - 1;
-            }
-        }
+        // for child in children.iter_mut() {
+        //     if child.constraints.is_height_constraint() {
+        //         let s = child.constraints.size(&rect.size());
+        //         available_height -= s.height + padding_compensation;
+        //         child.rect.set_wh(s.width - padding * 2., s.height);
+        //         unconstrained_children = unconstrained_children - 1;
+        //     }
+        // }
 
-        let child_height = available_height / unconstrained_children as f32;
+        // let child_height = available_height / unconstrained_children as f32;
         let mut child_pos = rect.top() + padding;
 
         for child in children.iter_mut() {
-            if !child.constraints.is_height_constraint() {
-                let h = child_height - padding_compensation;
-                let w = rect.width() - padding * 2.;
-                child.rect.set_wh(w, h);
-            }
+            // if !child.constraints.is_height_constraint() {
+            //     let h = child_height - padding_compensation;
+            //     let w = rect.width() - padding * 2.;
+            //     child.rect.set_wh(w, h);
+            // }
 
             child
                 .rect
@@ -385,8 +409,11 @@ impl<AppState> Stack<AppState> {
     }
 }
 
-impl<AppState> Widget<AppState> for Stack<AppState> {
+impl<AppState> Widget<AppState> for HStack<AppState> {
     fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+        assert_ne!(rect.width(), 0f32);
+        assert_ne!(rect.height(), 0f32);
+
         self.paint.set_anti_alias(true);
         self.paint.set_color(*style.get("bg-color").unwrap());
         self.border_paint
@@ -397,6 +424,60 @@ impl<AppState> Widget<AppState> for Stack<AppState> {
         canvas.draw_rounded_rect(rect, 1., 1., &self.border_paint);
     }
 
+    fn calculate_size(
+        &self,
+        preferred_width: Option<f32>,
+        preferred_height: Option<f32>,
+        constraints: &Constraints,
+        children: &[Node<AppState>],
+    ) -> (Size, Vec<Constraints>) {
+        let w = if let Some(preferred_width) = preferred_width {
+            let width = constraints.min_width;
+            let width = width.max(preferred_width).min(constraints.max_width);
+            width
+        } else {
+            constraints.max_width
+        };
+
+        let h = if let Some(preferred_height) = preferred_height {
+            let height = constraints.min_height;
+            let height = height.max(preferred_height).min(constraints.max_height);
+            height
+        } else {
+            constraints.max_height
+        };
+
+        let remaining_space = w - children.iter().fold(0.0, |acc, child| {
+            acc + child.preferred_width().unwrap_or(0.)
+        });
+
+        let width_per_flex = remaining_space
+            / children
+                .iter()
+                .fold(0.0, |acc, child| acc + child.flex().unwrap_or(0.));
+
+        let mut children_constraints = Vec::new();
+        for child in children {
+            if let Some(flex) = child.flex() {
+                children_constraints.push(Constraints::new(
+                    width_per_flex * flex,
+                    width_per_flex * flex,
+                    0.0,
+                    constraints.max_height,
+                ))
+            } else {
+                children_constraints.push(Constraints::new(
+                    0.0,
+                    constraints.max_width,
+                    0.0,
+                    constraints.max_height,
+                ))
+            }
+        }
+
+        (Size::new(w, h), children_constraints)
+    }
+
     fn layout(
         &mut self,
         _: &AppState,
@@ -405,10 +486,82 @@ impl<AppState> Widget<AppState> for Stack<AppState> {
         padding: f32,
         children: &mut [Node<AppState>],
     ) {
-        match self.orientation {
-            Orientation::Horizontal => self.layout_horizontally(rect, children, spacing, padding),
-            Orientation::Vertical => self.layout_vertically(rect, children, spacing, padding),
+        self.layout_horizontally(rect, children, spacing, padding)
+    }
+}
+
+impl<AppState> Widget<AppState> for VStack<AppState> {
+    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+        assert_ne!(rect.width(), 0f32);
+        assert_ne!(rect.height(), 0f32);
+        self.paint.set_anti_alias(true);
+        self.paint.set_color(*style.get("bg-color").unwrap());
+        self.border_paint
+            .set_color(*style.get("border-color").unwrap());
+        self.border_paint.set_style(PaintStyle::Stroke);
+        canvas.draw_rounded_rect(rect, 1., 1., &self.paint);
+
+        canvas.draw_rounded_rect(rect, 1., 1., &self.border_paint);
+    }
+
+    fn calculate_size(
+        &self,
+        preferred_width: Option<f32>,
+        preferred_height: Option<f32>,
+        constraints: &Constraints,
+        children: &[Node<AppState>],
+    ) -> (Size, Vec<Constraints>) {
+        let w = if let Some(preferred_width) = preferred_width {
+            let width = constraints.min_width;
+            let width = width.max(preferred_width).min(constraints.max_width);
+            width
+        } else {
+            constraints.max_width
+        };
+
+        let h = if let Some(preferred_height) = preferred_height {
+            let height = constraints.min_height;
+            let height = height.max(preferred_height).min(constraints.max_height);
+            height
+        } else {
+            constraints.max_height
+        };
+
+        let remaining_space = h - children
+            .iter()
+            .fold(0.0, |acc, child| acc + child.preferred_height().unwrap_or(0.));
+
+        let height_per_flex = remaining_space
+            / children
+                .iter()
+                .fold(0.0, |acc, child| acc + child.flex().unwrap_or(0.));
+
+        let mut children_constraints = Vec::new();
+        for child in children {
+            if let Some(flex) = child.flex() {
+                children_constraints.push(Constraints::new(
+                    0.0,
+                    w,
+                    height_per_flex * flex,
+                    height_per_flex * flex,
+                ))
+            } else {
+                children_constraints.push(Constraints::new(0.0, w, 0.0, h))
+            }
         }
+
+        (Size::new(w, h), children_constraints)
+    }
+
+    fn layout(
+        &mut self,
+        _: &AppState,
+        rect: &Rect,
+        spacing: f32,
+        padding: f32,
+        children: &mut [Node<AppState>],
+    ) {
+        self.layout_vertically(rect, children, spacing, padding)
     }
 }
 
@@ -430,11 +583,39 @@ impl Label {
 
 impl<AppState> Widget<AppState> for Label {
     fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+        assert_ne!(rect.width(), 0f32);
+        assert_ne!(rect.height(), 0f32);
         self.paint.set_color(*style.get("bg-color").unwrap());
         self.paint.set_anti_alias(true);
         canvas.draw_rounded_rect(rect, 15., 15., &self.paint);
         self.paint.set_color(Color::WHITE);
         canvas.draw_string(&self.text, &rect.center(), &self.font, &self.paint);
+    }
+
+    fn calculate_size(
+        &self,
+        preferred_width: Option<f32>,
+        preferred_height: Option<f32>,
+        constraints: &Constraints,
+        children: &[Node<AppState>],
+    ) -> (Size, Vec<Constraints>) {
+        let w = if let Some(preferred_width) = preferred_width {
+            let width = constraints.min_width;
+            let width = width.max(preferred_width).min(constraints.max_width);
+            width
+        } else {
+            constraints.max_width
+        };
+
+        let h = if let Some(preferred_height) = preferred_height {
+            let height = constraints.min_height;
+            let height = height.max(preferred_height).min(constraints.max_height);
+            height
+        } else {
+            constraints.max_height
+        };
+
+        (Size::new(w, h), vec![Constraints::new(0.0, w, 0.0, h)])
     }
 }
 
@@ -468,6 +649,32 @@ impl<AppState> Button<AppState> {
 }
 
 impl<AppState> Widget<AppState> for Button<AppState> {
+    fn calculate_size(
+        &self,
+        preferred_width: Option<f32>,
+        preferred_height: Option<f32>,
+        constraints: &Constraints,
+        _children: &[Node<AppState>],
+    ) -> (Size, Vec<Constraints>) {
+        let w = if let Some(preferred_width) = preferred_width {
+            let width = constraints.min_width;
+            let width = width.max(preferred_width).min(constraints.max_width);
+            width
+        } else {
+            constraints.max_width
+        };
+
+        let h = if let Some(preferred_height) = preferred_height {
+            let height = constraints.min_height;
+            let height = height.max(preferred_height).min(constraints.max_height);
+            height
+        } else {
+            constraints.max_height
+        };
+
+        (Size::new(w, h), vec![Constraints::new(0.0, w, 0.0, h)])
+    }
+
     fn mouse_down(&mut self, _: &mut AppState, _: &Rect, _: &MouseEvent) {
         self.pressed = true;
     }
@@ -490,6 +697,8 @@ impl<AppState> Widget<AppState> for Button<AppState> {
     }
 
     fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+        assert_ne!(rect.width(), 0f32);
+        assert_ne!(rect.height(), 0f32);
         self.paint.set_anti_alias(true);
         if self.hovered {
             if let Some(color) = style.get("hovered") {
@@ -543,6 +752,8 @@ impl<AppState> Widget<AppState> for Table<AppState> {
         canvas: &mut dyn Canvas2D,
         style: &StyleSheet,
     ) {
+        assert_ne!(rect.width(), 0f32);
+        assert_ne!(rect.height(), 0f32);
         let e_color = *style.get("even").unwrap_or(&Color::CYAN);
         let u_color = *style.get("uneven").unwrap_or(&Color::RED);
 
@@ -590,6 +801,32 @@ impl<AppState> Widget<AppState> for Table<AppState> {
         _padding: f32,
         _children: &mut [Node<AppState>],
     ) {
+    }
+
+    fn calculate_size(
+        &self,
+        preferred_width: Option<f32>,
+        preferred_height: Option<f32>,
+        constraints: &Constraints,
+        _children: &[Node<AppState>],
+    ) -> (Size, Vec<Constraints>) {
+        let w = if let Some(preferred_width) = preferred_width {
+            let width = constraints.min_width;
+            let width = width.max(preferred_width).min(constraints.max_width);
+            width
+        } else {
+            constraints.max_width
+        };
+
+        let h = if let Some(preferred_height) = preferred_height {
+            let height = constraints.min_height;
+            let height = height.max(preferred_height).min(constraints.max_height);
+            height
+        } else {
+            constraints.max_height
+        };
+
+        (Size::new(w, h), vec![Constraints::new(0.0, w, 0.0, h)])
     }
 }
 
@@ -654,6 +891,9 @@ impl<AppState> Slider<AppState> {
 
 impl<AppState> Widget<AppState> for Slider<AppState> {
     fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+        assert_ne!(rect.width(), 0f32);
+        assert_ne!(rect.height(), 0f32);
+
         let bg_color = style.get("bg-color");
         let fill_color = style.get("fill-color");
         let border_color = style.get("border-color");
@@ -695,6 +935,32 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
         }
 
         self.last_position = x;
+    }
+
+    fn calculate_size(
+        &self,
+        preferred_width: Option<f32>,
+        preferred_height: Option<f32>,
+        constraints: &Constraints,
+        _children: &[Node<AppState>],
+    ) -> (Size, Vec<Constraints>) {
+        let w = if let Some(preferred_width) = preferred_width {
+            let width = constraints.min_width;
+            let width = width.max(preferred_width).min(constraints.max_width);
+            width
+        } else {
+            constraints.max_width
+        };
+
+        let h = if let Some(preferred_height) = preferred_height {
+            let height = constraints.min_height;
+            let height = height.max(preferred_height).min(constraints.max_height);
+            height
+        } else {
+            constraints.max_height
+        };
+
+        (Size::new(w, h), vec![Constraints::new(0.0, w, 0.0, h)])
     }
 
     // fn mouse_drag(&mut self, state: &mut AppState, rect: &Rect, event: &MouseEvent) {
@@ -969,15 +1235,13 @@ impl<AppState: 'static> PopupRequest<AppState> {
     }
 
     pub fn build(&self) -> Node<AppState> {
-        let mut b = Node::new("menu")
-            .with_widget(Stack::new(Orientation::Vertical))
-            .with_spacing(1.);
+        let mut b = Node::new("menu").widget(VStack::new()).spacing(1.);
 
         for item in self.menu.items.iter() {
             let s = item.id;
             b.add_child(
                 Node::new("btn")
-                    .with_widget(Button::new(&item.name))
+                    .widget(Button::new(&item.name))
                     .with_mouse_event_callback(MouseEventType::MouseUp, move |_, _| {
                         Action::TriggerPopupMenu {
                             menu: 0,

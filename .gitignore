@@ -3,3 +3,4 @@ renderer/target/**
 target/**
 ui/target**
 vk_utils/target/**
+.vscode/c_cpp_properties.json

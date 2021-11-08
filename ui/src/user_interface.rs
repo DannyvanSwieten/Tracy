@@ -81,6 +81,13 @@ impl<AppState: 'static> UserInterface<AppState> {
 
     pub fn resize(&mut self, state: &AppState, width: u32, height: u32) {
         self.root.rect.set_wh(width as f32, height as f32);
+        self.root.build(state);
+        self.root.calculate_size(&Constraints::new(
+            width as f32,
+            width as f32,
+            height as f32,
+            height as f32,
+        ));
         self.layout(state);
     }
 

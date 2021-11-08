@@ -5,6 +5,8 @@ use ui::{
     window_event::MouseEvent, window_event::MouseEventType,
 };
 
+use skia_safe::Size;
+
 pub struct EditorState {
     selected_entity: Option<Entity>,
     entities: Vec<Entity>,
@@ -101,11 +103,11 @@ impl GameEditor {
 
 use skia_safe::Rect;
 
-struct ViewPortWidget {}
+struct ViewPort {}
 
 use nalgebra_glm::Vec3;
 
-impl Widget<GameEditor> for ViewPortWidget {
+impl Widget<GameEditor> for ViewPort {
     fn paint(
         &mut self,
         state: &GameEditor,
@@ -161,69 +163,82 @@ impl TableDelegate<GameEditor> for EntityTableDelegate {
 }
 
 fn build_top_bar() -> Node<GameEditor> {
-    Node::new("div").with_mouse_event_callback(MouseEventType::MouseUp, |event, state| {
-        let menu = ui::widget::PopupMenu::new(0, "root").with_item(1, "New Entity");
-        let request =
-            ui::widget::PopupRequest::new(menu, |menu, submenu, state: &mut GameEditor| {
-                state.create_entity("New Entity");
-                ui::widget::Action::Layout {
-                    nodes: vec!["root"],
-                }
-            });
+    Node::new("div").with_name("top bar")
+    // .with_mouse_event_callback(MouseEventType::MouseUp, |event, state| {
+    //     let menu = ui::widget::PopupMenu::new(0, "root").with_item(1, "New Entity");
+    //     let request =
+    //         ui::widget::PopupRequest::new(menu, |menu, submenu, state: &mut GameEditor| {
+    //             state.create_entity("New Entity");
+    //             ui::widget::Action::Layout {
+    //                 nodes: vec!["root"],
+    //             }
+    //         });
 
-        ui::widget::Action::PopupRequest {
-            request: request,
-            position: *event.global_position(),
-        }
-    })
+    //     ui::widget::Action::PopupRequest {
+    //         request: request,
+    //         position: *event.global_position(),
+    //     }
+    // })
 }
 
 fn build_left_side_bar() -> Node<GameEditor> {
-    Node::new("div").with_child(
-        Node::new("table").with_widget(Table::<GameEditor>::new(EntityTableDelegate {})),
-    )
+    Node::new("div")
+        .with_name("left bar")
+        .child(Node::new("table").widget(Table::<GameEditor>::new(EntityTableDelegate {})))
 }
 
 fn build_view_port() -> Node<GameEditor> {
-    Node::new_with_widget("viewport", Box::new(ViewPortWidget {}))
-        .with_relative_max_constraints(Some(70.), None)
-        .with_file_drop_handler(|state, file| {
+    Node::new("viewport")
+        .with_name("Render viewport")
+        .widget(ViewPort {})
+        .with_flex(3.0)
+        .on_file_drop(|state, file| {
             state.import_gltf(file);
             Action::None
         })
 }
 
 fn build_right_side_bar() -> Node<GameEditor> {
-    Node::new("div")
+    Node::new("div").with_name("right bar")
 }
 
 fn build_middle() -> Node<GameEditor> {
-    Node::new_with_widget("body", Box::new(Stack::new(Orientation::Horizontal)))
-        .with_rebuild_callback(|_| {
+    Node::new("body")
+        .with_name("middle")
+        .widget(HStack::new())
+        .on_rebuild(|_| {
             Some(vec![
                 build_left_side_bar(),
                 build_view_port(),
                 build_right_side_bar(),
             ])
         })
-        .with_relative_max_constraints(None, Some(60.))
-        .with_spacing(5.)
+        .spacing(5.)
+        .with_flex(2.)
 }
 
 fn build_bottom() -> Node<GameEditor> {
-    Node::new("div")
+    Node::new("div").with_name("bttm")
 }
 
 pub struct MyUIDelegate {}
 impl UIDelegate<GameEditor> for MyUIDelegate {
     fn build(&self, _: &str, _: &GameEditor) -> Node<GameEditor> {
-        Node::new("body").with_widget(Container::new()).with_child(
-            Node::new("body")
-                .with_widget(Stack::new(Orientation::Vertical))
-                .with_rebuild_callback(|_| {
-                    Some(vec![build_top_bar(), build_middle(), build_bottom()])
-                })
-                .with_spacing(5.),
-        )
+        Node::new("body")
+            .with_name("editor")
+            .widget(Container::new())
+            .child(
+                Node::new("body")
+                    .with_name("editor")
+                    .widget(VStack::new())
+                    .on_rebuild(|_| Some(vec![build_top_bar(), build_middle(), build_bottom()]))
+                    .spacing(5.),
+            )
+
+        // Node::new("body").widget(Container::new()).child(
+        //     Node::new("btn")
+        //         .widget(Button::new("My Button"))
+        //         .size(200.0, 75.0),
+        // )
     }
 }

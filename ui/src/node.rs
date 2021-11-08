@@ -26,6 +26,9 @@ pub struct Node<AppState> {
     widget: Box<dyn Widget<AppState>>,
     children: Vec<Node<AppState>>,
     style: Material,
+    preferred_width: Option<f32>,
+    preferred_height: Option<f32>,
+    flex: Option<f32>,
 
     mouse_callbacks:
         HashMap<MouseEventType, Box<dyn FnMut(&MouseEvent, &mut AppState) -> Action<AppState>>>,
@@ -35,24 +38,6 @@ pub struct Node<AppState> {
 }
 
 impl<AppState> Node<AppState> {
-    pub fn new_with_widget(material_tag: &str, widget: Box<dyn Widget<AppState>>) -> Self {
-        Node {
-            name: String::from(""),
-            material_tag: material_tag.to_string(),
-            rect: Rect::default(),
-            padding: 0.,
-            spacing: 0.,
-            constraints: Constraints::default(),
-            widget: widget,
-            children: Vec::new(),
-            uid: next_node_id(),
-            mouse_callbacks: HashMap::new(),
-            build_callback: None,
-            file_drop_handler: None,
-            style: Material::new(),
-        }
-    }
-
     pub fn new(tag: &str) -> Self {
         Node {
             name: String::from(""),
@@ -60,6 +45,9 @@ impl<AppState> Node<AppState> {
             rect: Rect::default(),
             padding: 0.,
             spacing: 0.,
+            preferred_width: None,
+            preferred_height: None,
+            flex: Some(1.0),
             constraints: Constraints::default(),
             widget: Box::new(Container::new()),
             children: Vec::new(),
@@ -71,7 +59,7 @@ impl<AppState> Node<AppState> {
         }
     }
 
-    pub fn with_widget<T>(mut self, w: T) -> Self
+    pub fn widget<T>(mut self, w: T) -> Self
     where
         T: Widget<AppState> + 'static,
     {
@@ -84,36 +72,30 @@ impl<AppState> Node<AppState> {
         self
     }
 
-    pub fn with_relative_max_constraints(
-        mut self,
-        width: Option<f32>,
-        height: Option<f32>,
-    ) -> Self {
+    pub fn relative_size(mut self, width: f32, height: f32) -> Self {
         self.constraints.max_width = width;
         self.constraints.max_height = height;
-        self.constraints.unit_type = UnitType::Relative;
         self
     }
 
-    pub fn with_absolute_max_constraints(
-        mut self,
-        width: Option<f32>,
-        height: Option<f32>,
-    ) -> Self {
-        self.constraints.max_width = width;
-        self.constraints.max_height = height;
-        self.constraints.unit_type = UnitType::Absolute;
+    pub fn with_preferred_width(mut self, width: f32) -> Self {
+        self.preferred_width = Some(width);
         self
     }
 
-    pub fn with_absolute_min_constraints(
-        mut self,
-        width: Option<f32>,
-        height: Option<f32>,
-    ) -> Self {
-        self.constraints.min_width = width;
-        self.constraints.min_height = height;
-        self.constraints.unit_type = UnitType::Absolute;
+    pub fn with_preferred_height(mut self, height: f32) -> Self {
+        self.preferred_height = Some(height);
+        self
+    }
+
+    pub fn with_preferred_size(mut self, width: f32, height: f32) -> Self {
+        self.preferred_width = Some(width);
+        self.preferred_height = Some(height);
+        self
+    }
+
+    pub fn with_flex(mut self, factor: f32) -> Self {
+        self.flex = Some(factor);
         self
     }
 
@@ -122,7 +104,7 @@ impl<AppState> Node<AppState> {
         self
     }
 
-    pub fn with_spacing(mut self, spacing: f32) -> Self {
+    pub fn spacing(mut self, spacing: f32) -> Self {
         self.spacing = spacing;
         self
     }
@@ -140,7 +122,15 @@ impl<AppState> Node<AppState> {
         self
     }
 
-    pub fn with_rebuild_callback<F>(mut self, cb: F) -> Self
+    pub fn flex(&self) -> Option<f32> {
+        self.flex
+    }
+
+    pub fn preferred_width(&self) -> Option<f32> {
+        self.preferred_width
+    }
+
+    pub fn on_rebuild<F>(mut self, cb: F) -> Self
     where
         F: FnMut(&AppState) -> Option<Vec<Node<AppState>>> + 'static,
     {
@@ -148,7 +138,7 @@ impl<AppState> Node<AppState> {
         self
     }
 
-    pub fn with_file_drop_handler<F>(mut self, handler: F) -> Self
+    pub fn on_file_drop<F>(mut self, handler: F) -> Self
     where
         F: FnMut(&mut AppState, &std::path::PathBuf) -> Action<AppState> + 'static,
     {
@@ -161,7 +151,7 @@ impl<AppState> Node<AppState> {
         return self;
     }
 
-    pub fn with_child(mut self, child: Node<AppState>) -> Self {
+    pub fn child(mut self, child: Node<AppState>) -> Self {
         self.children.push(child);
         return self;
     }
@@ -181,7 +171,6 @@ impl<AppState> Node<AppState> {
     }
 
     pub fn resized(&mut self, state: &mut AppState) {
-        self.widget.resized(state, &self.rect);
         for child in self.children.iter_mut() {
             child.resized(state);
         }
@@ -234,9 +223,32 @@ impl<AppState> Node<AppState> {
         action
     }
 
-    pub fn layout(&mut self, state: &AppState) {
-        self.build(state);
+    pub fn prefrerred_width(&self) -> Option<f32> {
+        self.preferred_width
+    }
 
+    pub fn preferred_height(&self) -> Option<f32> {
+        self.preferred_height
+    }
+
+    pub fn calculate_size(&mut self, constraints: &Constraints) {
+        let (size, children_constraints) = self.widget.calculate_size(
+            self.preferred_width,
+            self.preferred_height,
+            constraints,
+            &self.children,
+        );
+
+        assert_ne!(size.width, 0.0);
+
+        self.set_size(&size);
+
+        for child in 0..self.children.len() {
+            self.children[child].calculate_size(&children_constraints[child])
+        }
+    }
+
+    pub fn layout(&mut self, state: &AppState) {
         self.widget.layout(
             state,
             &self.rect,
@@ -289,16 +301,6 @@ impl<AppState> Node<AppState> {
 
         for child in self.children.iter_mut() {
             child.draw(state, canvas, material);
-        }
-    }
-
-    pub fn draw_3d(&mut self, state: &AppState) {
-        if self.widget.needs_gpu() {
-            self.widget.paint_3d(state, &self.rect);
-        }
-
-        for child in self.children.iter_mut() {
-            child.draw_3d(state);
         }
     }
 
