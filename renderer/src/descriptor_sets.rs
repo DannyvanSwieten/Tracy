@@ -6,7 +6,6 @@ use ash::vk::{
 };
 
 use crate::scene_data::SceneData;
-use ash::version::DeviceV1_0;
 use vk_utils::device_context::DeviceContext;
 
 pub struct RTXDescriptorSets {

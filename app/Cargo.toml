@@ -8,8 +8,8 @@ edition = "2018"
 renderer = {path = "../renderer"}
 vk_utils = {path = "../vk_utils"}
 ui = {path = "../ui"}
-ash = "*"
-ash-window = "*"
+ash = "0.35.0"
+ash-window = "0.9"
 winit = "*"
 image = "*"
 nalgebra-glm = "*"

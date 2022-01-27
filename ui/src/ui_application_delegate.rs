@@ -68,18 +68,15 @@ impl<AppState> UIApplicationDelegate<AppState> {
         self
     }
 
-    pub fn with_window(
-        mut self,
-        title: &str,
-        width: u32,
-        height: u32,
-        ui_delegate: Box<dyn UIDelegate<AppState>>,
-    ) -> Self {
+    pub fn with_window<D>(mut self, title: &str, width: u32, height: u32, ui_delegate: D) -> Self
+    where
+        D: UIDelegate<AppState> + 'static,
+    {
         self.window_requests.push(WindowRequest {
             title: title.to_string(),
             width,
             height,
-            ui_delegate,
+            ui_delegate: Box::new(ui_delegate),
         });
         self
     }

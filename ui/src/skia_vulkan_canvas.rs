@@ -1,5 +1,4 @@
 use crate::canvas_2d::Canvas2D;
-use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 use ash::vk::Handle;
 use skia_safe::gpu::{vk, DirectContext, RecordingContext, SemaphoresSubmitted, SurfaceOrigin};
 use skia_safe::{Budgeted, Color, Font, Image, ImageInfo, Paint, Point, Rect, Surface};

@@ -1,7 +1,6 @@
 use crate::device_context::DeviceContext;
 use crate::gpu::Gpu;
 use crate::vulkan::Vulkan;
-use ash::version::DeviceV1_0;
 use ash::vk::SurfaceKHR;
 
 pub struct Swapchain {

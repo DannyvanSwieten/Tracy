@@ -11,9 +11,6 @@ use vk_utils::image_resource::Image2DResource;
 use vk_utils::shader_library::load_spirv;
 use vk_utils::wait_handle::WaitHandle;
 
-// Version traits
-use ash::version::{DeviceV1_0, InstanceV1_1};
-
 use ash::extensions::khr::{AccelerationStructure, RayTracingPipeline};
 
 // Extension Objects
@@ -245,27 +242,30 @@ impl Renderer {
     }
 
     fn load_shaders_and_pipeline(&mut self, device: &DeviceContext) {
-
-        let dir = std::env::current_exe().expect("current dir check failed").parent().unwrap().parent().unwrap().parent().unwrap().join("shaders").join("simple_pipeline");
+        let dir = std::env::current_exe()
+            .expect("current dir check failed")
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("shaders")
+            .join("simple_pipeline");
         unsafe {
-            let code = load_spirv(
-                 dir.join("ray_gen.rgen.spv").to_str().unwrap(),
-            );
+            let code = load_spirv(dir.join("ray_gen.rgen.spv").to_str().unwrap());
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let gen = device
                 .vk_device()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray generation shader compilation failed");
-            let code =
-                load_spirv(dir.join("closest_hit.rchit.spv").to_str().unwrap());
+            let code = load_spirv(dir.join("closest_hit.rchit.spv").to_str().unwrap());
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let chit = device
                 .vk_device()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray closest hit shader compilation failed");
-            let code = load_spirv(
-                dir.join("ray_miss.rmiss.spv").to_str().unwrap(),
-            );
+            let code = load_spirv(dir.join("ray_miss.rmiss.spv").to_str().unwrap());
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let miss = device
                 .vk_device()

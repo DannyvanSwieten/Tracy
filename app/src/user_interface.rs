@@ -163,7 +163,7 @@ impl TableDelegate<GameEditor> for EntityTableDelegate {
 }
 
 fn build_top_bar() -> Node<GameEditor> {
-    Node::new("div").with_name("top bar")
+    Node::new("div").with_name("top bar").with_flex(1.0)
     // .with_mouse_event_callback(MouseEventType::MouseUp, |event, state| {
     //     let menu = ui::widget::PopupMenu::new(0, "root").with_item(1, "New Entity");
     //     let request =
@@ -182,9 +182,7 @@ fn build_top_bar() -> Node<GameEditor> {
 }
 
 fn build_left_side_bar() -> Node<GameEditor> {
-    Node::new("div")
-        .with_name("left bar")
-        .child(Node::new("table").widget(Table::<GameEditor>::new(EntityTableDelegate {})))
+    Node::new("div").with_name("left bar").with_flex(1.0)
 }
 
 fn build_view_port() -> Node<GameEditor> {
@@ -196,10 +194,11 @@ fn build_view_port() -> Node<GameEditor> {
             state.import_gltf(file);
             Action::None
         })
+        .with_flex(4.0)
 }
 
 fn build_right_side_bar() -> Node<GameEditor> {
-    Node::new("div").with_name("right bar")
+    Node::new("div").with_name("right bar").with_flex(1.0)
 }
 
 fn build_middle() -> Node<GameEditor> {
@@ -214,11 +213,31 @@ fn build_middle() -> Node<GameEditor> {
             ])
         })
         .spacing(5.)
-        .with_flex(2.)
+        .with_flex(3.)
 }
 
 fn build_bottom() -> Node<GameEditor> {
-    Node::new("div").with_name("bttm")
+    Node::new("div").with_name("bttm").with_flex(1.0)
+}
+
+fn build_menu_bar() -> Node<GameEditor> {
+    Node::new("div")
+        .with_name("menu")
+        .widget(HStack::new())
+        .on_rebuild(|_| {
+            Some(vec![
+                Node::new("btn")
+                    .widget(Button::new("File"))
+                    .with_preferred_width(65.0),
+                Node::new("btn")
+                    .widget(Button::new("Edit"))
+                    .with_preferred_width(65.0),
+                Node::new("btn")
+                    .widget(Button::new("View"))
+                    .with_preferred_width(65.0),
+            ])
+        })
+        .with_preferred_height(30.0)
 }
 
 pub struct MyUIDelegate {}
@@ -231,14 +250,15 @@ impl UIDelegate<GameEditor> for MyUIDelegate {
                 Node::new("body")
                     .with_name("editor")
                     .widget(VStack::new())
-                    .on_rebuild(|_| Some(vec![build_top_bar(), build_middle(), build_bottom()]))
+                    .on_rebuild(|_| {
+                        Some(vec![
+                            build_menu_bar(),
+                            build_top_bar(),
+                            build_middle(),
+                            build_bottom(),
+                        ])
+                    })
                     .spacing(5.),
             )
-
-        // Node::new("body").widget(Container::new()).child(
-        //     Node::new("btn")
-        //         .widget(Button::new("My Button"))
-        //         .size(200.0, 75.0),
-        // )
     }
 }

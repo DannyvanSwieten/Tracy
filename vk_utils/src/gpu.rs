@@ -1,4 +1,3 @@
-use ash::version::{InstanceV1_0, InstanceV1_1};
 use ash::vk::{
     DeviceCreateInfo, DeviceCreateInfoBuilder, PhysicalDevice, PhysicalDeviceFeatures,
     PhysicalDeviceLimits, PhysicalDeviceMemoryProperties2, PhysicalDeviceProperties,

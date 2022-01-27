@@ -2,13 +2,11 @@ use crate::device_context::DeviceContext;
 use crate::memory::memory_type_index;
 
 use ash::vk::{
-    DeviceMemory, Extent3D, Format, Image,
-    ImageCreateInfo, ImageLayout, ImageType,
+    DeviceMemory, Extent3D, Format, Image, ImageCreateInfo, ImageLayout, ImageType,
     ImageUsageFlags, MemoryAllocateInfo, MemoryPropertyFlags, PhysicalDeviceMemoryProperties,
     SampleCountFlags, SharingMode,
 };
 
-use ash::version::DeviceV1_0;
 use ash::Device;
 
 pub struct Image2DResource {

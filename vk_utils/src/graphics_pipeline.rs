@@ -8,8 +8,6 @@ use ash::vk::{
 
 use crate::device_context::DeviceContext;
 
-use ash::version::DeviceV1_0;
-
 pub struct GraphicsPipeline {
     blend_state: PipelineColorBlendStateCreateInfo,
     depth_stencil_state: PipelineDepthStencilStateCreateInfo,

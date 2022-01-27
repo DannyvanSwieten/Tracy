@@ -2,7 +2,6 @@ use crate::buffer_resource::BufferResource;
 use crate::gpu::Gpu;
 use crate::image_resource::Image2DResource;
 use crate::queue::QueueHandle;
-use ash::version::{DeviceV1_0, InstanceV1_0};
 use ash::vk::{
     BufferUsageFlags, DeviceCreateInfoBuilder, DeviceQueueCreateInfo, Format, ImageUsageFlags,
     MemoryPropertyFlags, QueueFlags,

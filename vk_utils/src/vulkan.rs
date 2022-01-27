@@ -1,19 +1,14 @@
-use ash::version::{EntryV1_0, InstanceV1_0};
 use ash::vk::{
-    make_version, ApplicationInfo, Bool32, DebugUtilsMessageSeverityFlagsEXT,
+    make_api_version, ApplicationInfo, Bool32, DebugUtilsMessageSeverityFlagsEXT,
     DebugUtilsMessageTypeFlagsEXT, DebugUtilsMessengerCallbackDataEXT,
     DebugUtilsMessengerCreateInfoEXT, DebugUtilsMessengerEXT, InstanceCreateInfo, QueueFlags,
     FALSE,
 };
-use ash::{Entry, Instance};
+pub use ash::{Entry, Instance};
 use std::borrow::Cow;
 use std::ffi::{CStr, CString};
 
-use ash::extensions::{
-    ext::DebugUtils,
-    khr::{Surface, Win32Surface},
-    mvk::MacOSSurface,
-};
+use ash::extensions::{ext::DebugUtils, khr::Win32Surface, mvk::MacOSSurface};
 
 use crate::gpu::Gpu;
 
@@ -75,7 +70,7 @@ impl Vulkan {
             .application_version(0)
             .engine_name(&c_name)
             .engine_version(0)
-            .api_version(make_version(1, 2, 0));
+            .api_version(make_api_version(0, 1, 2, 0));
 
         let layers_names_raw: Vec<*const i8> = layers
             .iter()
@@ -93,7 +88,7 @@ impl Vulkan {
             .enabled_extension_names(&extension_names_raw);
 
         unsafe {
-            let library = Entry::new().unwrap();
+            let library = Entry::load().unwrap();
             let instance: Instance = library
                 .create_instance(&create_info, None)
                 .expect("Instance creation error");
@@ -104,7 +99,7 @@ impl Vulkan {
                         | DebugUtilsMessageSeverityFlagsEXT::WARNING
                         | DebugUtilsMessageSeverityFlagsEXT::INFO,
                 )
-                .message_type(DebugUtilsMessageTypeFlagsEXT::all())
+                .message_type(DebugUtilsMessageTypeFlagsEXT::VALIDATION)
                 .pfn_user_callback(Some(vulkan_debug_callback));
 
             let debug_utils_loader = DebugUtils::new(&library, &instance);

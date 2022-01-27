@@ -1,9 +1,8 @@
 use crate::command_buffer::CommandBufferHandle;
 use crate::wait_handle::WaitHandle;
-use ash::version::DeviceV1_0;
 use ash::vk::{
     CommandBufferAllocateInfo, CommandPool, CommandPoolCreateFlags, CommandPoolCreateInfo,
-    CommandPoolResetFlags, Framebuffer, Queue, RenderPass,
+    Framebuffer, Queue, RenderPass,
 };
 use ash::Device;
 

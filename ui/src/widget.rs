@@ -468,9 +468,9 @@ impl<AppState> Widget<AppState> for HStack<AppState> {
             } else {
                 children_constraints.push(Constraints::new(
                     0.0,
-                    constraints.max_width,
+                    child.preferred_width().unwrap_or(constraints.max_width),
                     0.0,
-                    constraints.max_height,
+                    child.preferred_height().unwrap_or(constraints.max_height),
                 ))
             }
         }
@@ -527,9 +527,9 @@ impl<AppState> Widget<AppState> for VStack<AppState> {
             constraints.max_height
         };
 
-        let remaining_space = h - children
-            .iter()
-            .fold(0.0, |acc, child| acc + child.preferred_height().unwrap_or(0.));
+        let remaining_space = h - children.iter().fold(0.0, |acc, child| {
+            acc + child.preferred_height().unwrap_or(0.)
+        });
 
         let height_per_flex = remaining_space
             / children
@@ -541,12 +541,17 @@ impl<AppState> Widget<AppState> for VStack<AppState> {
             if let Some(flex) = child.flex() {
                 children_constraints.push(Constraints::new(
                     0.0,
-                    w,
+                    child.preferred_width().unwrap_or(w),
                     height_per_flex * flex,
                     height_per_flex * flex,
                 ))
             } else {
-                children_constraints.push(Constraints::new(0.0, w, 0.0, h))
+                children_constraints.push(Constraints::new(
+                    0.0,
+                    child.preferred_width().unwrap_or(w),
+                    0.0,
+                    child.preferred_height().unwrap_or(h),
+                ))
             }
         }
 

@@ -47,7 +47,7 @@ impl<AppState> Node<AppState> {
             spacing: 0.,
             preferred_width: None,
             preferred_height: None,
-            flex: Some(1.0),
+            flex: None,
             constraints: Constraints::default(),
             widget: Box::new(Container::new()),
             children: Vec::new(),

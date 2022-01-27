@@ -6,6 +6,17 @@ use skia_safe::Point;
 
 pub trait UIDelegate<AppState> {
     fn build(&self, section: &str, state: &AppState) -> Node<AppState>;
+    fn build_menu(&self, _state: AppState) -> Option<PopupRequest<AppState>> {
+        None
+    }
+
+    fn menu_item_count(&self, _state: &AppState) -> i32 {
+        0
+    }
+
+    fn menu_item_name(&self, _state: &AppState) -> &str {
+        todo!()
+    }
 }
 
 #[repr(C)]

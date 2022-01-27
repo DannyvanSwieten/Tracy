@@ -3,7 +3,6 @@ use ash::vk::{
     PipelineLayout, RenderPass, Sampler, ShaderModule,
 };
 
-use ash::version::DeviceV1_0;
 use vk_utils::command_buffer::CommandBufferHandle;
 use vk_utils::device_context::DeviceContext;
 use vk_utils::shader_library::load_spirv;
@@ -29,9 +28,16 @@ impl ImageRenderer {
         width: u32,
         height: u32,
     ) -> Self {
-        let dir = std::env::current_exe().expect("current dir check failed").parent().unwrap().parent().unwrap().parent().unwrap().join("shaders");
-        let buffer =
-            load_spirv(dir.join("sampled_image.vert.spv").to_str().unwrap());
+        let dir = std::env::current_exe()
+            .expect("current dir check failed")
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("shaders");
+        let buffer = load_spirv(dir.join("sampled_image.vert.spv").to_str().unwrap());
         let vertex_shader_module_create_info = ash::vk::ShaderModuleCreateInfo::builder()
             .code(&buffer)
             .build();
@@ -43,8 +49,7 @@ impl ImageRenderer {
                 .expect("Vertex Shader module creation failed")
         };
 
-        let buffer =
-            load_spirv(dir.join("sampled_image.frag.spv").to_str().unwrap());
+        let buffer = load_spirv(dir.join("sampled_image.frag.spv").to_str().unwrap());
 
         let fragment_shader_module_create_info = ash::vk::ShaderModuleCreateInfo::builder()
             .code(&buffer)

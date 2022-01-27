@@ -8,7 +8,6 @@ use ash::vk::{
     SharingMode,
 };
 
-use ash::version::{DeviceV1_0, DeviceV1_2};
 use ash::Device;
 
 pub struct BufferResource {

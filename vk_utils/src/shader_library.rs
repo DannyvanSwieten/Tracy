@@ -1,4 +1,3 @@
-use ash::version::DeviceV1_0;
 use ash::vk::{ShaderModule, ShaderModuleCreateInfo, ShaderStageFlags};
 use ash::Device;
 use std::collections::HashMap;
