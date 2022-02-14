@@ -2,9 +2,9 @@
 name = "vk_utils"
 version = "0.1.0"
 authors = ["Danny van Swieten <dannyvanswieten@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-ash = "0.35.0"
+ash = "*"
 byteorder = "*"

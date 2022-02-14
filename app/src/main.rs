@@ -1,52 +1,32 @@
-pub mod game;
-pub mod user_interface;
-
-use ash::vk::{
-    PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2KHR,
-    PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceVulkan12Features,
-};
-
-use user_interface::{GameEditor, MyUIDelegate};
-
-use ui::application::Application;
-use ui::ui_application_delegate::UIApplicationDelegate;
+use ash::extensions::ext::DebugUtils;
+use renderer::{geometry::Vertex, renderer::Renderer, scene::Scene};
+use vk_utils::vulkan::Vulkan;
 
 fn main() {
-    let app: Application<GameEditor> = Application::new("My Application");
-    let app_delegate = UIApplicationDelegate::new()
-        .on_update(|_, state: &mut GameEditor| {
-            if let Some(game) = &mut state.game {
-                game.tick()
-            }
-        })
-        .with_window("My Window", 1920, 1080, MyUIDelegate {})
-        .on_device_created(|gpu, device, state| state.game = Some(game::Game::new(gpu, device)))
-        .with_device_builder(|gpu, mut extensions| {
-            extensions.push(ash::extensions::khr::RayTracingPipeline::name());
-            extensions.push(ash::extensions::khr::AccelerationStructure::name());
-            extensions.push(ash::extensions::khr::DeferredHostOperations::name());
+    let vulkan = Vulkan::new(
+        "tracey renderer",
+        &[std::ffi::CString::new("VK_LAYER_KHRONOS_validation").expect("String Creation Failed")],
+        &[DebugUtils::name()],
+    );
+    let gpu = &vulkan.hardware_devices_with_queue_support(ash::vk::QueueFlags::GRAPHICS)[0];
+    let context = Renderer::create_suitable_device(gpu);
+    let mut renderer = Renderer::new(&context, 1920, 1080);
 
-            let mut rt_features =
-                PhysicalDeviceRayTracingPipelineFeaturesKHR::builder().ray_tracing_pipeline(true);
-            let mut address_features =
-                PhysicalDeviceVulkan12Features::builder().buffer_device_address(true);
-            let mut acc_features = PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
-                .acceleration_structure(true);
-            let mut features2 = PhysicalDeviceFeatures2KHR::default();
-            unsafe {
-                gpu.vulkan()
-                    .vk_instance()
-                    .get_physical_device_features2(*gpu.vk_physical_device(), &mut features2);
-            }
+    let vertices = [
+        Vertex::new(-1.0, -1.0, 0.0),
+        Vertex::new(1.0, -1.0, 0.0),
+        Vertex::new(0.0, 1.0, 0.0),
+    ];
 
-            gpu.device_context(&extensions, |builder| {
-                builder
-                    .push_next(&mut address_features)
-                    .push_next(&mut rt_features)
-                    .push_next(&mut acc_features)
-                    .enabled_features(&features2.features)
-            })
-        });
+    let indices = [0, 1, 2];
 
-    app.run(Box::new(app_delegate), GameEditor::new());
+    let mut scene = Scene::new();
+    let geometry_id = scene.add_geometry(&indices, &vertices);
+    scene.create_instance(geometry_id);
+    renderer.build(&context, &scene);
+    renderer.render(&context);
+    let buffer = renderer.download_image(&context);
+    let data = buffer.copy_data::<u8>();
+    image::save_buffer("output.png", &data, 1920, 1080, image::ColorType::Rgba8)
+        .expect("Image Write failed");
 }

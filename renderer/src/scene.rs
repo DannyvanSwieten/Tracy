@@ -39,7 +39,7 @@ impl Scene {
         }
     }
 
-    pub fn add_geometry(&mut self, indices: Vec<u32>, vertices: Vec<Vertex>) -> usize {
+    pub fn add_geometry(&mut self, indices: &[u32], vertices: &[Vertex]) -> usize {
         let (index_offset, vertex_offset) = if let Some(view) = self.geometry_views.last() {
             (
                 view.index_offset() + view.index_count(),
@@ -74,6 +74,7 @@ impl Scene {
             index: self.geometry_views[geometry_id].index_offset(),
             vertex: self.geometry_views[geometry_id].vertex_offset(),
         });
+        self.set_scale(instance_id as usize, &glm::Vec3::new(1.0, 1.0, 1.0));
         instance_id as usize
     }
 

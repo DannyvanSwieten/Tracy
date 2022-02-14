@@ -41,9 +41,9 @@ impl GeometryBuffer {
         }
     }
 
-    pub fn append(&mut self, indices: Vec<u32>, vertices: Vec<Vertex>) {
+    pub fn append(&mut self, indices: &[u32], vertices: &[Vertex]) {
         self.indices.extend(indices);
-        self.vertices.extend(vertices);
+        self.vertices.extend(vertices.to_vec());
     }
 
     pub fn new_with_data(indices: Vec<u32>, vertices: Vec<Vertex>) -> Self {
