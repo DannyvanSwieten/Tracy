@@ -28,8 +28,6 @@ fn load_node(
         }
     }
 
-    nalgebra_glm::Mat4x4::from_column_slice(parent_transform.matrix())
-
     for child in node.children() {
         scene = load_node(scene, document, &child, &node.transform())
     }
