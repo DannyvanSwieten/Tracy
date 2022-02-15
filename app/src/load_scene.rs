@@ -23,35 +23,31 @@ fn load_node(
     mut scene: Scene,
     document: &gltf::Document,
     node: &gltf::Node,
-    parent_transform: gltf::scene::Transform,
+    parent_transform: &[[f32; 4]; 4],
 ) -> Scene {
+    let this_transform = mul_matrix_array(parent_transform, &node.transform().matrix());
+
     if let Some(mesh) = node.mesh() {
         let instance_id = scene.create_instance(mesh.index());
-        match node.transform() {
-            gltf::scene::Transform::Decomposed {
-                translation,
-                rotation,
-                scale,
-            } => {
-                scene.set_position_values(
-                    instance_id,
-                    translation[0],
-                    translation[1],
-                    translation[2],
-                );
-                // scene.set_orientation(instance_id, tr.rotation);
-                scene.set_scale_values(instance_id, scale[0], scale[1], scale[2]);
+        scene.set_matrix(instance_id, &this_transform)
+    }
+
+    if let Some(camera) = node.camera() {
+        match camera.projection() {
+            gltf::camera::Projection::Perspective(cam) => {
+                scene.add_camera(&renderer::scene::Camera {
+                    fov: cam.yfov(),
+                    z_near: cam.znear(),
+                    z_far: cam.zfar().unwrap_or(1000.0),
+                })
             }
-            gltf::scene::Transform::Matrix { matrix } => {
-                let p = parent_transform.matrix();
-                let new_transform = mul_matrix_array(&p, &matrix);
-                scene.set_matrix(instance_id, &new_transform)
-            }
+            _ => (),
         }
+        //scene.add_camera(Camera{fov: camera.fov, z_near: camera.z_near, z_far: camera.z_far})
     }
 
     for child in node.children() {
-        scene = load_node(scene, document, &child, node.transform())
+        scene = load_node(scene, document, &child, &this_transform)
     }
 
     scene
@@ -96,8 +92,14 @@ pub fn load_scene(path: &str) -> Option<Scene> {
     }
 
     for scene in document.scenes() {
+        let parent_transform = [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
         for node in scene.nodes() {
-            new_scene = load_node(new_scene, &document, &node, node.transform());
+            new_scene = load_node(new_scene, &document, &node, &parent_transform);
         }
     }
 

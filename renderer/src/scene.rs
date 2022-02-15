@@ -1,6 +1,11 @@
 use crate::geometry::*;
 use ash::vk::GeometryInstanceFlagsKHR;
-
+#[derive(Clone, Copy)]
+pub struct Camera {
+    pub fov: f32,
+    pub z_near: f32,
+    pub z_far: f32,
+}
 pub struct TextureImageData {
     pub format: ash::vk::Format,
     pub width: u32,
@@ -43,7 +48,7 @@ pub struct Material {
 impl Material {
     pub fn new() -> Self {
         Self {
-            color: glm::vec4(1., 0., 1., 1.),
+            color: glm::vec4(1., 1., 1., 1.),
             emission: glm::vec4(0., 0., 0., 0.),
             maps: glm::vec4(-1, -1, -1, -1),
         }
@@ -58,9 +63,8 @@ pub struct Scene {
     materials: Vec<Material>,
 
     images: Vec<TextureImageData>,
+    cameras: Vec<Camera>,
 }
-
-unsafe impl Send for Scene {}
 
 impl Scene {
     pub fn new() -> Self {
@@ -71,7 +75,12 @@ impl Scene {
             geometry_instance_offsets: Vec::new(),
             materials: Vec::new(),
             images: Vec::new(),
+            cameras: Vec::new(),
         }
+    }
+
+    pub fn add_camera(&mut self, camera: &Camera) {
+        self.cameras.push(*camera)
     }
 
     pub fn add_image(&mut self, format: ash::vk::Format, width: u32, height: u32, data: &[u8]) {
@@ -193,5 +202,9 @@ impl Scene {
 
     pub fn images(&self) -> &[TextureImageData] {
         &self.images
+    }
+
+    pub fn cameras(&self) -> &[Camera] {
+        &self.cameras
     }
 }

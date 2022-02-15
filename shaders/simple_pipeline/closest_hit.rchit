@@ -29,6 +29,8 @@ layout(binding = 1, set = 1) uniform BufferAddresses {
     uint64_t material_address;
 };
 
+layout(binding = 2, set = 1) uniform sampler2D[1024];
+
 void main()
 {
     Materials materials = Materials(material_address);

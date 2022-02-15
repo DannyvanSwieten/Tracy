@@ -5,11 +5,10 @@ use crate::geometry::{
 };
 use crate::scene::{Material, Scene};
 use vk_utils::buffer_resource::BufferResource;
-use vk_utils::command_buffer;
 use vk_utils::device_context::DeviceContext;
 use vk_utils::image_resource::Image2DResource;
 
-use ash::vk::{BufferUsageFlags, GeometryInstanceFlagsKHR, Image, MemoryPropertyFlags};
+use ash::vk::{BufferUsageFlags, GeometryInstanceFlagsKHR, MemoryPropertyFlags};
 
 pub struct SceneData {
     pub vertex_buffer: BufferResource,
@@ -20,6 +19,7 @@ pub struct SceneData {
     pub bottom_level_acceleration_structures: Vec<BottomLevelAccelerationStructure>,
     pub top_level_acceleration_structure: TopLevelAccelerationStructure,
     pub images: Vec<Image2DResource>,
+    pub image_views: Vec<ash::vk::ImageView>,
 }
 
 impl SceneData {
@@ -149,6 +149,27 @@ impl SceneData {
             })
             .collect();
 
+        let image_views: Vec<ash::vk::ImageView> = images
+            .iter()
+            .map(|image| {
+                let range = ash::vk::ImageSubresourceRange::builder()
+                    .aspect_mask(ash::vk::ImageAspectFlags::COLOR)
+                    .layer_count(1)
+                    .level_count(1);
+                let info_builder = ash::vk::ImageViewCreateInfo::builder()
+                    .image(*image.vk_image())
+                    .view_type(ash::vk::ImageViewType::TYPE_2D)
+                    .format(image.format())
+                    .subresource_range(*range);
+                unsafe {
+                    device
+                        .vk_device()
+                        .create_image_view(&info_builder, None)
+                        .expect("Image View Creation Failed")
+                }
+            })
+            .collect();
+
         Self {
             vertex_buffer,
             index_buffer,
@@ -158,6 +179,7 @@ impl SceneData {
             bottom_level_acceleration_structures,
             top_level_acceleration_structure,
             images: images,
+            image_views,
         }
     }
 }

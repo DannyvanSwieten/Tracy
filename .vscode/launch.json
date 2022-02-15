@@ -17,7 +17,9 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/target/debug/tracey.exe",
-            "args": ["${workspaceFolder}/assets/Suzanne/glTF/Suzanne.gltf"],
+            "args": [
+                "${workspaceFolder}/assets/Duck/glTF/Duck.gltf"
+            ],
             "stopOnEntry": false,
             "cwd": "${workspaceFolder}",
             "console": "externalTerminal"

@@ -108,6 +108,3 @@ impl DeviceContext {
         )
     }
 }
-
-unsafe impl Send for DeviceContext {}
-unsafe impl Sync for DeviceContext {}
