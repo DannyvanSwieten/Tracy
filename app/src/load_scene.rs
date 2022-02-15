@@ -1,6 +1,14 @@
 use renderer::geometry::Vertex;
 use renderer::scene::Scene;
 
+fn dot_array(lhs: &[f32; 4], rhs: &[f32; 4]) -> f32 {
+    lhs[0] * rhs[0] + lhs[1] * rhs[1] + lhs[2] * rhs[2] + lhs[3] * rhs[3]
+}
+
+// fn mul_matrix_array(lhs: &[[f32; 4]; 4], rhs: &[[f32; 4]; 4]) -> [[f32; 4]; 4] {
+
+// }
+
 fn load_node(
     mut scene: Scene,
     document: &gltf::Document,
