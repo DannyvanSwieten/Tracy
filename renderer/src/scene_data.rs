@@ -5,9 +5,11 @@ use crate::geometry::{
 };
 use crate::scene::{Material, Scene};
 use vk_utils::buffer_resource::BufferResource;
+use vk_utils::command_buffer;
 use vk_utils::device_context::DeviceContext;
+use vk_utils::image_resource::Image2DResource;
 
-use ash::vk::{BufferUsageFlags, GeometryInstanceFlagsKHR, MemoryPropertyFlags};
+use ash::vk::{BufferUsageFlags, GeometryInstanceFlagsKHR, Image, MemoryPropertyFlags};
 
 pub struct SceneData {
     pub vertex_buffer: BufferResource,
@@ -17,6 +19,7 @@ pub struct SceneData {
     pub address_buffer: BufferResource,
     pub bottom_level_acceleration_structures: Vec<BottomLevelAccelerationStructure>,
     pub top_level_acceleration_structure: TopLevelAccelerationStructure,
+    pub images: Vec<Image2DResource>,
 }
 
 impl SceneData {
@@ -108,6 +111,44 @@ impl SceneData {
         let top_level_acceleration_structure =
             TopLevelAccelerationStructure::new(&device, &rtx, &instances);
 
+        let images: Vec<Image2DResource> = scene
+            .images()
+            .iter()
+            .map(|data| {
+                let mut buffer = device.buffer(
+                    data.pixels.len() as _,
+                    ash::vk::MemoryPropertyFlags::HOST_VISIBLE,
+                    ash::vk::BufferUsageFlags::TRANSFER_SRC,
+                );
+
+                buffer.copy_to(&data.pixels);
+
+                let mut image = device.image_2d(
+                    data.width,
+                    data.height,
+                    data.format,
+                    ash::vk::MemoryPropertyFlags::DEVICE_LOCAL,
+                    ash::vk::ImageUsageFlags::SAMPLED | ash::vk::ImageUsageFlags::TRANSFER_DST,
+                );
+
+                device.graphics_queue().unwrap().begin(|command_buffer| {
+                    command_buffer.color_image_resource_transition(
+                        &mut image,
+                        ash::vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    );
+
+                    command_buffer.copy_buffer_to_image_2d(&buffer, &image);
+                    command_buffer.color_image_resource_transition(
+                        &mut image,
+                        ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    );
+                    command_buffer
+                });
+
+                image
+            })
+            .collect();
+
         Self {
             vertex_buffer,
             index_buffer,
@@ -116,6 +157,7 @@ impl SceneData {
             address_buffer,
             bottom_level_acceleration_structures,
             top_level_acceleration_structure,
+            images: images,
         }
     }
 }

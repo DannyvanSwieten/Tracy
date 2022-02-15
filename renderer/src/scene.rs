@@ -1,6 +1,38 @@
 use crate::geometry::*;
 use ash::vk::GeometryInstanceFlagsKHR;
 
+pub struct TextureImageData {
+    pub format: ash::vk::Format,
+    pub width: u32,
+    pub height: u32,
+    pub pixels: Vec<u8>,
+}
+
+impl TextureImageData {
+    pub fn new(format: ash::vk::Format, width: u32, height: u32, pixels: &[u8]) -> Self {
+        if format == ash::vk::Format::R8G8B8_UNORM {
+            let mut new_pixels = Vec::new();
+            for i in (0..pixels.len()).step_by(3) {
+                new_pixels.extend(&pixels[i..i + 3]);
+                new_pixels.push(255);
+            }
+            Self {
+                format: ash::vk::Format::R8G8B8A8_UNORM,
+                width,
+                height,
+                pixels: new_pixels,
+            }
+        } else {
+            Self {
+                format,
+                width,
+                height,
+                pixels: pixels.to_vec(),
+            }
+        }
+    }
+}
+
 #[repr(C)]
 pub struct Material {
     color: glm::Vec4,
@@ -11,7 +43,7 @@ pub struct Material {
 impl Material {
     pub fn new() -> Self {
         Self {
-            color: glm::vec4(1., 1., 1., 1.),
+            color: glm::vec4(1., 0., 1., 1.),
             emission: glm::vec4(0., 0., 0., 0.),
             maps: glm::vec4(-1, -1, -1, -1),
         }
@@ -24,6 +56,8 @@ pub struct Scene {
     geometry_instances: Vec<GeometryInstance>,
     geometry_instance_offsets: Vec<GeometryOffset>,
     materials: Vec<Material>,
+
+    images: Vec<TextureImageData>,
 }
 
 unsafe impl Send for Scene {}
@@ -36,7 +70,13 @@ impl Scene {
             geometry_instances: Vec::new(),
             geometry_instance_offsets: Vec::new(),
             materials: Vec::new(),
+            images: Vec::new(),
         }
+    }
+
+    pub fn add_image(&mut self, format: ash::vk::Format, width: u32, height: u32, data: &[u8]) {
+        self.images
+            .push(TextureImageData::new(format, width, height, data))
     }
 
     pub fn add_geometry(&mut self, indices: &[u32], vertices: &[Vertex]) -> usize {
@@ -78,6 +118,23 @@ impl Scene {
         instance_id as usize
     }
 
+    pub fn set_matrix(&mut self, instance_id: usize, matrix: &[[f32; 4]; 4]) {
+        self.geometry_instances[instance_id].transform[0] = matrix[0][0];
+        self.geometry_instances[instance_id].transform[1] = matrix[0][1];
+        self.geometry_instances[instance_id].transform[2] = matrix[0][2];
+        self.geometry_instances[instance_id].transform[3] = matrix[0][3];
+
+        self.geometry_instances[instance_id].transform[4] = matrix[1][0];
+        self.geometry_instances[instance_id].transform[5] = matrix[1][1];
+        self.geometry_instances[instance_id].transform[6] = matrix[1][2];
+        self.geometry_instances[instance_id].transform[7] = matrix[1][3];
+
+        self.geometry_instances[instance_id].transform[8] = matrix[2][0];
+        self.geometry_instances[instance_id].transform[9] = matrix[2][1];
+        self.geometry_instances[instance_id].transform[10] = matrix[2][2];
+        self.geometry_instances[instance_id].transform[11] = matrix[2][3];
+    }
+
     pub fn set_transform(&mut self, instance_id: usize, transform: &glm::Mat4x3) {
         self.geometry_instances[instance_id].transform = *transform;
     }
@@ -91,6 +148,18 @@ impl Scene {
         self.geometry_instances[instance_id].transform[3] = position.x;
         self.geometry_instances[instance_id].transform[7] = position.y;
         self.geometry_instances[instance_id].transform[11] = position.z;
+    }
+
+    pub fn set_position_values(&mut self, instance_id: usize, x: f32, y: f32, z: f32) {
+        self.geometry_instances[instance_id].transform[3] = x;
+        self.geometry_instances[instance_id].transform[7] = y;
+        self.geometry_instances[instance_id].transform[11] = z;
+    }
+
+    pub fn set_scale_values(&mut self, instance_id: usize, x: f32, y: f32, z: f32) {
+        self.geometry_instances[instance_id].transform[0] = x;
+        self.geometry_instances[instance_id].transform[5] = y;
+        self.geometry_instances[instance_id].transform[10] = z;
     }
 
     pub fn set_scale(&mut self, instance_id: usize, scale: &glm::Vec3) {
@@ -120,5 +189,9 @@ impl Scene {
 
     pub fn materials(&self) -> &[Material] {
         &self.materials
+    }
+
+    pub fn images(&self) -> &[TextureImageData] {
+        &self.images
     }
 }

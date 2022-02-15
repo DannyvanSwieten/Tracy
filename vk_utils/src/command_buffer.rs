@@ -131,7 +131,11 @@ impl CommandBufferHandle {
         &self.submit_info
     }
 
-    pub fn color_image_resource_transition(&self, image: &Image2DResource, layout: ImageLayout) {
+    pub fn color_image_resource_transition(
+        &self,
+        image: &mut Image2DResource,
+        layout: ImageLayout,
+    ) {
         let barrier = ImageMemoryBarrier::builder()
             .old_layout(image.layout())
             .new_layout(layout)
@@ -158,6 +162,8 @@ impl CommandBufferHandle {
                 &[barrier],
             );
         }
+
+        image.layout = layout;
     }
 
     pub fn color_image_transition(
@@ -232,6 +238,30 @@ impl CommandBufferHandle {
                 *image.vk_image(),
                 image.layout(),
                 buffer.buffer,
+                &copy,
+            )
+        }
+    }
+
+    pub fn copy_buffer_to_image_2d(&self, buffer: &BufferResource, image: &Image2DResource) {
+        let layer_info = ImageSubresourceLayers::builder()
+            .layer_count(1)
+            .aspect_mask(ImageAspectFlags::COLOR);
+        let copy = [*BufferImageCopy::builder()
+            .image_extent(
+                *Extent3D::builder()
+                    .width(image.width())
+                    .height(image.height())
+                    .depth(1),
+            )
+            .image_subresource(*layer_info)];
+
+        unsafe {
+            self.device.cmd_copy_buffer_to_image(
+                self.command_buffer[0],
+                buffer.buffer,
+                *image.vk_image(),
+                image.layout(),
                 &copy,
             )
         }

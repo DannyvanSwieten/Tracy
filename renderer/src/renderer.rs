@@ -106,7 +106,7 @@ impl Renderer {
                 if let Some(queue) = device.graphics_queue() {
                     self.wait_handles[self.current_frame_index] =
                         Some(queue.begin(|command_buffer| {
-                            if let Some(image) = self.output_image.as_ref() {
+                            if let Some(image) = self.output_image.as_mut() {
                                 command_buffer
                                     .color_image_resource_transition(image, ImageLayout::GENERAL);
                                 self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
