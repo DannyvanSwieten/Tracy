@@ -1,19 +1,29 @@
 use renderer::geometry::Vertex;
 use renderer::scene::Scene;
 
-fn dot_array(lhs: &[f32; 4], rhs: &[f32; 4]) -> f32 {
-    lhs[0] * rhs[0] + lhs[1] * rhs[1] + lhs[2] * rhs[2] + lhs[3] * rhs[3]
+fn mul_matrix_array(lhs: &[[f32; 4]; 4], rhs: &[[f32; 4]; 4]) -> [[f32; 4]; 4] {
+    let mut mul = [
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+    ];
+    for i in 0..4 {
+        for j in 0..4 {
+            for k in 0..4 {
+                mul[i][j] += lhs[i][k] * rhs[k][j];
+            }
+        }
+    }
+
+    mul
 }
-
-// fn mul_matrix_array(lhs: &[[f32; 4]; 4], rhs: &[[f32; 4]; 4]) -> [[f32; 4]; 4] {
-
-// }
 
 fn load_node(
     mut scene: Scene,
     document: &gltf::Document,
     node: &gltf::Node,
-    parent_transform: &gltf::scene::Transform,
+    parent_transform: gltf::scene::Transform,
 ) -> Scene {
     if let Some(mesh) = node.mesh() {
         let instance_id = scene.create_instance(mesh.index());
@@ -32,12 +42,16 @@ fn load_node(
                 // scene.set_orientation(instance_id, tr.rotation);
                 scene.set_scale_values(instance_id, scale[0], scale[1], scale[2]);
             }
-            gltf::scene::Transform::Matrix { matrix } => scene.set_matrix(instance_id, &matrix),
+            gltf::scene::Transform::Matrix { matrix } => {
+                let p = parent_transform.matrix();
+                let new_transform = mul_matrix_array(&p, &matrix);
+                scene.set_matrix(instance_id, &new_transform)
+            }
         }
     }
 
     for child in node.children() {
-        scene = load_node(scene, document, &child, &node.transform())
+        scene = load_node(scene, document, &child, node.transform())
     }
 
     scene
@@ -83,7 +97,7 @@ pub fn load_scene(path: &str) -> Option<Scene> {
 
     for scene in document.scenes() {
         for node in scene.nodes() {
-            new_scene = load_node(new_scene, &document, &node, &node.transform());
+            new_scene = load_node(new_scene, &document, &node, node.transform());
         }
     }
 
