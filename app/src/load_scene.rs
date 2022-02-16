@@ -1,3 +1,4 @@
+use nalgebra_glm::Vec4;
 use renderer::geometry::Vertex;
 use renderer::scene::Scene;
 
@@ -23,40 +24,12 @@ fn load_node(
     mut scene: Scene,
     document: &gltf::Document,
     node: &gltf::Node,
+    buffers: &Vec<gltf::buffer::Data>,
     parent_transform: &[[f32; 4]; 4],
 ) -> Scene {
     let this_transform = mul_matrix_array(parent_transform, &node.transform().matrix());
 
     if let Some(mesh) = node.mesh() {
-        let instance_id = scene.create_instance(mesh.index());
-        scene.set_matrix(instance_id, &this_transform)
-    }
-
-    if let Some(camera) = node.camera() {
-        match camera.projection() {
-            gltf::camera::Projection::Perspective(cam) => {
-                scene.add_camera(&renderer::scene::Camera {
-                    fov: cam.yfov(),
-                    z_near: cam.znear(),
-                    z_far: cam.zfar().unwrap_or(1000.0),
-                })
-            }
-            _ => (),
-        }
-        //scene.add_camera(Camera{fov: camera.fov, z_near: camera.z_near, z_far: camera.z_far})
-    }
-
-    for child in node.children() {
-        scene = load_node(scene, document, &child, &this_transform)
-    }
-
-    scene
-}
-
-pub fn load_scene(path: &str) -> Option<Scene> {
-    let mut new_scene = Scene::new();
-    let (document, buffers, images) = gltf::import(path).expect("GLTF import failed");
-    for mesh in document.meshes() {
         for primitive in mesh.primitives() {
             let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
             let vertices: Vec<Vertex> = reader
@@ -71,9 +44,73 @@ pub fn load_scene(path: &str) -> Option<Scene> {
                 (0..vertices.len() as u32).collect()
             };
 
-            new_scene.add_geometry(&indices, &vertices);
+            let tex_coords: Vec<nalgebra_glm::Vec2> = if let Some(iter) = reader.read_tex_coords(0)
+            {
+                iter.into_f32()
+                    .map(|texcoord| nalgebra_glm::Vec2::new(texcoord[0], texcoord[1]))
+                    .collect()
+            } else {
+                (0..vertices.len() as u32)
+                    .map(|_| nalgebra_glm::Vec2::new(0.0, 0.0))
+                    .collect()
+            };
+
+            let geometry_id = scene.add_geometry(&indices, &vertices, &tex_coords);
+            let instance_id = scene.create_instance(geometry_id);
+            scene.set_matrix(instance_id, &this_transform);
+            let m = primitive.material().pbr_metallic_roughness();
+            let a = m.base_color_factor();
+            scene.set_material_base_color(instance_id, &Vec4::new(a[0], a[1], a[2], a[3]));
+            if let Some(base_color_texture) = m.base_color_texture() {
+                scene.set_material_base_color_texture(
+                    instance_id,
+                    base_color_texture.texture().index(),
+                );
+            }
         }
     }
+
+    if let Some(camera) = node.camera() {
+        match camera.projection() {
+            gltf::camera::Projection::Perspective(cam) => {
+                scene.add_camera(&renderer::scene::Camera {
+                    fov: cam.yfov(),
+                    z_near: cam.znear(),
+                    z_far: cam.zfar().unwrap_or(1000.0),
+                })
+            }
+            _ => (),
+        }
+    }
+
+    for child in node.children() {
+        scene = load_node(scene, document, &child, buffers, &this_transform)
+    }
+
+    scene
+}
+
+pub fn load_scene(path: &str) -> Option<Scene> {
+    let mut new_scene = Scene::new();
+    let (document, buffers, images) = gltf::import(path).expect("GLTF import failed");
+    // for mesh in document.meshes() {
+    //     for primitive in mesh.primitives() {
+    //         let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
+    //         let vertices: Vec<Vertex> = reader
+    //             .read_positions()
+    //             .unwrap()
+    //             .map(|position| Vertex::new(position[0], position[1], position[2]))
+    //             .collect();
+
+    //         let indices: Vec<u32> = if let Some(iter) = reader.read_indices() {
+    //             iter.into_u32().collect()
+    //         } else {
+    //             (0..vertices.len() as u32).collect()
+    //         };
+
+    //         new_scene.add_geometry(&indices, &vertices);
+    //     }
+    // }
 
     for image in images {
         let format = match image.format {
@@ -99,7 +136,7 @@ pub fn load_scene(path: &str) -> Option<Scene> {
             [0.0, 0.0, 0.0, 1.0],
         ];
         for node in scene.nodes() {
-            new_scene = load_node(new_scene, &document, &node, &parent_transform);
+            new_scene = load_node(new_scene, &document, &node, &buffers, &parent_transform);
         }
     }
 

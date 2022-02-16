@@ -13,6 +13,7 @@ use ash::vk::{BufferUsageFlags, GeometryInstanceFlagsKHR, MemoryPropertyFlags};
 pub struct SceneData {
     pub vertex_buffer: BufferResource,
     pub index_buffer: BufferResource,
+    pub tex_coord_buffer: BufferResource,
     pub offset_buffer: BufferResource,
     pub material_buffer: BufferResource,
     pub address_buffer: BufferResource,
@@ -20,6 +21,7 @@ pub struct SceneData {
     pub top_level_acceleration_structure: TopLevelAccelerationStructure,
     pub images: Vec<Image2DResource>,
     pub image_views: Vec<ash::vk::ImageView>,
+    pub samplers: Vec<ash::vk::Sampler>,
 }
 
 impl SceneData {
@@ -45,6 +47,14 @@ impl SceneData {
 
         index_buffer.copy_to(geometry.indices());
 
+        let mut tex_coord_buffer = device.buffer(
+            (geometry.vertices().len() * std::mem::size_of::<nalgebra_glm::Vec2>()) as u64,
+            MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::SHADER_DEVICE_ADDRESS | BufferUsageFlags::STORAGE_BUFFER,
+        );
+
+        tex_coord_buffer.copy_to(geometry.tex_coords());
+
         let mut offset_buffer = device.buffer(
             (scene.geometry_offsets().len() * std::mem::size_of::<GeometryOffset>()) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
@@ -62,7 +72,7 @@ impl SceneData {
         material_buffer.copy_to(scene.materials());
 
         let mut address_buffer = device.buffer(
-            32 as u64,
+            40 as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::UNIFORM_BUFFER,
         );
@@ -70,6 +80,7 @@ impl SceneData {
         address_buffer.copy_to(&[
             vertex_buffer.device_address(),
             index_buffer.device_address(),
+            tex_coord_buffer.device_address(),
             offset_buffer.device_address(),
             material_buffer.device_address(),
         ]);
@@ -170,9 +181,27 @@ impl SceneData {
             })
             .collect();
 
+        let mut samplers = Vec::new();
+        unsafe {
+            samplers.push(
+                device
+                    .vk_device()
+                    .create_sampler(
+                        &ash::vk::SamplerCreateInfo::builder()
+                            .min_filter(ash::vk::Filter::LINEAR)
+                            .mag_filter(ash::vk::Filter::LINEAR)
+                            .anisotropy_enable(true)
+                            .max_anisotropy(8.0),
+                        None,
+                    )
+                    .expect("Sampler creation failed"),
+            );
+        }
+
         Self {
             vertex_buffer,
             index_buffer,
+            tex_coord_buffer,
             offset_buffer,
             material_buffer,
             address_buffer,
@@ -180,6 +209,7 @@ impl SceneData {
             top_level_acceleration_structure,
             images: images,
             image_views,
+            samplers,
         }
     }
 }

@@ -1,5 +1,6 @@
 use crate::geometry::*;
 use ash::vk::GeometryInstanceFlagsKHR;
+use glm::Vec3;
 #[derive(Clone, Copy)]
 pub struct Camera {
     pub fov: f32,
@@ -39,16 +40,17 @@ impl TextureImageData {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct Material {
-    color: glm::Vec4,
-    emission: glm::Vec4,
-    maps: glm::IVec4,
+    pub color: glm::Vec4,
+    pub emission: glm::Vec4,
+    pub maps: glm::IVec4,
 }
 
 impl Material {
-    pub fn new() -> Self {
+    pub fn new(color: &glm::Vec4) -> Self {
         Self {
-            color: glm::vec4(1., 1., 1., 1.),
+            color: *color,
             emission: glm::vec4(0., 0., 0., 0.),
             maps: glm::vec4(-1, -1, -1, -1),
         }
@@ -88,7 +90,12 @@ impl Scene {
             .push(TextureImageData::new(format, width, height, data))
     }
 
-    pub fn add_geometry(&mut self, indices: &[u32], vertices: &[Vertex]) -> usize {
+    pub fn add_geometry(
+        &mut self,
+        indices: &[u32],
+        vertices: &[Vertex],
+        tex_coords: &[nalgebra_glm::Vec2],
+    ) -> usize {
         let (index_offset, vertex_offset) = if let Some(view) = self.geometry_views.last() {
             (
                 view.index_offset() + view.index_count(),
@@ -104,7 +111,7 @@ impl Scene {
             vertices.len() as u32,
             vertex_offset,
         ));
-        self.geometry_buffer.append(indices, vertices);
+        self.geometry_buffer.append(indices, vertices, tex_coords);
         return self.geometry_views.len() - 1;
     }
 
@@ -118,13 +125,26 @@ impl Scene {
             geometry_id as u64,
         ));
 
-        self.materials.push(Material::new());
+        self.materials
+            .push(Material::new(&glm::Vec4::new(1.0, 1.0, 1.0, 1.0)));
         self.geometry_instance_offsets.push(GeometryOffset {
             index: self.geometry_views[geometry_id].index_offset(),
             vertex: self.geometry_views[geometry_id].vertex_offset(),
         });
         self.set_scale(instance_id as usize, &glm::Vec3::new(1.0, 1.0, 1.0));
         instance_id as usize
+    }
+
+    pub fn set_material_base_color(&mut self, instance_id: usize, color: &glm::Vec4) {
+        self.materials[instance_id].color = *color
+    }
+
+    pub fn set_material_base_color_texture(&mut self, instance_id: usize, texture_id: usize) {
+        self.materials[instance_id].maps[0] = texture_id as i32;
+    }
+
+    pub fn set_material(&mut self, instance_id: usize, material: &Material) {
+        self.materials[instance_id] = *material;
     }
 
     pub fn set_matrix(&mut self, instance_id: usize, matrix: &[[f32; 4]; 4]) {

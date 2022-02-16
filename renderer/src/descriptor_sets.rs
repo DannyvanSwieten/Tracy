@@ -1,8 +1,8 @@
 use ash::vk::{
-    DescriptorBufferInfo, DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize,
-    DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding,
-    DescriptorSetLayoutCreateInfo, DescriptorType, PipelineLayout, PipelineLayoutCreateInfo,
-    ShaderStageFlags, WriteDescriptorSet,
+    DescriptorBufferInfo, DescriptorImageInfo, DescriptorPool, DescriptorPoolCreateInfo,
+    DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout,
+    DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo, DescriptorType, PipelineLayout,
+    PipelineLayoutCreateInfo, ShaderStageFlags, WriteDescriptorSet,
 };
 
 use crate::scene_data::SceneData;
@@ -46,6 +46,11 @@ impl RTXDescriptorSets {
                     .descriptor_type(DescriptorType::UNIFORM_BUFFER)
                     .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR | ShaderStageFlags::RAYGEN_KHR)
                     .binding(1),
+                *DescriptorSetLayoutBinding::builder()
+                    .descriptor_count(2)
+                    .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
+                    .binding(2),
             ];
 
             let set_1 = *DescriptorSetLayoutCreateInfo::builder().bindings(&set_1_bindings);
@@ -85,6 +90,10 @@ impl RTXDescriptorSets {
                     ty: DescriptorType::UNIFORM_BUFFER,
                     descriptor_count: 2,
                 },
+                DescriptorPoolSize {
+                    ty: DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    descriptor_count: 2,
+                },
             ];
             let descriptor_pool_create_info = DescriptorPoolCreateInfo::builder()
                 .max_sets(3)
@@ -117,11 +126,32 @@ impl RTXDescriptorSets {
             .range(scene_data.address_buffer.content_size())
             .buffer(scene_data.address_buffer.buffer)];
 
+        let image_writes: Vec<DescriptorImageInfo> = scene_data
+            .image_views
+            .iter()
+            .map(|view| {
+                *DescriptorImageInfo::builder()
+                    .image_view(*view)
+                    .image_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                    .sampler(scene_data.samplers[0])
+            })
+            .collect();
+
         let writes = [*WriteDescriptorSet::builder()
             .dst_binding(1)
             .dst_set(self.descriptor_sets[1])
             .descriptor_type(DescriptorType::UNIFORM_BUFFER)
             .buffer_info(&buffer_writes)];
+
+        unsafe {
+            ctx.vk_device().update_descriptor_sets(&writes, &[]);
+        }
+
+        let writes = [*WriteDescriptorSet::builder()
+            .dst_binding(2)
+            .dst_set(self.descriptor_sets[1])
+            .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .image_info(&image_writes)];
         unsafe {
             ctx.vk_device().update_descriptor_sets(&writes, &[]);
         }

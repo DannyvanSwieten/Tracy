@@ -31,29 +31,49 @@ impl Vertex {
 pub struct GeometryBuffer {
     indices: Vec<u32>,
     vertices: Vec<Vertex>,
+    tex_coords: Vec<glm::Vec2>,
 }
 
 impl GeometryBuffer {
     pub fn new() -> Self {
         Self {
-            indices: Vec::default(),
-            vertices: Vec::default(),
+            indices: Vec::new(),
+            vertices: Vec::new(),
+            tex_coords: Vec::new(),
         }
     }
 
-    pub fn append(&mut self, indices: &[u32], vertices: &[Vertex]) {
+    pub fn append(
+        &mut self,
+        indices: &[u32],
+        vertices: &[Vertex],
+        tex_coords: &[nalgebra_glm::Vec2],
+    ) {
         self.indices.extend(indices);
         self.vertices.extend(vertices.to_vec());
+        self.tex_coords.extend(tex_coords.to_vec())
     }
 
-    pub fn new_with_data(indices: Vec<u32>, vertices: Vec<Vertex>) -> Self {
-        Self { indices, vertices }
+    pub fn new_with_data(
+        indices: &[u32],
+        vertices: &[Vertex],
+        tex_coords: &[nalgebra_glm::Vec2],
+    ) -> Self {
+        Self {
+            indices: indices.to_vec(),
+            vertices: vertices.to_vec(),
+            tex_coords: tex_coords.to_vec(),
+        }
     }
     pub fn vertices(&self) -> &[Vertex] {
         &self.vertices
     }
     pub fn indices(&self) -> &[u32] {
         &self.indices
+    }
+
+    pub fn tex_coords(&self) -> &[nalgebra_glm::Vec2] {
+        &self.tex_coords
     }
 }
 
@@ -191,7 +211,8 @@ impl BottomLevelAccelerationStructure {
                 build_sizes.build_scratch_size,
                 MemoryPropertyFlags::DEVICE_LOCAL,
                 BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
-                    | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+                    | BufferUsageFlags::SHADER_DEVICE_ADDRESS
+                    | BufferUsageFlags::STORAGE_BUFFER,
             );
 
             let acc_buffer = device.buffer(
@@ -332,7 +353,8 @@ impl TopLevelAccelerationStructure {
                 MemoryPropertyFlags::DEVICE_LOCAL,
                 BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
                     | BufferUsageFlags::SHADER_DEVICE_ADDRESS
-                    | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
+                    | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR
+                    | BufferUsageFlags::STORAGE_BUFFER,
             );
 
             let acc_buffer = device.buffer(

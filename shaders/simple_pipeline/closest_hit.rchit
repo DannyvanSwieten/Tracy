@@ -19,17 +19,19 @@ layout(location = 0) rayPayloadInEXT RayPayload ray;
 
 layout(buffer_reference, scalar) readonly buffer Vertices { vec3 data[]; };
 layout(buffer_reference, scalar) readonly buffer Indices { int32_t data[]; };
+layout(buffer_reference, scalar) readonly buffer TextureCoordinates { vec2 data[]; };
 layout(buffer_reference, scalar) readonly buffer Offsets { ivec2 data[]; };
 layout(buffer_reference, scalar) readonly buffer Materials { Material data[]; };
 
 layout(binding = 1, set = 1) uniform BufferAddresses {
     uint64_t vertex_address;
     uint64_t index_address;
+    uint64_t texcoord_address;
     uint64_t offset_address;
     uint64_t material_address;
 };
 
-layout(binding = 2, set = 1) uniform sampler2D[1024];
+layout(binding = 2, set = 1) uniform sampler2D images[1];
 
 void main()
 {
@@ -37,6 +39,7 @@ void main()
     Offsets offsets = Offsets(offset_address);
     Indices indices = Indices(index_address);
     Vertices vertices = Vertices(vertex_address);
+    TextureCoordinates tex_coords = TextureCoordinates(texcoord_address);
 
     const vec3 barycentric = vec3(1 - attribs.x - attribs.y, attribs.x, attribs.y);
 
@@ -54,6 +57,12 @@ void main()
     const vec3 pv1 = barycentric.y * v1;
     const vec3 pv2 = barycentric.z * v2;
 
+    const vec2 uv0 = barycentric.x * tex_coords.data[start_vertex + i0];
+    const vec2 uv1 = barycentric.y * tex_coords.data[start_vertex + i1];
+    const vec2 uv2 = barycentric.z * tex_coords.data[start_vertex + i2];
+
+    const vec2 uv = uv0 + uv1 + uv2;
+
     const vec3 e10 = v1 - v0;
     const vec3 e20 = v2 - v0;
     const vec3 N = normalize(cross(e10, e20));
@@ -64,6 +73,10 @@ void main()
     vec3 L;
     vec3 att = sample_lambert_brdf(N, L, -gl_WorldRayDirectionEXT, Xi);
     vec3 c = materials.data[gl_InstanceCustomIndexEXT].albedo.rgb;
+    if(materials.data[gl_InstanceCustomIndexEXT].maps[0] != -1)
+    {
+        c *= texture(images[materials.data[gl_InstanceCustomIndexEXT].maps[0]], uv).rgb;
+    }
     c*= att;
     ray.color = vec4(c, 1);
     ray.w_out = L;

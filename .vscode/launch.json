@@ -18,7 +18,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/target/debug/tracey.exe",
             "args": [
-                "${workspaceFolder}/assets/Duck/glTF/Duck.gltf"
+                "${workspaceFolder}/assets/Suzanne/glTF/Suzanne.gltf"
             ],
             "stopOnEntry": false,
             "cwd": "${workspaceFolder}",
