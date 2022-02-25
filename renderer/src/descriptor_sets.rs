@@ -2,7 +2,7 @@ use ash::vk::{
     DescriptorBufferInfo, DescriptorImageInfo, DescriptorPool, DescriptorPoolCreateInfo,
     DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout,
     DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo, DescriptorType, PipelineLayout,
-    PipelineLayoutCreateInfo, ShaderStageFlags, WriteDescriptorSet,
+    PipelineLayoutCreateInfo, PushConstantRange, ShaderStageFlags, WriteDescriptorSet,
 };
 
 use crate::scene_data::SceneData;
@@ -31,6 +31,12 @@ impl RTXDescriptorSets {
                     .descriptor_type(DescriptorType::STORAGE_IMAGE)
                     .stage_flags(ShaderStageFlags::RAYGEN_KHR)
                     .binding(1),
+                // accumulation image
+                *DescriptorSetLayoutBinding::builder()
+                    .descriptor_count(1)
+                    .descriptor_type(DescriptorType::STORAGE_IMAGE)
+                    .stage_flags(ShaderStageFlags::RAYGEN_KHR)
+                    .binding(2),
             ];
 
             let set_0 = *DescriptorSetLayoutCreateInfo::builder().bindings(&set_0_bindings);
@@ -47,7 +53,7 @@ impl RTXDescriptorSets {
                     .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR | ShaderStageFlags::RAYGEN_KHR)
                     .binding(1),
                 *DescriptorSetLayoutBinding::builder()
-                    .descriptor_count(2)
+                    .descriptor_count(1024)
                     .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
                     .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
                     .binding(2),
@@ -66,10 +72,16 @@ impl RTXDescriptorSets {
                     .expect("Descriptor set layout creation failed"),
             ];
 
+            let constant_ranges = [*PushConstantRange::builder()
+                .size(8)
+                .stage_flags(ShaderStageFlags::RAYGEN_KHR)];
+
             let pipeline_layout = device
                 .vk_device()
                 .create_pipeline_layout(
-                    &PipelineLayoutCreateInfo::builder().set_layouts(&descriptor_set_layouts),
+                    &PipelineLayoutCreateInfo::builder()
+                        .set_layouts(&descriptor_set_layouts)
+                        .push_constant_ranges(&constant_ranges),
                     None,
                 )
                 .expect("Pipeline layout creation failed");
@@ -92,7 +104,7 @@ impl RTXDescriptorSets {
                 },
                 DescriptorPoolSize {
                     ty: DescriptorType::COMBINED_IMAGE_SAMPLER,
-                    descriptor_count: 2,
+                    descriptor_count: 1024,
                 },
             ];
             let descriptor_pool_create_info = DescriptorPoolCreateInfo::builder()
@@ -147,13 +159,15 @@ impl RTXDescriptorSets {
             ctx.vk_device().update_descriptor_sets(&writes, &[]);
         }
 
-        let writes = [*WriteDescriptorSet::builder()
-            .dst_binding(2)
-            .dst_set(self.descriptor_sets[1])
-            .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .image_info(&image_writes)];
-        unsafe {
-            ctx.vk_device().update_descriptor_sets(&writes, &[]);
+        if image_writes.len() > 0 {
+            let writes = [*WriteDescriptorSet::builder()
+                .dst_binding(2)
+                .dst_set(self.descriptor_sets[1])
+                .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .image_info(&image_writes)];
+            unsafe {
+                ctx.vk_device().update_descriptor_sets(&writes, &[]);
+            }
         }
     }
 }

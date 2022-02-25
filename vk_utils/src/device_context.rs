@@ -14,6 +14,8 @@ pub struct DeviceContext {
     graphics_queue: Option<QueueHandle>,
 }
 
+unsafe impl Send for DeviceContext {}
+
 impl DeviceContext {
     pub(crate) fn new(
         gpu: &Gpu,

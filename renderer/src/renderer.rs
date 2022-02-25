@@ -2,7 +2,7 @@ use crate::context::RtxContext;
 use crate::descriptor_sets::RTXDescriptorSets;
 use crate::scene::Scene;
 use crate::scene_data::SceneData;
-use nalgebra_glm::Vec3;
+use nalgebra_glm::{vec3, Vec3};
 
 use vk_utils::buffer_resource::BufferResource;
 use vk_utils::device_context::DeviceContext;
@@ -29,10 +29,16 @@ use ash::vk::{
     ShaderModuleCreateInfo, ShaderStageFlags, WriteDescriptorSet,
 };
 
+struct CameraData {
+    view_inverse: glm::Mat4,
+    projection_inverse: glm::Mat4,
+}
+
 pub struct Renderer {
     rtx: RtxContext,
     pipeline: Pipeline,
     accumulation_image: Option<Image2DResource>,
+    accumulation_image_view: ImageView,
     output_image: Option<Image2DResource>,
     output_image_view: ImageView,
     camera_buffer: BufferResource,
@@ -42,15 +48,18 @@ pub struct Renderer {
     scene_data: Option<SceneData>,
     descriptor_sets: RTXDescriptorSets,
 
-    output_width: u32,
-    output_height: u32,
+    pub output_width: u32,
+    pub output_height: u32,
 
     wait_handles: [Option<WaitHandle>; 3],
     current_frame_index: usize,
 
     camera_position: Vec3,
     camera_target: Vec3,
+    current_batch: u32,
 }
+
+unsafe impl Send for Renderer {}
 
 impl Renderer {
     pub fn create_suitable_device(gpu: &Gpu) -> DeviceContext {
@@ -100,13 +109,21 @@ impl Renderer {
         buffer
     }
 
-    pub fn render(&mut self, device: &DeviceContext) -> (Image, ImageView) {
+    pub fn render(&mut self, spp: u32, device: &DeviceContext) -> (Image, ImageView) {
         unsafe {
             if let Some(_scene) = self.scene_data.as_ref() {
                 if let Some(queue) = device.graphics_queue() {
                     self.wait_handles[self.current_frame_index] =
                         Some(queue.begin(|command_buffer| {
                             if let Some(image) = self.output_image.as_mut() {
+                                command_buffer
+                                    .color_image_resource_transition(image, ImageLayout::GENERAL);
+                                self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
+                            } else {
+                                panic!()
+                            }
+
+                            if let Some(image) = self.accumulation_image.as_mut() {
                                 command_buffer
                                     .color_image_resource_transition(image, ImageLayout::GENERAL);
                                 self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
@@ -123,6 +140,21 @@ impl Renderer {
                                 PipelineBindPoint::RAY_TRACING_KHR,
                                 self.pipeline,
                             );
+                            let constants: Vec<u8> = [spp, self.current_batch]
+                                .iter()
+                                .flat_map(|val| {
+                                    let i: u32 = *val;
+                                    let bytes = i.to_le_bytes();
+                                    bytes
+                                })
+                                .collect();
+                            device.vk_device().cmd_push_constants(
+                                *command_buffer.native_handle(),
+                                self.descriptor_sets.pipeline_layout,
+                                ShaderStageFlags::RAYGEN_KHR,
+                                0,
+                                &constants,
+                            );
                             self.rtx.pipeline_ext().cmd_trace_rays(
                                 *command_buffer.native_handle(),
                                 &self.stride_addresses[0],
@@ -138,6 +170,7 @@ impl Renderer {
 
                     self.current_frame_index += 1;
                     self.current_frame_index %= 3;
+                    self.current_batch += 1;
                 }
 
                 (
@@ -202,6 +235,7 @@ impl Renderer {
             rtx,
             pipeline: Pipeline::null(),
             accumulation_image: None,
+            accumulation_image_view: ImageView::null(),
             output_image: None,
             output_image_view: ImageView::null(),
             camera_buffer,
@@ -217,8 +251,9 @@ impl Renderer {
             wait_handles: [None, None, None],
             current_frame_index: 0,
 
-            camera_position: Vec3::new(0., 0., 5.),
-            camera_target: Vec3::default(),
+            camera_position: Vec3::new(0., 0., 12.5),
+            camera_target: vec3(0.0, 0.0, 0.0),
+            current_batch: 0,
         };
 
         result.load_shaders_and_pipeline(device);
@@ -238,7 +273,7 @@ impl Renderer {
             &self.camera_target,
             &glm::vec3(0., 1., 0.),
         );
-        let view_matrix = glm::inverse(&view_matrix);
+        let view_inverse = glm::inverse(&view_matrix);
 
         let projection_matrix = glm::perspective_rh(
             self.output_width as f32 / self.output_height as f32,
@@ -247,20 +282,41 @@ impl Renderer {
             1000.,
         );
 
-        let projection_matrix = glm::inverse(&projection_matrix);
-        self.camera_buffer
-            .copy_to(&[view_matrix, projection_matrix]);
+        let projection_inverse = glm::inverse(&projection_matrix);
+        let cam_data = CameraData {
+            view_inverse,
+            projection_inverse,
+        };
+        self.camera_buffer.copy_to(&[cam_data]);
     }
 
     pub fn move_camera(&mut self, delta: &Vec3) {
         self.camera_position += delta;
+        self.clear();
+        self.build_camera_buffer()
+    }
+
+    pub fn look_at(&mut self, target: &Vec3) {
+        self.camera_target = *target;
+        self.clear();
+        self.build_camera_buffer()
+    }
+
+    pub fn set_camera_position(&mut self, position: &Vec3) {
+        self.camera_position = *position;
+        self.clear();
         self.build_camera_buffer()
     }
 
     pub fn set_camera(&mut self, origin: &Vec3, target: &Vec3) {
         self.camera_position = *origin;
         self.camera_target = *target;
+        self.clear();
         self.build_camera_buffer()
+    }
+
+    pub fn camera_position(&self) -> &Vec3 {
+        &self.camera_position
     }
 
     fn load_shaders_and_pipeline(&mut self, device: &DeviceContext) {
@@ -423,6 +479,11 @@ impl Renderer {
         self.update_image_descriptors(device);
     }
 
+    pub fn clear(&mut self) {
+        self.current_frame_index = 0;
+        self.current_batch = 0;
+    }
+
     fn create_images_and_views(&mut self, device: &DeviceContext, width: u32, height: u32) {
         self.output_width = width;
         self.output_height = height;
@@ -432,10 +493,7 @@ impl Renderer {
             height,
             Format::R8G8B8A8_UNORM,
             MemoryPropertyFlags::DEVICE_LOCAL,
-            ImageUsageFlags::STORAGE
-                | ImageUsageFlags::SAMPLED
-                | ImageUsageFlags::TRANSFER_SRC
-                | ImageUsageFlags::TRANSFER_DST,
+            ImageUsageFlags::STORAGE | ImageUsageFlags::TRANSFER_SRC,
         ));
 
         self.accumulation_image = Some(device.image_2d(
@@ -464,17 +522,47 @@ impl Renderer {
                 .create_image_view(&view_info, None)
                 .expect("Image View creation failed");
         }
+
+        let accumulation_view_info = ImageViewCreateInfo::builder()
+            .format(Format::R32G32B32A32_SFLOAT)
+            .subresource_range(
+                ImageSubresourceRange::builder()
+                    .aspect_mask(ImageAspectFlags::COLOR)
+                    .layer_count(1)
+                    .level_count(1)
+                    .build(),
+            )
+            .view_type(ImageViewType::TYPE_2D)
+            .image(*self.accumulation_image.as_ref().unwrap().vk_image());
+
+        unsafe {
+            self.accumulation_image_view = device
+                .vk_device()
+                .create_image_view(&accumulation_view_info, None)
+                .expect("Image View creation failed");
+        }
     }
 
     fn update_image_descriptors(&mut self, device: &DeviceContext) {
         let image_writes = [*DescriptorImageInfo::builder()
             .image_view(self.output_image_view)
             .image_layout(ImageLayout::GENERAL)];
-        let writes = [*WriteDescriptorSet::builder()
-            .image_info(&image_writes)
-            .dst_set(self.descriptor_sets.descriptor_sets[0])
-            .dst_binding(1)
-            .descriptor_type(DescriptorType::STORAGE_IMAGE)];
+        let accumulation_image_writes = [*DescriptorImageInfo::builder()
+            .image_view(self.accumulation_image_view)
+            .image_layout(ImageLayout::GENERAL)];
+
+        let writes = [
+            *WriteDescriptorSet::builder()
+                .image_info(&image_writes)
+                .dst_set(self.descriptor_sets.descriptor_sets[0])
+                .dst_binding(1)
+                .descriptor_type(DescriptorType::STORAGE_IMAGE),
+            *WriteDescriptorSet::builder()
+                .image_info(&accumulation_image_writes)
+                .dst_set(self.descriptor_sets.descriptor_sets[0])
+                .dst_binding(2)
+                .descriptor_type(DescriptorType::STORAGE_IMAGE),
+        ];
 
         unsafe {
             device.vk_device().update_descriptor_sets(&writes, &[]);

@@ -31,7 +31,13 @@ layout(binding = 1, set = 1) uniform BufferAddresses {
     uint64_t material_address;
 };
 
-layout(binding = 2, set = 1) uniform sampler2D images[1];
+layout(binding = 2, set = 1) uniform sampler2D images[1024];
+
+void direction_of_anisotropicity(vec3 N, out vec3 tangent, out vec3 binormal){
+    tangent = cross(N, vec3(1.,0.,1.));
+    binormal = normalize(cross(N, tangent));
+    tangent = normalize(cross(N, binormal));
+}
 
 void main()
 {
@@ -69,16 +75,50 @@ void main()
     ray.normal = N;
 
     vec2 Xi = vec2(rand_float(ray.seed), rand_float(ray.seed));
-    ray.hit = true;
-    vec3 L;
-    vec3 att = sample_lambert_brdf(N, L, -gl_WorldRayDirectionEXT, Xi);
-    vec3 c = materials.data[gl_InstanceCustomIndexEXT].albedo.rgb;
+
+    int instance_id = gl_InstanceCustomIndexEXT;
+    Material material = materials.data[instance_id];
+
+    float pdf = 0.0;
+    vec3 wi = vec3(0.0);
+    vec3 wo = -gl_WorldRayDirectionEXT;
+    vec3 base_color = material.albedo.rgb;
     if(materials.data[gl_InstanceCustomIndexEXT].maps[0] != -1)
     {
-        c *= texture(images[materials.data[gl_InstanceCustomIndexEXT].maps[0]], uv).rgb;
+        base_color *= texture(images[material.maps[0]], uv).rgb;
     }
-    c*= att;
+    float metal = material.metallic_roughness[1];
+    float roughness = material.metallic_roughness[0];
+    if(material.maps[1] != -1)
+    {
+        vec2 mr = texture(images[material.maps[1]], uv).bg;
+        metal *= mr.x;
+        roughness *= mr.y;
+    }
+
+    roughness = max(roughness, 0.001);
+
+    float anisotropy = 0.0;
+    vec3 X = vec3(0.0);
+    vec3 Y = vec3(0.0);
+    direction_of_anisotropicity(N, X, Y);
+    vec3 color_according_to_disney = sample_disney_bsdf(Xi, wi, wo, N, X, Y, base_color, roughness, metal, anisotropy, pdf);
+
+    ray.hit = true;
+    vec3 c = color_according_to_disney;
+    if(pdf > 0.0001 && dot(c, c) > 0.0001)
+        c /= pdf;
+    else
+        c = vec3(0);
+
     ray.color = vec4(c, 1);
-    ray.w_out = L;
+    ray.emission = material.emission;
+    if(material.maps[3] != -1)
+    {
+        ray.emission *= texture(images[material.maps[3]], uv);
+    }
+
+    c += ray.emission.rgb * ray.emission.a;
+    ray.w_out = wi;
     ray.point = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
 }

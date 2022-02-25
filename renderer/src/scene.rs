@@ -1,6 +1,6 @@
 use crate::geometry::*;
 use ash::vk::GeometryInstanceFlagsKHR;
-use glm::Vec3;
+use glm::{vec2, vec3, vec4};
 #[derive(Clone, Copy)]
 pub struct Camera {
     pub fov: f32,
@@ -19,7 +19,9 @@ impl TextureImageData {
         if format == ash::vk::Format::R8G8B8_UNORM {
             let mut new_pixels = Vec::new();
             for i in (0..pixels.len()).step_by(3) {
-                new_pixels.extend(&pixels[i..i + 3]);
+                new_pixels.push(pixels[i]);
+                new_pixels.push(pixels[i + 1]);
+                new_pixels.push(pixels[i + 2]);
                 new_pixels.push(255);
             }
             Self {
@@ -44,6 +46,7 @@ impl TextureImageData {
 pub struct Material {
     pub color: glm::Vec4,
     pub emission: glm::Vec4,
+    pub metallic_roughness: glm::Vec2,
     pub maps: glm::IVec4,
 }
 
@@ -51,12 +54,21 @@ impl Material {
     pub fn new(color: &glm::Vec4) -> Self {
         Self {
             color: *color,
-            emission: glm::vec4(0., 0., 0., 0.),
-            maps: glm::vec4(-1, -1, -1, -1),
+            metallic_roughness: vec2(1.0, 0.0),
+            emission: vec4(0., 0., 0., 0.),
+            maps: vec4(-1, -1, -1, -1),
         }
     }
 }
+#[derive(Default, Clone)]
+pub struct SceneGraphNode {
+    pub name: String,
+    pub camera: Option<usize>,
+    pub mesh: Option<usize>,
+    pub children: Vec<usize>,
+}
 
+impl SceneGraphNode {}
 pub struct Scene {
     geometry_buffer: GeometryBuffer,
     geometry_views: Vec<GeometryBufferView>,
@@ -66,6 +78,43 @@ pub struct Scene {
 
     images: Vec<TextureImageData>,
     cameras: Vec<Camera>,
+
+    pub nodes: Vec<SceneGraphNode>,
+}
+
+impl Default for Scene {
+    fn default() -> Self {
+        let mut scene = Self {
+            geometry_buffer: Default::default(),
+            geometry_views: Default::default(),
+            geometry_instances: Default::default(),
+            geometry_instance_offsets: Default::default(),
+            materials: Default::default(),
+            images: Default::default(),
+            cameras: Default::default(),
+            nodes: Default::default(),
+        };
+
+        scene.add_geometry(
+            &[0, 2, 1, 0, 3, 2],
+            &[
+                Vertex::new(-1.0, -5.0, 1.0),
+                Vertex::new(-1.0, -5.0, -1.0),
+                Vertex::new(1.0, -5.0, -1.0),
+                Vertex::new(1.0, -5.0, 1.0),
+            ],
+            &[
+                vec2(0.0, 0.0),
+                vec2(0.0, 0.0),
+                vec2(0.0, 0.0),
+                vec2(0.0, 0.0),
+            ],
+        );
+        scene.create_instance(0);
+        scene.set_scale(0, &vec3(1000.0, 1.0, 1000.0));
+        scene.set_material_base_color(0, &vec4(0.5, 0.5, 0.5, 1.0));
+        scene
+    }
 }
 
 impl Scene {
@@ -78,16 +127,30 @@ impl Scene {
             materials: Vec::new(),
             images: Vec::new(),
             cameras: Vec::new(),
+            nodes: Vec::new(),
         }
     }
 
-    pub fn add_camera(&mut self, camera: &Camera) {
-        self.cameras.push(*camera)
+    pub fn add_node(&mut self, node: SceneGraphNode) -> usize {
+        self.nodes.push(node);
+        self.nodes.len() - 1
     }
 
-    pub fn add_image(&mut self, format: ash::vk::Format, width: u32, height: u32, data: &[u8]) {
+    pub fn add_camera(&mut self, camera: &Camera) -> usize {
+        self.cameras.push(*camera);
+        self.cameras.len() - 1
+    }
+
+    pub fn add_image(
+        &mut self,
+        format: ash::vk::Format,
+        width: u32,
+        height: u32,
+        data: &[u8],
+    ) -> usize {
         self.images
-            .push(TextureImageData::new(format, width, height, data))
+            .push(TextureImageData::new(format, width, height, data));
+        self.images.len() - 1
     }
 
     pub fn add_geometry(
@@ -143,6 +206,30 @@ impl Scene {
         self.materials[instance_id].maps[0] = texture_id as i32;
     }
 
+    pub fn set_material_metallic(&mut self, instance_id: usize, metallic: f32) {
+        self.materials[instance_id].metallic_roughness[1] = metallic;
+    }
+
+    pub fn set_material_roughness(&mut self, instance_id: usize, roughness: f32) {
+        self.materials[instance_id].metallic_roughness[0] = roughness;
+    }
+
+    pub fn set_material_metallic_roughness_texture(
+        &mut self,
+        instance_id: usize,
+        texture_id: usize,
+    ) {
+        self.materials[instance_id].maps[1] = texture_id as i32;
+    }
+
+    pub fn set_material_emission(&mut self, instance_id: usize, color: &glm::Vec3, intensity: f32) {
+        self.materials[instance_id].emission = vec4(color[0], color[1], color[2], intensity);
+    }
+
+    pub fn set_material_emission_texture(&mut self, instance_id: usize, texture_id: usize) {
+        self.materials[instance_id].maps[3] = texture_id as i32;
+    }
+
     pub fn set_material(&mut self, instance_id: usize, material: &Material) {
         self.materials[instance_id] = *material;
     }
@@ -185,16 +272,22 @@ impl Scene {
         self.geometry_instances[instance_id].transform[11] = z;
     }
 
+    pub fn set_scale(&mut self, instance_id: usize, scale: &glm::Vec3) {
+        self.geometry_instances[instance_id].transform[0] = scale.x;
+        self.geometry_instances[instance_id].transform[5] = scale.y;
+        self.geometry_instances[instance_id].transform[10] = scale.z;
+    }
+
     pub fn set_scale_values(&mut self, instance_id: usize, x: f32, y: f32, z: f32) {
         self.geometry_instances[instance_id].transform[0] = x;
         self.geometry_instances[instance_id].transform[5] = y;
         self.geometry_instances[instance_id].transform[10] = z;
     }
 
-    pub fn set_scale(&mut self, instance_id: usize, scale: &glm::Vec3) {
-        self.geometry_instances[instance_id].transform[0] = scale.x;
-        self.geometry_instances[instance_id].transform[5] = scale.y;
-        self.geometry_instances[instance_id].transform[10] = scale.z;
+    pub fn set_uniform_scale(&mut self, instance_id: usize, s: f32) {
+        self.geometry_instances[instance_id].transform[0] = s;
+        self.geometry_instances[instance_id].transform[5] = s;
+        self.geometry_instances[instance_id].transform[10] = s;
     }
 
     pub fn geometry_buffer(&self) -> &GeometryBuffer {

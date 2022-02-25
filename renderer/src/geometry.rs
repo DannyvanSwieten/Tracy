@@ -27,7 +27,7 @@ impl Vertex {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct GeometryBuffer {
     indices: Vec<u32>,
     vertices: Vec<Vertex>,
@@ -244,7 +244,7 @@ impl BottomLevelAccelerationStructure {
 
             let range = vec![*AccelerationStructureBuildRangeInfoKHR::builder()
                 .primitive_count(index_count / 3)
-                .primitive_offset(index_offset / 3)
+                .primitive_offset(index_offset * std::mem::size_of::<u32>() as u32)
                 .first_vertex(vertex_offset)];
             let ranges = vec![&range[0..1]];
 
