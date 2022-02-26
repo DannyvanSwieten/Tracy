@@ -70,6 +70,7 @@ pub struct SceneGraphNode {
 
 impl SceneGraphNode {}
 pub struct Scene {
+    pub name: String,
     geometry_buffer: GeometryBuffer,
     geometry_views: Vec<GeometryBufferView>,
     geometry_instances: Vec<GeometryInstance>,
@@ -84,7 +85,10 @@ pub struct Scene {
 
 impl Default for Scene {
     fn default() -> Self {
+        let mut node = SceneGraphNode::default();
+        node.name = "Root".to_string();
         let mut scene = Self {
+            name: "Default".to_string(),
             geometry_buffer: Default::default(),
             geometry_views: Default::default(),
             geometry_instances: Default::default(),
@@ -92,7 +96,7 @@ impl Default for Scene {
             materials: Default::default(),
             images: Default::default(),
             cameras: Default::default(),
-            nodes: Default::default(),
+            nodes: vec![node],
         };
 
         scene.add_geometry(
@@ -112,14 +116,15 @@ impl Default for Scene {
         );
         scene.create_instance(0);
         scene.set_scale(0, &vec3(1000.0, 1.0, 1000.0));
-        scene.set_material_base_color(0, &vec4(0.5, 0.5, 0.5, 1.0));
+        scene.set_material_base_color(0, &vec4(0.25, 0.25, 0.25, 1.0));
         scene
     }
 }
 
 impl Scene {
-    pub fn new() -> Self {
+    pub fn new(name: String) -> Self {
         Self {
+            name,
             geometry_buffer: GeometryBuffer::new(),
             geometry_views: Vec::new(),
             geometry_instances: Vec::new(),

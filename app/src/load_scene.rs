@@ -138,6 +138,7 @@ pub fn load_scene(path: &str) -> gltf::Result<Scene> {
     }
 
     for scene in document.scenes() {
+        new_scene.name = scene.name().unwrap_or("Untitled").to_string();
         let parent_transform = [
             [1.0, 0.0, 0.0, 0.0],
             [0.0, 1.0, 0.0, 0.0],

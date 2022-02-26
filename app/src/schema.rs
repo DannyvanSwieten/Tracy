@@ -7,10 +7,57 @@ use futures::lock::Mutex;
 use serde_json::Value;
 use std::sync::Arc;
 
+pub struct Node {
+    name: String,
+}
+
+#[Object]
+impl Node {
+    async fn name(&self, _context: &Context<'_>) -> Result<String> {
+        Ok(self.name.clone())
+    }
+}
+
+pub struct Scene {
+    name: String,
+    nodes: Vec<Node>,
+}
+
+#[Object]
+impl Scene {
+    async fn name(&self, _context: &Context<'_>) -> Result<String> {
+        Ok(self.name.clone())
+    }
+
+    async fn nodes(&self, _context: &Context<'_>) -> Result<&'_ Vec<Node>> {
+        Ok(&self.nodes)
+    }
+}
+
 pub struct Query;
 
 #[Object]
 impl Query {
+    async fn scenes(&self, context: &Context<'_>) -> Result<Vec<Scene>> {
+        let model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
+        let scenes = model
+            .scenes
+            .iter()
+            .map(|scene| Scene {
+                nodes: scene
+                    .nodes
+                    .iter()
+                    .map(|node| Node {
+                        name: node.name.clone(),
+                    })
+                    .collect(),
+                name: scene.name.clone(),
+            })
+            .collect();
+
+        Ok(scenes)
+    }
+
     async fn width(&self, context: &Context<'_>) -> Result<u32> {
         let model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
         Ok(model.renderer.output_width)
@@ -24,6 +71,12 @@ impl Query {
     async fn build(&self, context: &Context<'_>) -> Result<bool> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
         model.build_current_scene();
+        Ok(true)
+    }
+
+    async fn set_active_scene(&self, context: &Context<'_>, scene_id: usize) -> Result<bool> {
+        let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
+        model.current_scene = scene_id;
         Ok(true)
     }
 
@@ -65,15 +118,14 @@ impl Query {
         Ok(true)
     }
 
-    async fn load(&self, context: &Context<'_>, path: String) -> Result<bool> {
+    async fn load(&self, context: &Context<'_>, path: String) -> Result<usize> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
         match load_scene(&path) {
             Ok(scene) => {
-                model.scenes[0] = scene;
-                model.build_current_scene();
-                Ok(true)
+                model.scenes.push(scene);
+                Ok(model.scenes.len() - 1)
             }
-            Err(_) => Ok(false),
+            Err(_) => Ok(usize::MAX),
         }
     }
 }

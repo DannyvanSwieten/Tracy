@@ -24,7 +24,8 @@ impl Model {
     }
 
     pub fn build_current_scene(&mut self) {
-        self.renderer.build(&self.device, &self.scenes[0]);
+        self.renderer
+            .build(&self.device, &self.scenes[self.current_scene]);
         self.renderer.clear();
     }
 
