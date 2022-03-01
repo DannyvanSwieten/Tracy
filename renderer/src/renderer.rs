@@ -251,7 +251,7 @@ impl Renderer {
             wait_handles: [None, None, None],
             current_frame_index: 0,
 
-            camera_position: Vec3::new(0., 0., 12.5),
+            camera_position: Vec3::new(0., 0., -10.),
             camera_target: vec3(0.0, 0.0, 0.0),
             current_batch: 0,
         };
@@ -271,7 +271,7 @@ impl Renderer {
         let view_matrix = glm::look_at_rh(
             &self.camera_position,
             &self.camera_target,
-            &glm::vec3(0., 1., 0.),
+            &glm::vec3(0., -1., 0.),
         );
         let view_inverse = glm::inverse(&view_matrix);
 

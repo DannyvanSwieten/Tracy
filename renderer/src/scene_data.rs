@@ -190,6 +190,8 @@ impl SceneData {
                         &ash::vk::SamplerCreateInfo::builder()
                             .min_filter(ash::vk::Filter::LINEAR)
                             .mag_filter(ash::vk::Filter::LINEAR)
+                            .address_mode_u(ash::vk::SamplerAddressMode::CLAMP_TO_EDGE)
+                            .address_mode_v(ash::vk::SamplerAddressMode::CLAMP_TO_EDGE)
                             .anisotropy_enable(true)
                             .max_anisotropy(8.0),
                         None,

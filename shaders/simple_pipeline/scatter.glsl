@@ -71,7 +71,7 @@ vec3 evaluate_disney_anisotropic_specular(
 
     vec3 Ctint = Cdlum > 0. ? base_color / Cdlum : vec3(1.); // normalize lum. to isolate hue+sat
 	const float specular = 1.0;
-	const float specular_tint = 1.0;
+	const float specular_tint = 0.0;
 	const vec3 tint = mix(vec3(1.), Ctint, specular_tint);
     const vec3 Cspec0 = mix(specular *.08 * tint, base_color, metal);
 

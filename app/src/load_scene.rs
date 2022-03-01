@@ -55,7 +55,12 @@ fn load_node(
                     .collect()
             };
 
-            let geometry_id = scene.add_geometry(&indices, &vertices, &tex_coords);
+            let geometry_id = scene.add_geometry(
+                mesh.name().unwrap_or("Untitled"),
+                &indices,
+                &vertices,
+                &tex_coords,
+            );
             let instance_id = scene.create_instance(geometry_id);
             scene.set_matrix(instance_id, &this_transform);
             let m = primitive.material().pbr_metallic_roughness();
@@ -110,16 +115,19 @@ fn load_node(
 
     for child in node.children() {
         n.children.push(child.index());
-        scene = load_node(scene, document, &child, buffers, &this_transform)
     }
 
     scene.add_node(n);
+
+    for child in node.children() {
+        scene = load_node(scene, document, &child, buffers, &this_transform)
+    }
 
     scene
 }
 
 pub fn load_scene(path: &str) -> gltf::Result<Scene> {
-    let mut new_scene = Scene::default();
+    let mut new_scene = Scene::new(path);
     let (document, buffers, images) = gltf::import(path)?;
     for image in images {
         let format = match image.format {

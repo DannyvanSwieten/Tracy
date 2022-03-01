@@ -54,7 +54,7 @@ impl ServerApplication {
         let model = Arc::new(Mutex::new(Model::new(device, renderer)));
         Self {
             model: model.clone(),
-            server: Server::new(model.clone(), address, true),
+            server: Server::new(model.clone(), address, false),
         }
     }
 

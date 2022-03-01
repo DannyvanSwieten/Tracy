@@ -68,7 +68,29 @@ pub struct SceneGraphNode {
     pub children: Vec<usize>,
 }
 
-impl SceneGraphNode {}
+impl SceneGraphNode {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            ..Default::default()
+        }
+    }
+
+    pub fn with_camera(mut self, camera_id: usize) -> Self {
+        self.camera = Some(camera_id);
+        self
+    }
+
+    pub fn with_mesh(mut self, mesh_id: usize) -> Self {
+        self.mesh = Some(mesh_id);
+        self
+    }
+
+    pub fn with_children(mut self, children: &[usize]) -> Self {
+        self.children.extend(children);
+        self
+    }
+}
 pub struct Scene {
     pub name: String,
     geometry_buffer: GeometryBuffer,
@@ -80,6 +102,7 @@ pub struct Scene {
     images: Vec<TextureImageData>,
     cameras: Vec<Camera>,
 
+    pub root: usize,
     pub nodes: Vec<SceneGraphNode>,
 }
 
@@ -87,6 +110,7 @@ impl Default for Scene {
     fn default() -> Self {
         let mut node = SceneGraphNode::default();
         node.name = "Root".to_string();
+        node.mesh = Some(0);
         let mut scene = Self {
             name: "Default".to_string(),
             geometry_buffer: Default::default(),
@@ -97,9 +121,11 @@ impl Default for Scene {
             images: Default::default(),
             cameras: Default::default(),
             nodes: vec![node],
+            root: 0,
         };
 
         scene.add_geometry(
+            "Floor",
             &[0, 2, 1, 0, 3, 2],
             &[
                 Vertex::new(-1.0, -5.0, 1.0),
@@ -122,9 +148,9 @@ impl Default for Scene {
 }
 
 impl Scene {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: &str) -> Self {
         Self {
-            name,
+            name: name.to_string(),
             geometry_buffer: GeometryBuffer::new(),
             geometry_views: Vec::new(),
             geometry_instances: Vec::new(),
@@ -133,12 +159,17 @@ impl Scene {
             images: Vec::new(),
             cameras: Vec::new(),
             nodes: Vec::new(),
+            root: 0,
         }
     }
 
     pub fn add_node(&mut self, node: SceneGraphNode) -> usize {
         self.nodes.push(node);
         self.nodes.len() - 1
+    }
+
+    pub fn add_child_to_node(&mut self, parent_id: usize, child_id: usize) {
+        self.nodes[parent_id].children.push(child_id)
     }
 
     pub fn add_camera(&mut self, camera: &Camera) -> usize {
@@ -158,8 +189,34 @@ impl Scene {
         self.images.len() - 1
     }
 
+    pub fn create_floor(&mut self, y: f32) {
+        let floor_id = self.add_geometry(
+            "Floor",
+            &[0, 2, 1, 0, 3, 2],
+            &[
+                Vertex::new(-1.0, y, 1.0),
+                Vertex::new(-1.0, y, -1.0),
+                Vertex::new(1.0, y, -1.0),
+                Vertex::new(1.0, y, 1.0),
+            ],
+            &[
+                vec2(0.0, 0.0),
+                vec2(0.0, 0.0),
+                vec2(0.0, 0.0),
+                vec2(0.0, 0.0),
+            ],
+        );
+        let instance_id = self.create_instance(floor_id);
+        self.set_scale(instance_id, &vec3(1000.0, 1.0, 1000.0));
+        self.set_material_base_color(0, &vec4(0.05, 0.05, 0.05, 1.0));
+
+        let node_id = self.add_node(SceneGraphNode::new("Floor").with_mesh(floor_id));
+        self.add_child_to_node(self.root, node_id);
+    }
+
     pub fn add_geometry(
         &mut self,
+        name: &str,
         indices: &[u32],
         vertices: &[Vertex],
         tex_coords: &[nalgebra_glm::Vec2],
@@ -174,6 +231,7 @@ impl Scene {
         };
 
         self.geometry_views.push(GeometryBufferView::new(
+            name,
             indices.len() as u32,
             index_offset,
             vertices.len() as u32,

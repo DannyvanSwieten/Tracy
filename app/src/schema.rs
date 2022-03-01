@@ -1,3 +1,5 @@
+use crate::application::ServerApplication;
+
 use super::application::Model;
 use super::load_scene;
 use async_graphql::{
@@ -7,26 +9,73 @@ use futures::lock::Mutex;
 use serde_json::Value;
 use std::sync::Arc;
 
+pub struct Mesh {
+    name: String,
+    vertex_count: usize,
+}
+
+#[Object]
+impl Mesh {
+    async fn name(&self, _context: &Context<'_>) -> Result<&String> {
+        Ok(&self.name)
+    }
+
+    async fn vertex_count(&self, _context: &Context<'_>) -> Result<usize> {
+        Ok(self.vertex_count)
+    }
+}
+
+pub struct Resources {
+    meshes: Vec<Mesh>,
+}
+
+#[Object]
+impl Resources {
+    async fn meshes(&self, _context: &Context<'_>) -> Result<&Vec<Mesh>> {
+        Ok(&self.meshes)
+    }
+}
+
 pub struct Node {
     name: String,
+    children: Vec<usize>,
+    camera: Option<usize>,
+    mesh: Option<usize>,
 }
 
 #[Object]
 impl Node {
-    async fn name(&self, _context: &Context<'_>) -> Result<String> {
-        Ok(self.name.clone())
+    async fn name(&self, _context: &Context<'_>) -> Result<&String> {
+        Ok(&self.name)
+    }
+
+    async fn camera(&self, _context: &Context<'_>) -> Result<&Option<usize>> {
+        Ok(&self.camera)
+    }
+
+    async fn mesh(&self, _context: &Context<'_>) -> Result<&Option<usize>> {
+        Ok(&self.mesh)
+    }
+
+    async fn children(&self, _context: &Context<'_>) -> Result<&Vec<usize>> {
+        Ok(&self.children)
     }
 }
 
 pub struct Scene {
     name: String,
     nodes: Vec<Node>,
+    root: usize,
 }
 
 #[Object]
 impl Scene {
-    async fn name(&self, _context: &Context<'_>) -> Result<String> {
-        Ok(self.name.clone())
+    async fn name(&self, _context: &Context<'_>) -> Result<&String> {
+        Ok(&self.name)
+    }
+
+    async fn root(&self, _context: &Context<'_>) -> Result<usize> {
+        Ok(self.root)
     }
 
     async fn nodes(&self, _context: &Context<'_>) -> Result<&'_ Vec<Node>> {
@@ -49,13 +98,31 @@ impl Query {
                     .iter()
                     .map(|node| Node {
                         name: node.name.clone(),
+                        children: node.children.clone(),
+                        camera: node.camera,
+                        mesh: node.mesh,
                     })
                     .collect(),
                 name: scene.name.clone(),
+                root: scene.root,
             })
             .collect();
 
         Ok(scenes)
+    }
+
+    async fn resources(&self, context: &Context<'_>) -> Result<Resources> {
+        let model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
+        Ok(Resources {
+            meshes: model.scenes[model.current_scene]
+                .geometry_buffer_views()
+                .iter()
+                .map(|view| Mesh {
+                    name: view.name.clone(),
+                    vertex_count: view.vertex_count() as usize,
+                })
+                .collect(),
+        })
     }
 
     async fn width(&self, context: &Context<'_>) -> Result<u32> {
@@ -128,6 +195,13 @@ impl Query {
             Err(_) => Ok(usize::MAX),
         }
     }
+
+    async fn create_floor(&self, context: &Context<'_>, y: f32) -> Result<bool> {
+        let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
+        let current_scene = model.current_scene;
+        model.scenes[current_scene].create_floor(y);
+        Ok(true)
+    }
 }
 
 pub type Schema = async_graphql::Schema<Query, EmptyMutation, EmptySubscription>;
@@ -137,14 +211,3 @@ pub fn new_schema(renderer: Arc<Mutex<Model>>) -> Schema {
         .data(renderer)
         .finish()
 }
-
-// pub async fn execute(
-//     composition: Arc<Mutex<CompositionHost>>,
-//     query: &str,
-//     args: Value,
-// ) -> Response {
-//     let schema = new_schema(composition);
-//     let request = Request::new(query).variables(Variables::from_json(args));
-
-//     schema.execute(request).await
-// }

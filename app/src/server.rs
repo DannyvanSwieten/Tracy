@@ -1,6 +1,5 @@
 use super::application::Model;
 use super::schema::new_schema;
-use super::Renderer;
 use async_graphql::http::{playground_source, GraphQLPlaygroundConfig};
 use async_graphql_poem::GraphQL;
 use futures::channel::oneshot;
@@ -80,4 +79,16 @@ impl Drop for Server {
 #[handler]
 async fn graphql_playground() -> impl IntoResponse {
     Html(playground_source(GraphQLPlaygroundConfig::new("/")))
+}
+
+pub async fn execute(
+    model: Arc<Mutex<Model>>,
+    query: &str,
+    args: serde_json::Value,
+) -> async_graphql::Response {
+    let schema = new_schema(model);
+    let request =
+        async_graphql::Request::new(query).variables(async_graphql::Variables::from_json(args));
+
+    schema.execute(request).await
 }

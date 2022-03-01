@@ -79,10 +79,11 @@ impl GeometryBuffer {
 
 #[repr(C)]
 pub struct GeometryBufferView {
-    index_count: u32,
-    index_offset: u32,
-    vertex_count: u32,
-    vertex_offset: u32,
+    pub name: String,
+    pub index_count: u32,
+    pub index_offset: u32,
+    pub vertex_count: u32,
+    pub vertex_offset: u32,
 }
 
 #[repr(C)]
@@ -92,8 +93,15 @@ pub struct GeometryOffset {
 }
 
 impl GeometryBufferView {
-    pub fn new(index_count: u32, index_offset: u32, vertex_count: u32, vertex_offset: u32) -> Self {
+    pub fn new(
+        name: &str,
+        index_count: u32,
+        index_offset: u32,
+        vertex_count: u32,
+        vertex_offset: u32,
+    ) -> Self {
         Self {
+            name: name.to_string(),
             index_count,
             index_offset,
             vertex_count,

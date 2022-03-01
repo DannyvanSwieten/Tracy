@@ -96,7 +96,7 @@ void main()
         roughness *= mr.y;
     }
 
-    roughness = max(roughness, 0.001);
+    roughness = clamp(roughness, 0.001, 0.999);
 
     float anisotropy = 0.0;
     vec3 X = vec3(0.0);
