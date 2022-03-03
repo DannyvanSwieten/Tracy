@@ -12,12 +12,14 @@
 #include "material.glsl"
 #include "scatter.glsl"
 #include "random.glsl"
-//#include "object.glsl"
+
+layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 
 hitAttributeEXT vec2 attribs;
 layout(location = 0) rayPayloadInEXT RayPayload ray;
 
 layout(buffer_reference, scalar) readonly buffer Vertices { vec3 data[]; };
+layout(buffer_reference, scalar) readonly buffer Normals { vec3 data[]; };
 layout(buffer_reference, scalar) readonly buffer Indices { int32_t data[]; };
 layout(buffer_reference, scalar) readonly buffer TextureCoordinates { vec2 data[]; };
 layout(buffer_reference, scalar) readonly buffer Offsets { ivec2 data[]; };
@@ -25,6 +27,7 @@ layout(buffer_reference, scalar) readonly buffer Materials { Material data[]; };
 
 layout(binding = 1, set = 1) uniform BufferAddresses {
     uint64_t vertex_address;
+    uint64_t normal_address;
     uint64_t index_address;
     uint64_t texcoord_address;
     uint64_t offset_address;
@@ -42,6 +45,7 @@ void direction_of_anisotropicity(vec3 N, out vec3 tangent, out vec3 binormal){
 void main()
 {
     Materials materials = Materials(material_address);
+    Normals normals = Normals(normal_address);
     Offsets offsets = Offsets(offset_address);
     Indices indices = Indices(index_address);
     Vertices vertices = Vertices(vertex_address);
@@ -69,10 +73,15 @@ void main()
 
     const vec2 uv = uv0 + uv1 + uv2;
 
-    const vec3 e10 = v1 - v0;
-    const vec3 e20 = v2 - v0;
-    const vec3 N = normalize(cross(e10, e20));
-    ray.normal = N;
+    const vec3 n0 = gl_ObjectToWorldEXT * vec4(normals.data[start_vertex + i0], 0);
+    const vec3 n1 = gl_ObjectToWorldEXT * vec4(normals.data[start_vertex + i1], 0);
+    const vec3 n2 = gl_ObjectToWorldEXT * vec4(normals.data[start_vertex + i2], 0);
+
+    const vec3 N0 = barycentric.x * n0;
+    const vec3 N1 = barycentric.y * n1;
+    const vec3 N2 = barycentric.z * n2;
+    ray.normal = normalize(N0 + N1 + N2);
+    vec3 N = ray.normal;
 
     vec2 Xi = vec2(rand_float(ray.seed), rand_float(ray.seed));
 
@@ -96,12 +105,31 @@ void main()
         roughness *= mr.y;
     }
 
-    roughness = clamp(roughness, 0.001, 0.999);
-
+    // Shadow Ray
+    uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+    float tmin = 0.1;
+    float tmax = 1000.0;
+    ray.hit = true;
+    vec3 L = normalize(vec3(0, 1, 0.01));
+    traceRayEXT(topLevelAS, 
+              rayFlags, 
+              0xff, 
+              0 /*sbtRecordOffset*/, 
+              0 /*sbtRecordStride*/,
+              0 /*missIndex*/, 
+              gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT, tmin, 
+              L, tmax, 
+              0 /*payload index*/);
     float anisotropy = 0.0;
     vec3 X = vec3(0.0);
     vec3 Y = vec3(0.0);
     direction_of_anisotropicity(N, X, Y);
+    ray.direct = vec3(0);
+    if(!ray.hit)
+    {
+        ray.direct = evaluate_disney_bsdf(L, wo, N, X, Y, base_color, roughness, metal, anisotropy) * vec3(1) * max(0.0, dot(L, N));
+    }
+
     vec3 color_according_to_disney = sample_disney_bsdf(Xi, wi, wo, N, X, Y, base_color, roughness, metal, anisotropy, pdf);
 
     ray.hit = true;

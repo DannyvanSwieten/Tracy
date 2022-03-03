@@ -1,12 +1,9 @@
-use crate::application::ServerApplication;
-
 use super::application::Model;
 use super::load_scene;
 use async_graphql::{
     Context, EmptyMutation, EmptySubscription, Object, Request, Response, Result, Variables,
 };
 use futures::lock::Mutex;
-use serde_json::Value;
 use std::sync::Arc;
 
 pub struct Mesh {

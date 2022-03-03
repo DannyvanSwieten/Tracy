@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/target/debug/tracey.exe",
             // "args": ["--file",
-            //     "${workspaceFolder}/assets/Buggy/glTF/Buggy.gltf",
+            //     "${workspaceFolder}/assets/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf",
             //     "1280", "720"
             // ],
             "args": ["--server",

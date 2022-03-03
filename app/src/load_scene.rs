@@ -44,6 +44,13 @@ fn load_node(
                 (0..vertices.len() as u32).collect()
             };
 
+            let normals: Vec<nalgebra_glm::Vec3> = if let Some(iter) = reader.read_normals() {
+                iter.map(|normal| nalgebra_glm::Vec3::new(normal[0], normal[1], normal[2]))
+                    .collect()
+            } else {
+                Vec::new()
+            };
+
             let tex_coords: Vec<nalgebra_glm::Vec2> = if let Some(iter) = reader.read_tex_coords(0)
             {
                 iter.into_f32()
@@ -59,6 +66,7 @@ fn load_node(
                 mesh.name().unwrap_or("Untitled"),
                 &indices,
                 &vertices,
+                &normals,
                 &tex_coords,
             );
             let instance_id = scene.create_instance(geometry_id);
@@ -128,6 +136,7 @@ fn load_node(
 
 pub fn load_scene(path: &str) -> gltf::Result<Scene> {
     let mut new_scene = Scene::new(path);
+    new_scene.create_floor(-5.);
     let (document, buffers, images) = gltf::import(path)?;
     for image in images {
         let format = match image.format {

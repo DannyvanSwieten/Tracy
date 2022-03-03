@@ -31,6 +31,7 @@ impl Vertex {
 pub struct GeometryBuffer {
     indices: Vec<u32>,
     vertices: Vec<Vertex>,
+    normals: Vec<glm::Vec3>,
     tex_coords: Vec<glm::Vec2>,
 }
 
@@ -39,6 +40,7 @@ impl GeometryBuffer {
         Self {
             indices: Vec::new(),
             vertices: Vec::new(),
+            normals: Vec::new(),
             tex_coords: Vec::new(),
         }
     }
@@ -47,27 +49,36 @@ impl GeometryBuffer {
         &mut self,
         indices: &[u32],
         vertices: &[Vertex],
+        normals: &[nalgebra_glm::Vec3],
         tex_coords: &[nalgebra_glm::Vec2],
     ) {
         self.indices.extend(indices);
         self.vertices.extend(vertices.to_vec());
+        self.normals.extend(normals.to_vec());
         self.tex_coords.extend(tex_coords.to_vec())
     }
 
     pub fn new_with_data(
         indices: &[u32],
         vertices: &[Vertex],
+        normals: &[glm::Vec3],
         tex_coords: &[nalgebra_glm::Vec2],
     ) -> Self {
         Self {
             indices: indices.to_vec(),
             vertices: vertices.to_vec(),
+            normals: normals.to_vec(),
             tex_coords: tex_coords.to_vec(),
         }
     }
     pub fn vertices(&self) -> &[Vertex] {
         &self.vertices
     }
+
+    pub fn normals(&self) -> &[glm::Vec3] {
+        &self.normals
+    }
+
     pub fn indices(&self) -> &[u32] {
         &self.indices
     }

@@ -23,7 +23,7 @@ impl RTXDescriptorSets {
                 *DescriptorSetLayoutBinding::builder()
                     .descriptor_count(1)
                     .descriptor_type(DescriptorType::ACCELERATION_STRUCTURE_KHR)
-                    .stage_flags(ShaderStageFlags::RAYGEN_KHR)
+                    .stage_flags(ShaderStageFlags::RAYGEN_KHR | ShaderStageFlags::CLOSEST_HIT_KHR)
                     .binding(0),
                 // final image
                 *DescriptorSetLayoutBinding::builder()

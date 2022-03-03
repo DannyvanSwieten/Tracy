@@ -134,6 +134,12 @@ impl Default for Scene {
                 Vertex::new(1.0, -5.0, 1.0),
             ],
             &[
+                vec3(0., 1., 0.),
+                vec3(0., 1., 0.),
+                vec3(0., 1., 0.),
+                vec3(0., 1., 0.),
+            ],
+            &[
                 vec2(0.0, 0.0),
                 vec2(0.0, 0.0),
                 vec2(0.0, 0.0),
@@ -200,10 +206,16 @@ impl Scene {
                 Vertex::new(1.0, y, 1.0),
             ],
             &[
+                vec3(0., 1., 0.),
+                vec3(0., 1., 0.),
+                vec3(0., 1., 0.),
+                vec3(0., 1., 0.),
+            ],
+            &[
+                vec2(0.0, 1.0),
                 vec2(0.0, 0.0),
-                vec2(0.0, 0.0),
-                vec2(0.0, 0.0),
-                vec2(0.0, 0.0),
+                vec2(1.0, 0.0),
+                vec2(1.0, 1.0),
             ],
         );
         let instance_id = self.create_instance(floor_id);
@@ -219,6 +231,7 @@ impl Scene {
         name: &str,
         indices: &[u32],
         vertices: &[Vertex],
+        normals: &[nalgebra_glm::Vec3],
         tex_coords: &[nalgebra_glm::Vec2],
     ) -> usize {
         let (index_offset, vertex_offset) = if let Some(view) = self.geometry_views.last() {
@@ -237,7 +250,8 @@ impl Scene {
             vertices.len() as u32,
             vertex_offset,
         ));
-        self.geometry_buffer.append(indices, vertices, tex_coords);
+        self.geometry_buffer
+            .append(indices, vertices, normals, tex_coords);
         return self.geometry_views.len() - 1;
     }
 

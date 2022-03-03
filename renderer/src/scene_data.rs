@@ -12,6 +12,7 @@ use ash::vk::{BufferUsageFlags, GeometryInstanceFlagsKHR, MemoryPropertyFlags};
 
 pub struct SceneData {
     pub vertex_buffer: BufferResource,
+    pub normal_buffer: BufferResource,
     pub index_buffer: BufferResource,
     pub tex_coord_buffer: BufferResource,
     pub offset_buffer: BufferResource,
@@ -45,6 +46,14 @@ impl SceneData {
                 | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
         );
 
+        let mut normal_buffer = device.buffer(
+            (geometry.normals().len() * std::mem::size_of::<glm::Vec3>()) as u64,
+            MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::SHADER_DEVICE_ADDRESS | BufferUsageFlags::STORAGE_BUFFER,
+        );
+
+        normal_buffer.copy_to(geometry.normals());
+
         index_buffer.copy_to(geometry.indices());
 
         let mut tex_coord_buffer = device.buffer(
@@ -72,13 +81,14 @@ impl SceneData {
         material_buffer.copy_to(scene.materials());
 
         let mut address_buffer = device.buffer(
-            40 as u64,
+            48 as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::UNIFORM_BUFFER,
         );
 
         address_buffer.copy_to(&[
             vertex_buffer.device_address(),
+            normal_buffer.device_address(),
             index_buffer.device_address(),
             tex_coord_buffer.device_address(),
             offset_buffer.device_address(),
@@ -190,8 +200,6 @@ impl SceneData {
                         &ash::vk::SamplerCreateInfo::builder()
                             .min_filter(ash::vk::Filter::LINEAR)
                             .mag_filter(ash::vk::Filter::LINEAR)
-                            .address_mode_u(ash::vk::SamplerAddressMode::CLAMP_TO_EDGE)
-                            .address_mode_v(ash::vk::SamplerAddressMode::CLAMP_TO_EDGE)
                             .anisotropy_enable(true)
                             .max_anisotropy(8.0),
                         None,
@@ -202,6 +210,7 @@ impl SceneData {
 
         Self {
             vertex_buffer,
+            normal_buffer,
             index_buffer,
             tex_coord_buffer,
             offset_buffer,

@@ -271,7 +271,7 @@ impl Renderer {
         let view_matrix = glm::look_at_rh(
             &self.camera_position,
             &self.camera_target,
-            &glm::vec3(0., -1., 0.),
+            &glm::vec3(0., 1., 0.),
         );
         let view_inverse = glm::inverse(&view_matrix);
 
@@ -392,7 +392,7 @@ impl Renderer {
             let infos = [*RayTracingPipelineCreateInfoKHR::builder()
                 .stages(&shader_stages)
                 .groups(&shader_groups)
-                .max_pipeline_ray_recursion_depth(1)
+                .max_pipeline_ray_recursion_depth(2)
                 .layout(self.descriptor_sets.pipeline_layout)];
 
             self.pipeline = self

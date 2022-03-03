@@ -31,7 +31,7 @@ impl Model {
 
     pub fn render(&mut self, batches: u32) {
         for _ in 0..batches {
-            self.renderer.render(4, &self.device);
+            self.renderer.render(2, &self.device);
         }
         self.has_new_frame = true;
     }
@@ -54,7 +54,7 @@ impl ServerApplication {
         let model = Arc::new(Mutex::new(Model::new(device, renderer)));
         Self {
             model: model.clone(),
-            server: Server::new(model.clone(), address, false),
+            server: Server::new(model.clone(), address, true),
         }
     }
 
