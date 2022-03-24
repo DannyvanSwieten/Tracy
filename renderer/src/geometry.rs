@@ -13,6 +13,11 @@ use ash::Device;
 use vk_utils::buffer_resource::BufferResource;
 use vk_utils::device_context::DeviceContext;
 
+pub type Position = glm::Vec3;
+pub type Normal = glm::Vec3;
+pub type Tangent = glm::Vec3;
+pub type Texcoord = glm::Vec2;
+
 #[repr(C)]
 #[derive(Default, Clone)]
 pub struct Vertex {

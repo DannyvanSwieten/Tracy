@@ -1,7 +1,14 @@
 pub mod application;
+pub mod image_resource;
+pub mod instancer;
 pub mod load_scene;
+pub mod mesh_resource;
+pub mod parameter;
+pub mod resources;
+pub mod scene_graph;
 pub mod schema;
 pub mod server;
+
 use load_scene::load_scene_gltf;
 use winit::{
     event::{Event, WindowEvent},
