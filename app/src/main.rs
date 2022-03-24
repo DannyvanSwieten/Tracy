@@ -2,7 +2,7 @@ pub mod application;
 pub mod load_scene;
 pub mod schema;
 pub mod server;
-use load_scene::load_scene;
+use load_scene::load_scene_gltf;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -29,38 +29,45 @@ fn main() {
     let context = Renderer::create_suitable_device(gpu);
 
     let args: Vec<String> = std::env::args().collect();
-    let mut mode = String::new();
-    let arg_count = args.len();
-    if arg_count == 5 {
-        mode = args[1].clone();
+    let mode = if args.len() == 5 {
+        args[1].clone()
     } else {
         panic!("Invalid arguments")
-    }
+    };
 
     println!("{}", args[2]);
-    let width = args[3].parse::<u32>().expect("Invalid width argument");
-    let height = args[4].parse::<u32>().expect("Invalid height argument");
+    let image_width = args[3].parse::<u32>().expect("Invalid width argument");
+    let image_height = args[4].parse::<u32>().expect("Invalid height argument");
 
-    if mode == "--file" {
-        let scene = load_scene(&args[2]).unwrap();
-        let mut renderer = Renderer::new(&context, width, height);
+    if mode == "--file".to_string() {
+        let scene = load_scene_gltf(&args[2]).unwrap();
+        let mut renderer = Renderer::new(&context, image_width, image_height);
         renderer.build(&context, &scene);
-        for _ in 0..1024 {
+        for _ in 0..128 {
             renderer.render(1, &context);
         }
         let buffer = renderer.download_image(&context);
         let data = buffer.copy_data::<u8>();
-        image::save_buffer("output.png", &data, width, height, image::ColorType::Rgba8)
-            .expect("Image Write failed");
-    } else if mode == "--server" {
+        image::save_buffer(
+            "output.png",
+            &data,
+            image_width,
+            image_height,
+            image::ColorType::Rgba8,
+        )
+        .expect("Image Write failed");
+    } else if mode == "--server".to_string() {
         // set up server
-        let server = application::ServerApplication::new(context, &args[2]);
+        let server =
+            application::ServerApplication::new(context, &args[2], image_width, image_height);
 
         let event_loop = EventLoop::new();
 
         let window = WindowBuilder::new()
             .with_title("Renderer Output")
-            .with_inner_size(winit::dpi::PhysicalSize::new(1280, 720))
+            .with_inner_size(winit::dpi::PhysicalSize::new(image_width, image_height))
+            .with_min_inner_size(winit::dpi::PhysicalSize::new(image_width, image_height))
+            .with_resizable(false)
             .build(&event_loop)
             .unwrap();
 
@@ -80,8 +87,9 @@ fn main() {
                             PixelBufferTyped::<NativeFormat>::new_supported(width, height, &window);
 
                         for (i, row) in pixel_buffer.rows_mut().enumerate() {
+                            let w = row.len();
                             for (j, pixel) in row.into_iter().enumerate() {
-                                let index = (i * 1270 + j) * 4;
+                                let index = (i * w + j) * 4;
                                 let value = &data[index..index + 3];
                                 *pixel = NativeFormat::from_rgb(value[0], value[1], value[2]);
                             }
@@ -98,7 +106,7 @@ fn main() {
                     }
                 }
                 *control_flow = ControlFlow::WaitUntil(
-                    std::time::Instant::now() + std::time::Duration::from_millis(60),
+                    std::time::Instant::now() + std::time::Duration::from_millis(100),
                 )
             }
         });

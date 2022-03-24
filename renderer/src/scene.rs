@@ -7,6 +7,8 @@ pub struct Camera {
     pub z_near: f32,
     pub z_far: f32,
 }
+#[repr(C)]
+#[derive(Clone)]
 pub struct TextureImageData {
     pub format: ash::vk::Format,
     pub width: u32,
@@ -50,6 +52,17 @@ pub struct Material {
     pub maps: glm::IVec4,
 }
 
+impl Default for Material {
+    fn default() -> Self {
+        Self {
+            color: vec4(1., 1., 1., 1.),
+            metallic_roughness: vec2(1.0, 0.0),
+            emission: vec4(0., 0., 0., 0.),
+            maps: vec4(-1, -1, -1, -1),
+        }
+    }
+}
+
 impl Material {
     pub fn new(color: &glm::Vec4) -> Self {
         Self {
@@ -64,8 +77,10 @@ impl Material {
 pub struct SceneGraphNode {
     pub name: String,
     pub camera: Option<usize>,
-    pub mesh: Option<usize>,
+    pub mesh: Option<Vec<usize>>,
     pub children: Vec<usize>,
+    pub global_transform: [[f32; 4]; 4],
+    pub local_transform: [[f32; 4]; 4],
 }
 
 impl SceneGraphNode {
@@ -82,7 +97,11 @@ impl SceneGraphNode {
     }
 
     pub fn with_mesh(mut self, mesh_id: usize) -> Self {
-        self.mesh = Some(mesh_id);
+        if let Some(vector) = self.mesh.as_mut() {
+            vector.push(mesh_id)
+        } else {
+            self.mesh = Some(vec![mesh_id])
+        }
         self
     }
 
@@ -97,10 +116,11 @@ pub struct Scene {
     geometry_views: Vec<GeometryBufferView>,
     geometry_instances: Vec<GeometryInstance>,
     geometry_instance_offsets: Vec<GeometryOffset>,
-    materials: Vec<Material>,
 
-    images: Vec<TextureImageData>,
-    cameras: Vec<Camera>,
+    pub images: Vec<TextureImageData>,
+    pub cameras: Vec<Camera>,
+    pub materials: Vec<Material>,
+    pub material_names: Vec<String>,
 
     pub root: usize,
     pub nodes: Vec<SceneGraphNode>,
@@ -110,7 +130,6 @@ impl Default for Scene {
     fn default() -> Self {
         let mut node = SceneGraphNode::default();
         node.name = "Root".to_string();
-        node.mesh = Some(0);
         let mut scene = Self {
             name: "Default".to_string(),
             geometry_buffer: Default::default(),
@@ -120,35 +139,12 @@ impl Default for Scene {
             materials: Default::default(),
             images: Default::default(),
             cameras: Default::default(),
+            material_names: Default::default(),
             nodes: vec![node],
             root: 0,
         };
 
-        scene.add_geometry(
-            "Floor",
-            &[0, 2, 1, 0, 3, 2],
-            &[
-                Vertex::new(-1.0, -5.0, 1.0),
-                Vertex::new(-1.0, -5.0, -1.0),
-                Vertex::new(1.0, -5.0, -1.0),
-                Vertex::new(1.0, -5.0, 1.0),
-            ],
-            &[
-                vec3(0., 1., 0.),
-                vec3(0., 1., 0.),
-                vec3(0., 1., 0.),
-                vec3(0., 1., 0.),
-            ],
-            &[
-                vec2(0.0, 0.0),
-                vec2(0.0, 0.0),
-                vec2(0.0, 0.0),
-                vec2(0.0, 0.0),
-            ],
-        );
-        scene.create_instance(0);
-        scene.set_scale(0, &vec3(1000.0, 1.0, 1000.0));
-        scene.set_material_base_color(0, &vec4(0.25, 0.25, 0.25, 1.0));
+        scene.create_floor(-5.);
         scene
     }
 }
@@ -165,6 +161,7 @@ impl Scene {
             images: Vec::new(),
             cameras: Vec::new(),
             nodes: Vec::new(),
+            material_names: Vec::new(),
             root: 0,
         }
     }
@@ -181,6 +178,16 @@ impl Scene {
     pub fn add_camera(&mut self, camera: &Camera) -> usize {
         self.cameras.push(*camera);
         self.cameras.len() - 1
+    }
+
+    pub fn add_material(&mut self, name: &str, material: &Material) -> usize {
+        self.materials.push(*material);
+        self.material_names.push(name.to_string());
+        self.materials.len() - 1
+    }
+
+    pub fn node(&mut self, id: usize) -> &mut SceneGraphNode {
+        &mut self.nodes[id]
     }
 
     pub fn add_image(
@@ -212,6 +219,12 @@ impl Scene {
                 vec3(0., 1., 0.),
             ],
             &[
+                vec3(1., 0., 0.),
+                vec3(1., 0., 0.),
+                vec3(1., 0., 0.),
+                vec3(1., 0., 0.),
+            ],
+            &[
                 vec2(0.0, 1.0),
                 vec2(0.0, 0.0),
                 vec2(1.0, 0.0),
@@ -220,7 +233,6 @@ impl Scene {
         );
         let instance_id = self.create_instance(floor_id);
         self.set_scale(instance_id, &vec3(1000.0, 1.0, 1000.0));
-        self.set_material_base_color(0, &vec4(0.05, 0.05, 0.05, 1.0));
 
         let node_id = self.add_node(SceneGraphNode::new("Floor").with_mesh(floor_id));
         self.add_child_to_node(self.root, node_id);
@@ -232,6 +244,7 @@ impl Scene {
         indices: &[u32],
         vertices: &[Vertex],
         normals: &[nalgebra_glm::Vec3],
+        tangents: &[nalgebra_glm::Vec3],
         tex_coords: &[nalgebra_glm::Vec2],
     ) -> usize {
         let (index_offset, vertex_offset) = if let Some(view) = self.geometry_views.last() {
@@ -251,7 +264,7 @@ impl Scene {
             vertex_offset,
         ));
         self.geometry_buffer
-            .append(indices, vertices, normals, tex_coords);
+            .append(indices, vertices, normals, tangents, tex_coords);
         return self.geometry_views.len() - 1;
     }
 
@@ -265,8 +278,6 @@ impl Scene {
             geometry_id as u64,
         ));
 
-        self.materials
-            .push(Material::new(&glm::Vec4::new(1.0, 1.0, 1.0, 1.0)));
         self.geometry_instance_offsets.push(GeometryOffset {
             index: self.geometry_views[geometry_id].index_offset(),
             vertex: self.geometry_views[geometry_id].vertex_offset(),

@@ -38,7 +38,7 @@ void main()
   }
 
   uint rayFlags = gl_RayFlagsOpaqueEXT;
-  float tmin = 0.1;
+  float tmin = 0.001;
   float tmax = 1000.0;
 
   uint pixelSeed = rand_seed(rand_seed(gl_LaunchIDEXT.x, gl_LaunchIDEXT.y), Batch.current_batch);
@@ -57,7 +57,7 @@ void main()
     vec3 color = vec3(0);
     vec3 contribution = vec3(1);
 
-    for(int i = 0; i < 16; ++i)
+    for(int i = 0; i < 32; ++i)
     {
       ray.hit = false;
       traceRayEXT(topLevelAS, 
@@ -76,10 +76,10 @@ void main()
         break;
 
       // Russion roulette
-      // if(rand_float(pixelSeed) > dot(color, color) && i > 3)
-      //   break;
+      if(rand_float(pixelSeed) > dot(color, color) && i > 3)
+        break;
 
-      origin.xyz = ray.point + ray.w_out * .02;
+      origin.xyz = ray.point + ray.w_out * 1e-4;
       direction.xyz = ray.w_out;
     }
 

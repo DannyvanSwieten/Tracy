@@ -1,10 +1,10 @@
 use super::application::Model;
 use super::schema::new_schema;
 use async_graphql::http::{playground_source, GraphQLPlaygroundConfig};
-use async_graphql_poem::GraphQL;
+use async_graphql_poem::{GraphQL, GraphQLSubscription};
 use futures::channel::oneshot;
 use futures::lock::Mutex;
-use poem::{get, handler, listener::TcpListener, post, web::Html, IntoResponse, Route};
+use poem::{handler, listener::TcpListener, post, web::Html, IntoResponse, Route};
 use std::{sync::Arc, thread, time::Duration};
 use tokio::runtime;
 pub struct Server {
@@ -32,13 +32,14 @@ impl Server {
                 .block_on(async {
                     let schema = new_schema(model);
 
-                    let endpoint = if serve_playground {
-                        println!("Serving playground at http://{addr}");
-                        get(graphql_playground).post(GraphQL::new(schema))
-                    } else {
-                        post(GraphQL::new(schema))
-                    };
-                    let app = Route::new().at("/", endpoint);
+                    let mut endpoint = post(GraphQL::new(schema.clone()));
+                    if serve_playground {
+                        endpoint = endpoint.get(graphql_playground);
+                    }
+
+                    let app = Route::new()
+                        .at("/", endpoint)
+                        .at("/ws", GraphQLSubscription::new(schema.clone()));
 
                     poem::Server::new(TcpListener::bind(addr))
                         .run_with_graceful_shutdown(
@@ -78,7 +79,9 @@ impl Drop for Server {
 
 #[handler]
 async fn graphql_playground() -> impl IntoResponse {
-    Html(playground_source(GraphQLPlaygroundConfig::new("/")))
+    Html(playground_source(
+        GraphQLPlaygroundConfig::new("/").subscription_endpoint("/ws"),
+    ))
 }
 
 pub async fn execute(

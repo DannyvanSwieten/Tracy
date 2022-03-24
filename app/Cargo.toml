@@ -17,6 +17,7 @@ async-graphql-poem = "3.0.27"
 poem = "1.2.56" 
 futures = "0.3.21"
 tokio = {version = "1.16.1", features = ["full"]}
+tokio-stream = {version = "0.1.8", features = ["sync"]}
 serde_json = "1.0.78"
 winit = "*"
 winit-blit = {git="https://github.com/rust-windowing/winit-blit.git"}

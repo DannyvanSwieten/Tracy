@@ -92,7 +92,7 @@ void main()
     vec3 wi = vec3(0.0);
     vec3 wo = -gl_WorldRayDirectionEXT;
     vec3 base_color = material.albedo.rgb;
-    if(materials.data[gl_InstanceCustomIndexEXT].maps[0] != -1)
+    if(material.maps[0] != -1)
     {
         base_color *= texture(images[material.maps[0]], uv).rgb;
     }
@@ -110,14 +110,15 @@ void main()
     float tmin = 0.1;
     float tmax = 1000.0;
     ray.hit = true;
-    vec3 L = normalize(vec3(0, 1, 0.01));
+    vec3 L = normalize(vec3(-1, 1, 0.001));
+    vec3 P = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
     traceRayEXT(topLevelAS, 
               rayFlags, 
               0xff, 
               0 /*sbtRecordOffset*/, 
               0 /*sbtRecordStride*/,
               0 /*missIndex*/, 
-              gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT, tmin, 
+              P + N * .05, tmin, 
               L, tmax, 
               0 /*payload index*/);
     float anisotropy = 0.0;
@@ -125,11 +126,13 @@ void main()
     vec3 Y = vec3(0.0);
     direction_of_anisotropicity(N, X, Y);
     ray.direct = vec3(0);
+    // Evaluate direct lighting
     if(!ray.hit)
     {
-        ray.direct = evaluate_disney_bsdf(L, wo, N, X, Y, base_color, roughness, metal, anisotropy) * vec3(1) * max(0.0, dot(L, N));
+        ray.direct = evaluate_disney_bsdf(L, wo, N, X, Y, base_color, roughness, metal, anisotropy) * max(0.0, dot(L, N));
     }
 
+    // Evaluate indirect lighting
     vec3 color_according_to_disney = sample_disney_bsdf(Xi, wi, wo, N, X, Y, base_color, roughness, metal, anisotropy, pdf);
 
     ray.hit = true;
@@ -148,5 +151,5 @@ void main()
 
     c += ray.emission.rgb * ray.emission.a;
     ray.w_out = wi;
-    ray.point = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
+    ray.point = P;
 }

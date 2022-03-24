@@ -32,6 +32,7 @@ pub struct GeometryBuffer {
     indices: Vec<u32>,
     vertices: Vec<Vertex>,
     normals: Vec<glm::Vec3>,
+    tangents: Vec<glm::Vec3>,
     tex_coords: Vec<glm::Vec2>,
 }
 
@@ -41,6 +42,7 @@ impl GeometryBuffer {
             indices: Vec::new(),
             vertices: Vec::new(),
             normals: Vec::new(),
+            tangents: Vec::new(),
             tex_coords: Vec::new(),
         }
     }
@@ -50,11 +52,13 @@ impl GeometryBuffer {
         indices: &[u32],
         vertices: &[Vertex],
         normals: &[nalgebra_glm::Vec3],
+        tangents: &[nalgebra_glm::Vec3],
         tex_coords: &[nalgebra_glm::Vec2],
     ) {
         self.indices.extend(indices);
         self.vertices.extend(vertices.to_vec());
         self.normals.extend(normals.to_vec());
+        self.tangents.extend(tangents.to_vec());
         self.tex_coords.extend(tex_coords.to_vec())
     }
 
@@ -62,12 +66,14 @@ impl GeometryBuffer {
         indices: &[u32],
         vertices: &[Vertex],
         normals: &[glm::Vec3],
+        tangents: &[glm::Vec3],
         tex_coords: &[nalgebra_glm::Vec2],
     ) -> Self {
         Self {
             indices: indices.to_vec(),
             vertices: vertices.to_vec(),
             normals: normals.to_vec(),
+            tangents: tangents.to_vec(),
             tex_coords: tex_coords.to_vec(),
         }
     }
@@ -148,7 +154,7 @@ impl GeometryInstance {
         instance_id: u32,
         mask: u8,
         hit_group_offset: u32,
-        flags: GeometryInstanceFlagsKHR,
+        _flags: GeometryInstanceFlagsKHR,
         acceleration_structure_handle: u64,
     ) -> Self {
         let id_and_mask = ((mask as u32) << 24) | instance_id;

@@ -10,12 +10,12 @@
             "request": "launch",
             "program": "${workspaceFolder}/target/debug/tracey.exe",
             // "args": ["--file",
-            //     "${workspaceFolder}/assets/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf",
+            //     "${workspaceFolder}/assets/Sponza/glTF/Sponza.gltf",
             //     "1280", "720"
             // ],
             "args": ["--server",
                     "127.0.0.1:7000",
-                    "1920", "1080"
+                    "1280", "720"
                 ],
             "stopOnEntry": false,
             "cwd": "${workspaceFolder}",
@@ -27,7 +27,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/target/release/tracey.exe",
             // "args": ["--file",
-            //     "${workspaceFolder}/assets/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf",
+            //     "${workspaceFolder}/assets/Sponza/glTF/Sponza.gltf",
             //     "1920", "1080"
             // ],
             "args": ["--server",
