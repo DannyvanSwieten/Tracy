@@ -5,17 +5,28 @@ use ash::vk::{
     PipelineLayoutCreateInfo, PushConstantRange, ShaderStageFlags, WriteDescriptorSet,
 };
 
-use crate::scene_data::SceneData;
+use crate::gpu_scene::SceneData;
 use vk_utils::device_context::DeviceContext;
 
 pub struct RTXDescriptorSets {
     pub descriptor_set_layouts: Vec<DescriptorSetLayout>,
-    pub descriptor_sets: Vec<DescriptorSet>,
     pub descriptor_pool: DescriptorPool,
     pub pipeline_layout: PipelineLayout,
 }
 
 impl RTXDescriptorSets {
+    pub fn descriptor_sets(&self, device: &DeviceContext) -> Vec<DescriptorSet> {
+        let descriptor_set_create_info = DescriptorSetAllocateInfo::builder()
+            .set_layouts(&self.descriptor_set_layouts)
+            .descriptor_pool(self.descriptor_pool);
+        unsafe {
+            device
+                .vk_device()
+                .allocate_descriptor_sets(&descriptor_set_create_info)
+                .expect("Descriptor set allocation failed")
+        }
+    }
+
     pub fn new(device: &DeviceContext) -> Self {
         unsafe {
             let set_0_bindings = [
@@ -108,32 +119,24 @@ impl RTXDescriptorSets {
                 },
             ];
             let descriptor_pool_create_info = DescriptorPoolCreateInfo::builder()
-                .max_sets(3)
+                .max_sets(32)
                 .pool_sizes(&sizes);
             let descriptor_pool = device
                 .vk_device()
                 .create_descriptor_pool(&descriptor_pool_create_info, None)
                 .expect("Descriptor pool creation failed");
 
-            let descriptor_set_create_info = DescriptorSetAllocateInfo::builder()
-                .set_layouts(&descriptor_set_layouts)
-                .descriptor_pool(descriptor_pool);
-
-            let descriptor_sets = device
-                .vk_device()
-                .allocate_descriptor_sets(&descriptor_set_create_info)
-                .expect("Descriptor set allocation failed");
-
             Self {
                 descriptor_set_layouts,
                 pipeline_layout,
                 descriptor_pool,
-                descriptor_sets,
             }
         }
     }
 
     pub(crate) fn update_scene_descriptors(&self, ctx: &DeviceContext, scene_data: &SceneData) {
+        let descriptor_sets = self.descriptor_sets(ctx);
+
         let buffer_writes = [*DescriptorBufferInfo::builder()
             .range(scene_data.address_buffer.content_size())
             .buffer(scene_data.address_buffer.buffer)];
@@ -151,7 +154,7 @@ impl RTXDescriptorSets {
 
         let writes = [*WriteDescriptorSet::builder()
             .dst_binding(1)
-            .dst_set(self.descriptor_sets[1])
+            .dst_set(descriptor_sets[1])
             .descriptor_type(DescriptorType::UNIFORM_BUFFER)
             .buffer_info(&buffer_writes)];
 
@@ -162,7 +165,7 @@ impl RTXDescriptorSets {
         if image_writes.len() > 0 {
             let writes = [*WriteDescriptorSet::builder()
                 .dst_binding(2)
-                .dst_set(self.descriptor_sets[1])
+                .dst_set(descriptor_sets[1])
                 .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
                 .image_info(&image_writes)];
             unsafe {

@@ -19,11 +19,16 @@ use winit::{
 use winit_blit::*;
 
 use ash::extensions::ext::DebugUtils;
-use renderer::renderer::Renderer;
+use renderer::{cpu_scene::CpuMesh, geometry::Position, renderer::Renderer};
 use vk_utils::vulkan::Vulkan;
 
 use futures::lock::Mutex;
 use std::sync::Arc;
+
+use crate::{
+    mesh_resource::MeshResource,
+    scene_graph::{Actor, SceneGraph},
+};
 
 type ServerContext = Arc<Mutex<application::Model>>;
 fn main() {
@@ -47,12 +52,35 @@ fn main() {
     let image_height = args[4].parse::<u32>().expect("Invalid height argument");
 
     if mode == "--file".to_string() {
-        let scene = load_scene_gltf(&args[2]).unwrap();
         let mut renderer = Renderer::new(&context, image_width, image_height);
-        renderer.build(&context, &scene);
-        for _ in 0..128 {
-            renderer.render(1, &context);
-        }
+        let mut gpu_resource_cache = renderer::gpu_scene::GpuResourceCache::new();
+        let mut cpu_resource_cache = resources::CpuResourceCache::new();
+
+        let mesh_id = cpu_resource_cache.add_mesh(CpuMesh::new(
+            &[0, 1, 2],
+            &[
+                Position::new(-1.0, -1.0, 0.0),
+                Position::new(1.0, -1.0, 0.0),
+                Position::new(0.0, 1.0, 0.0),
+            ],
+        ));
+
+        let actor = Actor::new().with_mesh(mesh_id);
+        let scene_graph = SceneGraph::new(actor);
+        let scene = scene_graph.build(
+            &cpu_resource_cache,
+            &mut gpu_resource_cache,
+            &context,
+            &renderer.rtx,
+        );
+
+        let frame = renderer.build_frame(&context, &gpu_resource_cache, scene);
+
+        let scene = load_scene_gltf(&args[2]).unwrap();
+        // renderer.build(&context, &scene);
+        // for _ in 0..128 {
+        //     renderer.render(1, &context);
+        // }
         let buffer = renderer.download_image(&context);
         let data = buffer.copy_data::<u8>();
         image::save_buffer(

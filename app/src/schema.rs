@@ -35,8 +35,8 @@ pub struct Node {
 impl Node {
     pub fn new(
         id: usize,
-        scene: &renderer::scene::Scene,
-        scene_node: &renderer::scene::SceneGraphNode,
+        scene: &renderer::cpu_scene::Scene,
+        scene_node: &renderer::cpu_scene::SceneGraphNode,
     ) -> Self {
         let meshes = if let Some(meshes) = &scene_node.mesh {
             Some(
@@ -91,11 +91,11 @@ impl Node {
 #[derive(Clone)]
 pub struct Material {
     name: String,
-    mat: renderer::scene::Material,
+    mat: renderer::cpu_scene::Material,
 }
 
 impl Material {
-    pub fn new(name: &String, scene_material: &renderer::scene::Material) -> Self {
+    pub fn new(name: &String, scene_material: &renderer::cpu_scene::Material) -> Self {
         Self {
             name: name.clone(),
             mat: scene_material.clone(),
@@ -138,7 +138,7 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn new(id: usize, scene: &renderer::scene::Scene) -> Self {
+    pub fn new(id: usize, scene: &renderer::cpu_scene::Scene) -> Self {
         Self {
             id,
             name: scene.name.clone(),

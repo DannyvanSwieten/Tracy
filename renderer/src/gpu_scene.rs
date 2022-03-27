@@ -1,14 +1,218 @@
 use crate::context::RtxContext;
+use crate::cpu_scene::{CpuMesh, Material, Scene};
 use crate::geometry::{
-    BottomLevelAccelerationStructure, GeometryInstance, GeometryOffset,
-    TopLevelAccelerationStructure, Vertex,
+    BottomLevelAccelerationStructure, GeometryInstance, GeometryOffset, Normal, Position, Tangent,
+    Texcoord, TopLevelAccelerationStructure, Vertex,
 };
-use crate::scene::{Material, Scene};
+use std::collections::HashMap;
 use vk_utils::buffer_resource::BufferResource;
 use vk_utils::device_context::DeviceContext;
 use vk_utils::image_resource::Image2DResource;
 
-use ash::vk::{BufferUsageFlags, GeometryInstanceFlagsKHR, MemoryPropertyFlags};
+use ash::vk::{
+    BufferUsageFlags, DescriptorSet, GeometryAABBNV, GeometryFlagsKHR, GeometryInstanceFlagsKHR,
+    MemoryPropertyFlags,
+};
+
+pub struct GpuMesh {
+    pub index_buffer: BufferResource,
+    pub vertex_buffer: BufferResource,
+    pub normal_buffer: BufferResource,
+    pub tangent_buffer: BufferResource,
+    pub tex_coord_buffer: BufferResource,
+    pub blas: BottomLevelAccelerationStructure,
+}
+
+impl GpuMesh {
+    pub fn new(device: &DeviceContext, rtx: &RtxContext, mesh: &CpuMesh) -> Self {
+        let mut index_buffer = device.buffer(
+            (mesh.indices.len() * std::mem::size_of::<u32>()) as u64,
+            MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::SHADER_DEVICE_ADDRESS
+                | BufferUsageFlags::STORAGE_BUFFER
+                | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
+        );
+
+        index_buffer.copy_to(&mesh.indices);
+
+        let mut vertex_buffer = device.buffer(
+            (mesh.positions.len() * std::mem::size_of::<Vertex>()) as u64,
+            MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::SHADER_DEVICE_ADDRESS
+                | BufferUsageFlags::STORAGE_BUFFER
+                | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
+        );
+
+        vertex_buffer.copy_to(&mesh.positions);
+
+        let mut normal_buffer = device.buffer(
+            (mesh.normals.len() * std::mem::size_of::<Normal>()) as u64,
+            MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::SHADER_DEVICE_ADDRESS
+                | BufferUsageFlags::STORAGE_BUFFER
+                | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
+        );
+
+        normal_buffer.copy_to(&mesh.normals);
+
+        let mut tangent_buffer = device.buffer(
+            (mesh.tangents.len() * std::mem::size_of::<Tangent>()) as u64,
+            MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::SHADER_DEVICE_ADDRESS
+                | BufferUsageFlags::STORAGE_BUFFER
+                | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
+        );
+
+        tangent_buffer.copy_to(&mesh.tangents);
+
+        let mut tex_coord_buffer = device.buffer(
+            (mesh.tex_coords.len() * std::mem::size_of::<Texcoord>()) as u64,
+            MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::SHADER_DEVICE_ADDRESS
+                | BufferUsageFlags::STORAGE_BUFFER
+                | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
+        );
+
+        tex_coord_buffer.copy_to(&mesh.tex_coords);
+
+        let blas = BottomLevelAccelerationStructure::new(
+            device,
+            rtx,
+            &vertex_buffer,
+            mesh.positions.len() as u32,
+            0,
+            &index_buffer,
+            mesh.indices.len() as u32,
+            0,
+        );
+
+        Self {
+            index_buffer,
+            vertex_buffer,
+            normal_buffer,
+            tangent_buffer,
+            tex_coord_buffer,
+            blas,
+        }
+    }
+}
+#[derive(Clone)]
+pub struct GpuMeshAddress {
+    _index_address: ash::vk::DeviceAddress,
+    _vertex_address: ash::vk::DeviceAddress,
+    _normal_address: ash::vk::DeviceAddress,
+    _tangent_address: ash::vk::DeviceAddress,
+    _tex_coord_address: ash::vk::DeviceAddress,
+}
+
+impl GpuMeshAddress {
+    pub fn new(gpu_mesh: &GpuMesh) -> Self {
+        Self {
+            _index_address: gpu_mesh.index_buffer.device_address(),
+            _vertex_address: gpu_mesh.vertex_buffer.device_address(),
+            _normal_address: gpu_mesh.normal_buffer.device_address(),
+            _tangent_address: gpu_mesh.tangent_buffer.device_address(),
+            _tex_coord_address: gpu_mesh.tex_coord_buffer.device_address(),
+        }
+    }
+}
+
+pub struct GpuResourceCache {
+    meshes: HashMap<usize, GpuMesh>,
+    mesh_addresses: HashMap<usize, GpuMeshAddress>,
+    images: HashMap<usize, Image2DResource>,
+    pub image_views: HashMap<usize, ash::vk::ImageView>,
+    samplers: HashMap<usize, ash::vk::Sampler>,
+}
+
+impl GpuResourceCache {
+    pub fn new() -> Self {
+        Self {
+            meshes: HashMap::new(),
+            mesh_addresses: HashMap::new(),
+            images: HashMap::new(),
+            image_views: HashMap::new(),
+            samplers: HashMap::new(),
+        }
+    }
+
+    pub fn add_mesh(
+        &mut self,
+        device: &DeviceContext,
+        rtx: &RtxContext,
+        mesh: &CpuMesh,
+        id: usize,
+    ) -> usize {
+        if let Some(_) = self.meshes.get(&id) {
+            id
+        } else {
+            self.meshes.insert(id, GpuMesh::new(device, rtx, mesh));
+            if let Some(gpu_mesh) = self.meshes.get(&id) {
+                self.mesh_addresses
+                    .insert(id, GpuMeshAddress::new(gpu_mesh));
+            }
+            id
+        }
+    }
+
+    pub fn buffer_addresses(&self, id: usize) -> &GpuMeshAddress {
+        &self.mesh_addresses.get(&id).unwrap()
+    }
+}
+
+#[derive(Default)]
+pub struct GpuScene {
+    pub instances: Vec<GeometryInstance>,
+    pub materials: Vec<Material>,
+    pub meshes: Vec<usize>,
+    pub images: Vec<usize>,
+    pub image_views: Vec<usize>,
+    pub samplers: Vec<usize>,
+}
+
+impl GpuScene {
+    pub fn new() -> Self {
+        Self {
+            ..Default::default()
+        }
+    }
+
+    pub fn add_mesh(&mut self, id: usize) {
+        self.meshes.push(id);
+    }
+
+    pub fn add_image(&mut self, id: usize) {
+        self.images.push(id);
+    }
+
+    pub fn create_instance(
+        &mut self,
+        mesh_id: usize,
+        position: &Position,
+        scale: f32,
+        material: Material,
+    ) {
+        self.materials.push(material);
+        self.instances.push(GeometryInstance::new(
+            self.instances.len() as u32,
+            0,
+            0,
+            GeometryInstanceFlagsKHR::empty(),
+            mesh_id as u64,
+        ));
+    }
+
+    pub fn materials(&self) -> &[Material] {
+        &self.materials
+    }
+}
+
+pub struct Frame {
+    pub material_buffer: BufferResource,
+    pub address_buffer: BufferResource,
+    pub descriptor_sets: Vec<DescriptorSet>,
+    pub acceleration_structuce: TopLevelAccelerationStructure,
+}
 
 pub struct SceneData {
     pub vertex_buffer: BufferResource,

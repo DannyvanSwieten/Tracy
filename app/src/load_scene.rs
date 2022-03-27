@@ -1,6 +1,6 @@
 use nalgebra_glm::vec4;
 use renderer::geometry::Vertex;
-use renderer::scene::Scene;
+use renderer::cpu_scene::Scene;
 
 fn mul_matrix_array(lhs: &[[f32; 4]; 4], rhs: &[[f32; 4]; 4]) -> [[f32; 4]; 4] {
     let mut mul = [
@@ -50,7 +50,7 @@ pub fn load_scene_gltf(path: &str) -> gltf::Result<Scene> {
     }
 
     for node in document.nodes() {
-        let mut n = renderer::scene::SceneGraphNode::new(node.name().unwrap_or("Untitled Node"));
+        let mut n = renderer::cpu_scene::SceneGraphNode::new(node.name().unwrap_or("Untitled Node"));
         if let Some(mesh) = node.mesh() {
             for primitive in mesh.primitives() {
                 let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
@@ -112,7 +112,7 @@ pub fn load_scene_gltf(path: &str) -> gltf::Result<Scene> {
                 let metallic = m.metallic_factor();
                 let roughness = m.roughness_factor();
                 let emission = material.emissive_factor();
-                let mut mat = renderer::scene::Material::new(&vec4(a[0], a[1], a[2], a[3]));
+                let mut mat = renderer::cpu_scene::Material::new(&vec4(a[0], a[1], a[2], a[3]));
                 mat.metallic_roughness[0] = roughness;
                 mat.metallic_roughness[1] = metallic;
                 mat.emission = vec4(emission[0], emission[1], emission[2], 1.0);
@@ -142,7 +142,7 @@ pub fn load_scene_gltf(path: &str) -> gltf::Result<Scene> {
     for camera in document.cameras() {
         match camera.projection() {
             gltf::camera::Projection::Perspective(cam) => {
-                new_scene.add_camera(&renderer::scene::Camera {
+                new_scene.add_camera(&renderer::cpu_scene::Camera {
                     fov: cam.yfov(),
                     z_near: cam.znear(),
                     z_far: cam.zfar().unwrap_or(1000.0),

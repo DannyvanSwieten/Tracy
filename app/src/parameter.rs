@@ -6,5 +6,5 @@ pub enum Value {
 pub struct Parameter {
     min: Option<Value>,
     max: Option<Value>,
-    default: Option<Value>,
+    default: Value,
 }

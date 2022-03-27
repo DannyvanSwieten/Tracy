@@ -1,9 +1,6 @@
-use renderer::geometry::{Normal, Position, Tangent, Texcoord};
+use renderer::cpu_scene::CpuMesh;
 
 pub struct MeshResource {
-    indices: Vec<u32>,
-    positions: Vec<Position>,
-    normals: Vec<Normal>,
-    tangents: Vec<Tangent>,
-    tex_coords: Vec<Texcoord>,
+    pub id: usize,
+    pub mesh: CpuMesh,
 }

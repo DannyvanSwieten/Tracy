@@ -5,6 +5,7 @@ use ash::vk::{
     PhysicalDeviceRayTracingPipelinePropertiesKHR, Queue, SubmitInfo,
 };
 use ash::Device;
+use vk_utils::device_context::DeviceContext;
 pub struct Context {
     device: Device,
     queue: Queue,
@@ -65,16 +66,33 @@ pub struct RtxContext {
 }
 
 impl RtxContext {
-    pub fn new(
-        acceleration_structure_ext: AccelerationStructure,
-        ray_tracing_pipeline_ext: RayTracingPipeline,
-        memory_properties: PhysicalDeviceMemoryProperties2,
-        pipeline_properties: PhysicalDeviceRayTracingPipelinePropertiesKHR,
-    ) -> Self {
+    pub fn new(device: &DeviceContext) -> Self {
+        let mut physical_device_memory_properties = PhysicalDeviceMemoryProperties2::default();
+        unsafe {
+            device
+                .gpu()
+                .vulkan()
+                .vk_instance()
+                .get_physical_device_memory_properties2(
+                    *device.gpu().vk_physical_device(),
+                    &mut physical_device_memory_properties,
+                );
+        }
+
+        let acceleration_structure_ext =
+            AccelerationStructure::new(device.gpu().vulkan().vk_instance(), device.vk_device());
+        let ray_tracing_pipeline_ext =
+            RayTracingPipeline::new(device.gpu().vulkan().vk_instance(), device.vk_device());
+
+        let mut pipeline_properties = PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
+        let _properties = device
+            .gpu()
+            .extension_properties(|builder| builder.push_next(&mut pipeline_properties));
+
         Self {
             acceleration_structure_ext,
             ray_tracing_pipeline_ext,
-            memory_properties: memory_properties,
+            memory_properties: physical_device_memory_properties,
             pipeline_properties: pipeline_properties,
         }
     }

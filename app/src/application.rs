@@ -1,8 +1,8 @@
 use super::schema;
 use super::server::Server;
 use futures::lock::Mutex;
+use renderer::cpu_scene::Scene;
 use renderer::renderer::Renderer;
-use renderer::scene::Scene;
 use std::sync::Arc;
 use vk_utils::device_context::DeviceContext;
 
@@ -40,7 +40,7 @@ impl Model {
 
     pub fn build_scene(&mut self, scene_id: usize) -> bool {
         if scene_id < self.scenes.len() {
-            self.renderer.build(&self.device, &self.scenes[scene_id]);
+            //self.renderer.build(&self.device, &self.scenes[scene_id]);
             self.renderer.clear();
             true
         } else {
@@ -50,7 +50,7 @@ impl Model {
 
     pub fn render(&mut self, scene_id: usize, batches: u32) {
         for _ in 0..batches {
-            self.renderer.render(2, &self.device);
+            //self.renderer.render(2, &self.device);
         }
         self.has_new_frame = true;
     }

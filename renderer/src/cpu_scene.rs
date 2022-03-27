@@ -110,6 +110,49 @@ impl SceneGraphNode {
         self
     }
 }
+#[derive(Default)]
+pub struct CpuMesh {
+    pub indices: Vec<u32>,
+    pub positions: Vec<Position>,
+    pub normals: Vec<Normal>,
+    pub tangents: Vec<Tangent>,
+    pub tex_coords: Vec<Texcoord>,
+}
+
+impl CpuMesh {
+    pub fn new(indices: &[u32], positions: &[Position]) -> Self {
+        let normals = positions
+            .iter()
+            .map(|_| Normal::new(0.0, 0.0, 0.0))
+            .collect();
+
+        let tangents = positions
+            .iter()
+            .map(|_| Tangent::new(0.0, 0.0, 0.0))
+            .collect();
+
+        let tex_coords = positions.iter().map(|_| Texcoord::new(0.0, 0.0)).collect();
+
+        Self {
+            indices: indices.to_vec(),
+            positions: positions.to_vec(),
+            normals,
+            tangents,
+            tex_coords,
+        }
+    }
+
+    pub fn with_normals(mut self, normals: &[Normal]) -> Self {
+        self.normals = normals.to_vec();
+        self
+    }
+
+    pub fn with_tangents(mut self, tangents: &[Tangent]) -> Self {
+        self.tangents = tangents.to_vec();
+        self
+    }
+}
+
 pub struct Scene {
     pub name: String,
     geometry_buffer: GeometryBuffer,
