@@ -1,5 +1,10 @@
-use crate::geometry::*;
-use ash::vk::GeometryInstanceFlagsKHR;
+use std::sync::Arc;
+
+use crate::{
+    geometry::*,
+    gpu_scene::GpuTexture,
+    resource::{GpuResource, Resource},
+};
 use glm::{vec2, vec3, vec4};
 #[derive(Clone, Copy)]
 pub struct Camera {
@@ -43,22 +48,42 @@ impl TextureImageData {
     }
 }
 
+impl GpuResource for TextureImageData {
+    type Item = GpuTexture;
+
+    fn prepare(
+        &self,
+        device: &vk_utils::device_context::DeviceContext,
+        rtx: &crate::context::RtxContext,
+    ) -> Self::Item {
+        todo!()
+    }
+}
+
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Material {
-    pub color: glm::Vec4,
+    pub base_color: glm::Vec4,
     pub emission: glm::Vec4,
-    pub metallic_roughness: glm::Vec2,
-    pub maps: glm::IVec4,
+    pub roughness: f32,
+    pub metalness: f32,
+    pub albedo_map: Option<Arc<Resource<TextureImageData>>>,
+    pub normal_map: Option<Arc<Resource<TextureImageData>>>,
+    pub metallic_roughness_map: Option<Arc<Resource<TextureImageData>>>,
+    pub emission_map: Option<Arc<Resource<TextureImageData>>>,
 }
 
 impl Default for Material {
     fn default() -> Self {
         Self {
-            color: vec4(1., 1., 1., 1.),
-            metallic_roughness: vec2(1.0, 0.0),
+            base_color: vec4(0.5, 0.5, 0.5, 1.),
+            roughness: 1.0,
+            metalness: 0.0,
             emission: vec4(0., 0., 0., 0.),
-            maps: vec4(-1, -1, -1, -1),
+            albedo_map: None,
+            normal_map: None,
+            metallic_roughness_map: None,
+            emission_map: None,
         }
     }
 }
@@ -66,13 +91,24 @@ impl Default for Material {
 impl Material {
     pub fn new(color: &glm::Vec4) -> Self {
         Self {
-            color: *color,
-            metallic_roughness: vec2(1.0, 0.0),
-            emission: vec4(0., 0., 0., 0.),
-            maps: vec4(-1, -1, -1, -1),
+            base_color: *color,
+            ..Default::default()
         }
     }
 }
+
+impl GpuResource for Material {
+    type Item = u32;
+
+    fn prepare(
+        &self,
+        device: &vk_utils::device_context::DeviceContext,
+        rtx: &crate::context::RtxContext,
+    ) -> Self::Item {
+        todo!()
+    }
+}
+
 #[derive(Default, Clone)]
 pub struct SceneGraphNode {
     pub name: String,
@@ -107,48 +143,6 @@ impl SceneGraphNode {
 
     pub fn with_children(mut self, children: &[usize]) -> Self {
         self.children.extend(children);
-        self
-    }
-}
-#[derive(Default)]
-pub struct CpuMesh {
-    pub indices: Vec<u32>,
-    pub positions: Vec<Position>,
-    pub normals: Vec<Normal>,
-    pub tangents: Vec<Tangent>,
-    pub tex_coords: Vec<Texcoord>,
-}
-
-impl CpuMesh {
-    pub fn new(indices: &[u32], positions: &[Position]) -> Self {
-        let normals = positions
-            .iter()
-            .map(|_| Normal::new(0.0, 0.0, 0.0))
-            .collect();
-
-        let tangents = positions
-            .iter()
-            .map(|_| Tangent::new(0.0, 0.0, 0.0))
-            .collect();
-
-        let tex_coords = positions.iter().map(|_| Texcoord::new(0.0, 0.0)).collect();
-
-        Self {
-            indices: indices.to_vec(),
-            positions: positions.to_vec(),
-            normals,
-            tangents,
-            tex_coords,
-        }
-    }
-
-    pub fn with_normals(mut self, normals: &[Normal]) -> Self {
-        self.normals = normals.to_vec();
-        self
-    }
-
-    pub fn with_tangents(mut self, tangents: &[Tangent]) -> Self {
-        self.tangents = tangents.to_vec();
         self
     }
 }
@@ -224,7 +218,7 @@ impl Scene {
     }
 
     pub fn add_material(&mut self, name: &str, material: &Material) -> usize {
-        self.materials.push(*material);
+        self.materials.push(material.clone());
         self.material_names.push(name.to_string());
         self.materials.len() - 1
     }
@@ -274,7 +268,7 @@ impl Scene {
                 vec2(1.0, 1.0),
             ],
         );
-        let instance_id = self.create_instance(floor_id);
+        let instance_id = 0;
         self.set_scale(instance_id, &vec3(1000.0, 1.0, 1000.0));
 
         let node_id = self.add_node(SceneGraphNode::new("Floor").with_mesh(floor_id));
@@ -311,38 +305,20 @@ impl Scene {
         return self.geometry_views.len() - 1;
     }
 
-    pub fn create_instance(&mut self, geometry_id: usize) -> usize {
-        let instance_id = self.geometry_instances.len() as u32;
-        self.geometry_instances.push(GeometryInstance::new(
-            instance_id,
-            0xff,
-            0,
-            GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE,
-            geometry_id as u64,
-        ));
-
-        self.geometry_instance_offsets.push(GeometryOffset {
-            index: self.geometry_views[geometry_id].index_offset(),
-            vertex: self.geometry_views[geometry_id].vertex_offset(),
-        });
-        self.set_scale(instance_id as usize, &glm::Vec3::new(1.0, 1.0, 1.0));
-        instance_id as usize
-    }
-
     pub fn set_material_base_color(&mut self, instance_id: usize, color: &glm::Vec4) {
-        self.materials[instance_id].color = *color
+        //self.materials[instance_id].color = *color
     }
 
     pub fn set_material_base_color_texture(&mut self, instance_id: usize, texture_id: usize) {
-        self.materials[instance_id].maps[0] = texture_id as i32;
+        //self.materials[instance_id].maps[0] = texture_id as i32;
     }
 
     pub fn set_material_metallic(&mut self, instance_id: usize, metallic: f32) {
-        self.materials[instance_id].metallic_roughness[1] = metallic;
+        //self.materials[instance_id].metallic_roughness[1] = metallic;
     }
 
     pub fn set_material_roughness(&mut self, instance_id: usize, roughness: f32) {
-        self.materials[instance_id].metallic_roughness[0] = roughness;
+        //self.materials[instance_id].metallic_roughness[0] = roughness;
     }
 
     pub fn set_material_metallic_roughness_texture(
@@ -350,7 +326,7 @@ impl Scene {
         instance_id: usize,
         texture_id: usize,
     ) {
-        self.materials[instance_id].maps[1] = texture_id as i32;
+        //self.materials[instance_id].maps[1] = texture_id as i32;
     }
 
     pub fn set_material_emission(&mut self, instance_id: usize, color: &glm::Vec3, intensity: f32) {
@@ -358,11 +334,11 @@ impl Scene {
     }
 
     pub fn set_material_emission_texture(&mut self, instance_id: usize, texture_id: usize) {
-        self.materials[instance_id].maps[3] = texture_id as i32;
+        //self.materials[instance_id].maps[3] = texture_id as i32;
     }
 
     pub fn set_material(&mut self, instance_id: usize, material: &Material) {
-        self.materials[instance_id] = *material;
+        self.materials[instance_id] = material.clone();
     }
 
     pub fn set_matrix(&mut self, instance_id: usize, matrix: &[[f32; 4]; 4]) {

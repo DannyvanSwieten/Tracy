@@ -1,15 +1,13 @@
 pub mod application;
-pub mod image_resource;
 pub mod instancer;
 pub mod load_scene;
-pub mod mesh_resource;
 pub mod parameter;
-pub mod resources;
 pub mod scene_graph;
 pub mod schema;
 pub mod server;
 
 use load_scene::load_scene_gltf;
+use nalgebra_glm::{vec3, Mat4x4};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -19,16 +17,11 @@ use winit::{
 use winit_blit::*;
 
 use ash::extensions::ext::DebugUtils;
-use renderer::{cpu_scene::CpuMesh, geometry::Position, renderer::Renderer};
+use renderer::{cpu_scene::Material, renderer::Renderer, resources::Resources};
 use vk_utils::vulkan::Vulkan;
 
 use futures::lock::Mutex;
 use std::sync::Arc;
-
-use crate::{
-    mesh_resource::MeshResource,
-    scene_graph::{Actor, SceneGraph},
-};
 
 type ServerContext = Arc<Mutex<application::Model>>;
 fn main() {
@@ -54,37 +47,25 @@ fn main() {
     if mode == "--file".to_string() {
         let mut renderer = Renderer::new(&context, image_width, image_height);
         let mut gpu_resource_cache = renderer::gpu_scene::GpuResourceCache::new();
-        let mut cpu_resource_cache = resources::CpuResourceCache::new();
+        let mut cpu_resource_cache = Resources::default();
+        //cpu_resource_cache.add_material(Material::default());
 
-        let mesh_id = cpu_resource_cache.add_mesh(CpuMesh::new(
-            &[0, 1, 2],
-            &[
-                Position::new(-1.0, -1.0, 0.0),
-                Position::new(1.0, -1.0, 0.0),
-                Position::new(0.0, 1.0, 0.0),
-            ],
-        ));
-
-        let actor = Actor::new().with_mesh(mesh_id);
-        let scene_graph = SceneGraph::new(actor);
-        let scene = scene_graph.build(
+        let scenes = load_scene_gltf(&args[2], &mut cpu_resource_cache).unwrap();
+        let gpu_scene = scenes[0].build(
+            Mat4x4::new_nonuniform_scaling(&vec3(1.0, 1.0, 1.0)),
             &cpu_resource_cache,
             &mut gpu_resource_cache,
             &context,
             &renderer.rtx,
         );
+        let frame = renderer.build_frame(&context, &renderer.rtx, &gpu_resource_cache, gpu_scene);
 
-        let frame = renderer.build_frame(&context, &gpu_resource_cache, scene);
+        renderer.render_frame(&context, &frame, 16);
 
-        let scene = load_scene_gltf(&args[2]).unwrap();
-        // renderer.build(&context, &scene);
-        // for _ in 0..128 {
-        //     renderer.render(1, &context);
-        // }
         let buffer = renderer.download_image(&context);
         let data = buffer.copy_data::<u8>();
         image::save_buffer(
-            "output.png",
+            "Camera_1.png",
             &data,
             image_width,
             image_height,

@@ -1,3 +1,5 @@
+use crate::scene_graph::{Actor, SceneGraph};
+
 use super::application::Model;
 use super::load_scene_gltf;
 use async_graphql::{Context, Object, Result, Subscription};
@@ -29,38 +31,29 @@ pub struct Node {
     name: String,
     children: Vec<usize>,
     camera: Option<usize>,
-    meshes: Option<Vec<Mesh>>,
+    mesh: Option<Mesh>,
 }
 
 impl Node {
-    pub fn new(
-        id: usize,
-        scene: &renderer::cpu_scene::Scene,
-        scene_node: &renderer::cpu_scene::SceneGraphNode,
-    ) -> Self {
-        let meshes = if let Some(meshes) = &scene_node.mesh {
-            Some(
-                meshes
-                    .iter()
-                    .map(|mesh| {
-                        let mat = scene.materials()[*mesh];
-                        Mesh {
-                            name: scene.geometry_buffer_views()[*mesh].name.clone(),
-                            material: Material::new(&scene.material_names[*mesh], &mat),
-                        }
-                    })
-                    .collect(),
-            )
+    pub fn new(id: usize, scene: &SceneGraph, actor: &Actor) -> Self {
+        let mesh = if let Some(meshes) = actor.mesh() {
+            Some(Mesh {
+                name: "Untitled".to_string(),
+                material: Material::new(
+                    &"Untitled".to_string(),
+                    &renderer::cpu_scene::Material::default(),
+                ),
+            })
         } else {
             None
         };
 
         Self {
             id,
-            name: scene_node.name.clone(),
-            children: scene_node.children.clone(),
+            name: "".to_string(),
+            children: actor.children().to_vec(),
             camera: None,
-            meshes,
+            mesh,
         }
     }
 }
@@ -75,8 +68,8 @@ impl Node {
         Ok(&self.camera)
     }
 
-    async fn meshes(&self, _context: &Context<'_>) -> Result<&Option<Vec<Mesh>>> {
-        Ok(&self.meshes)
+    async fn meshes(&self, _context: &Context<'_>) -> Result<&Option<Mesh>> {
+        Ok(&self.mesh)
     }
 
     async fn children(&self, _context: &Context<'_>) -> Result<&Vec<usize>> {
@@ -110,19 +103,19 @@ impl Material {
     }
 
     async fn roughness(&self, _context: &Context<'_>) -> Result<f32> {
-        Ok(self.mat.metallic_roughness[1])
+        Ok(self.mat.metalness)
     }
 
     async fn metalness(&self, _context: &Context<'_>) -> Result<f32> {
-        Ok(self.mat.metallic_roughness[0])
+        Ok(self.mat.roughness)
     }
 
     async fn base_color(&self, _context: &Context<'_>) -> Result<[f32; 4]> {
         Ok([
-            self.mat.color[0],
-            self.mat.color[1],
-            self.mat.color[2],
-            self.mat.color[3],
+            self.mat.base_color[0],
+            self.mat.base_color[1],
+            self.mat.base_color[2],
+            self.mat.base_color[3],
         ])
     }
 }
@@ -138,24 +131,19 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn new(id: usize, scene: &renderer::cpu_scene::Scene) -> Self {
+    pub fn new(id: usize, scene: &SceneGraph) -> Self {
         Self {
             id,
-            name: scene.name.clone(),
-            materials: scene
-                .materials
-                .iter()
-                .enumerate()
-                .map(|(index, m)| Material::new(&scene.material_names[index], m))
-                .collect(),
+            name: scene.name().to_string(),
+            materials: Vec::new(),
             nodes: scene
-                .nodes
+                .nodes()
                 .iter()
                 .enumerate()
                 .map(|(id, node)| Node::new(id, scene, node))
                 .collect(),
             meshes: Vec::new(),
-            root: scene.root,
+            root: scene.root(),
         }
     }
 }
@@ -239,7 +227,7 @@ impl Query {
     ) -> Result<Node> {
         let model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
         if scene_id < model.scenes.len() {
-            let n = &model.scenes[scene_id].nodes[node_id];
+            let n = model.scenes[scene_id].node(node_id);
             Ok(Node::new(node_id, &model.scenes[scene_id], n))
         } else {
             Err(async_graphql::Error::new("Nope"))
@@ -280,9 +268,9 @@ impl Mutation {
 
     async fn load(&self, context: &Context<'_>, path: String) -> Result<bool> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        match load_scene_gltf(&path) {
-            Ok(scene) => {
-                model.scenes.push(scene);
+        match load_scene_gltf(&path, &mut model.cpu_resource_cache) {
+            Ok(scenes) => {
+                model.scenes.extend(scenes);
                 let scene = model.scenes.last().unwrap();
                 let scene_data = Scene::new(model.scenes.len() - 1, scene);
 
@@ -294,16 +282,6 @@ impl Mutation {
                 Ok(true)
             }
             Err(e) => Err(async_graphql::Error::new(e.to_string())),
-        }
-    }
-
-    async fn create_floor(&self, context: &Context<'_>, y: f32) -> Result<bool> {
-        let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        if let Some(current_scene) = model.current_scene {
-            model.scenes[current_scene].create_floor(y);
-            Ok(true)
-        } else {
-            Ok(false)
         }
     }
 

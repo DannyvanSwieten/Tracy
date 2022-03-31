@@ -1,4 +1,4 @@
-use renderer::cpu_scene::TextureImageData;
+use super::cpu_scene::TextureImageData;
 
 pub struct TextureResource {
     pub id: usize,

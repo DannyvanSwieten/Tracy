@@ -8,6 +8,15 @@ use ash::vk::{
 use crate::gpu_scene::SceneData;
 use vk_utils::device_context::DeviceContext;
 
+pub const CAMERA_BUFFER_LOCATION: (u32, u32) = (1, 0);
+pub const MATERIAL_BUFFER_ADDRESS_LOCATION: (u32, u32) = (1, 1);
+pub const MATERIAL_TEXTURE_LOCATION: (u32, u32) = (1, 2);
+pub const MESH_BUFFERS_LOCATION: (u32, u32) = (1, 3);
+
+pub const ACCELERATION_STRUCTURE_LOCATION: (u32, u32) = (0, 0);
+pub const OUTPUT_IMAGE_LOCATION: (u32, u32) = (0, 1);
+pub const ACCUMULATION_IMAGE_LOCATION: (u32, u32) = (0, 2);
+
 pub struct RTXDescriptorSets {
     pub descriptor_set_layouts: Vec<DescriptorSetLayout>,
     pub descriptor_pool: DescriptorPool,
@@ -35,19 +44,19 @@ impl RTXDescriptorSets {
                     .descriptor_count(1)
                     .descriptor_type(DescriptorType::ACCELERATION_STRUCTURE_KHR)
                     .stage_flags(ShaderStageFlags::RAYGEN_KHR | ShaderStageFlags::CLOSEST_HIT_KHR)
-                    .binding(0),
+                    .binding(ACCELERATION_STRUCTURE_LOCATION.1),
                 // final image
                 *DescriptorSetLayoutBinding::builder()
                     .descriptor_count(1)
                     .descriptor_type(DescriptorType::STORAGE_IMAGE)
                     .stage_flags(ShaderStageFlags::RAYGEN_KHR)
-                    .binding(1),
+                    .binding(OUTPUT_IMAGE_LOCATION.1),
                 // accumulation image
                 *DescriptorSetLayoutBinding::builder()
                     .descriptor_count(1)
                     .descriptor_type(DescriptorType::STORAGE_IMAGE)
                     .stage_flags(ShaderStageFlags::RAYGEN_KHR)
-                    .binding(2),
+                    .binding(ACCUMULATION_IMAGE_LOCATION.1),
             ];
 
             let set_0 = *DescriptorSetLayoutCreateInfo::builder().bindings(&set_0_bindings);
@@ -57,17 +66,22 @@ impl RTXDescriptorSets {
                     .descriptor_count(1)
                     .descriptor_type(DescriptorType::UNIFORM_BUFFER)
                     .stage_flags(ShaderStageFlags::RAYGEN_KHR)
-                    .binding(0),
+                    .binding(CAMERA_BUFFER_LOCATION.1),
                 *DescriptorSetLayoutBinding::builder()
                     .descriptor_count(1)
                     .descriptor_type(DescriptorType::UNIFORM_BUFFER)
                     .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR | ShaderStageFlags::RAYGEN_KHR)
-                    .binding(1),
+                    .binding(MATERIAL_BUFFER_ADDRESS_LOCATION.1),
                 *DescriptorSetLayoutBinding::builder()
                     .descriptor_count(1024)
                     .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
                     .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
-                    .binding(2),
+                    .binding(MATERIAL_TEXTURE_LOCATION.1),
+                *DescriptorSetLayoutBinding::builder()
+                    .descriptor_count(1)
+                    .descriptor_type(DescriptorType::STORAGE_BUFFER)
+                    .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
+                    .binding(MESH_BUFFERS_LOCATION.1),
             ];
 
             let set_1 = *DescriptorSetLayoutCreateInfo::builder().bindings(&set_1_bindings);
@@ -112,6 +126,10 @@ impl RTXDescriptorSets {
                 DescriptorPoolSize {
                     ty: DescriptorType::UNIFORM_BUFFER,
                     descriptor_count: 2,
+                },
+                DescriptorPoolSize {
+                    ty: DescriptorType::STORAGE_BUFFER,
+                    descriptor_count: 1,
                 },
                 DescriptorPoolSize {
                     ty: DescriptorType::COMBINED_IMAGE_SAMPLER,

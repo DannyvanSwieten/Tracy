@@ -13,28 +13,27 @@
 #include "scatter.glsl"
 #include "random.glsl"
 
-layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
+
+struct BufferAddresses {
+    uint64_t index_address;
+    uint64_t vertex_address;
+    uint64_t normal_address;
+    uint64_t tangent_address;
+    uint64_t texcoord_address;
+};
+
+layout(set = 0, binding = 0) uniform accelerationStructureEXT topLevelAS;
 
 hitAttributeEXT vec2 attribs;
 layout(location = 0) rayPayloadInEXT RayPayload ray;
 
-layout(buffer_reference, scalar) readonly buffer Vertices { vec3 data[]; };
-layout(buffer_reference, scalar) readonly buffer Normals { vec3 data[]; };
-layout(buffer_reference, scalar) readonly buffer Indices { int32_t data[]; };
-layout(buffer_reference, scalar) readonly buffer TextureCoordinates { vec2 data[]; };
-layout(buffer_reference, scalar) readonly buffer Offsets { ivec2 data[]; };
-layout(buffer_reference, scalar) readonly buffer Materials { Material data[]; };
-
-layout(binding = 1, set = 1) uniform BufferAddresses {
-    uint64_t vertex_address;
-    uint64_t normal_address;
-    uint64_t index_address;
-    uint64_t texcoord_address;
-    uint64_t offset_address;
+layout(set = 1, binding = 1) uniform MaterialAddressBuffer {
     uint64_t material_address;
 };
 
-layout(binding = 2, set = 1) uniform sampler2D images[1024];
+layout(set = 1, binding = 2) uniform sampler2D images[1024];
+layout(set = 1, binding = 3, scalar) buffer AddressBuffer { BufferAddresses addresses[]; } meshes;
+
 
 void direction_of_anisotropicity(vec3 N, out vec3 tangent, out vec3 binormal){
     tangent = cross(N, vec3(1.,0.,1.));
@@ -42,40 +41,47 @@ void direction_of_anisotropicity(vec3 N, out vec3 tangent, out vec3 binormal){
     tangent = normalize(cross(N, binormal));
 }
 
+layout(buffer_reference, scalar) readonly buffer Vertices { vec3 data[]; };
+layout(buffer_reference, scalar) readonly buffer Normals { vec3 data[]; };
+layout(buffer_reference, scalar) readonly buffer Tangents { vec3 data[]; };
+layout(buffer_reference, scalar) readonly buffer Indices { int32_t data[]; };
+layout(buffer_reference, scalar) readonly buffer TextureCoordinates { vec2 data[]; };
+layout(buffer_reference, scalar) readonly buffer Materials { Material data[]; };
+
 void main()
 {
+    BufferAddresses mesh = meshes.addresses[gl_InstanceCustomIndexEXT];
+
     Materials materials = Materials(material_address);
-    Normals normals = Normals(normal_address);
-    Offsets offsets = Offsets(offset_address);
-    Indices indices = Indices(index_address);
-    Vertices vertices = Vertices(vertex_address);
-    TextureCoordinates tex_coords = TextureCoordinates(texcoord_address);
+    Normals normals = Normals(mesh.normal_address);
+    Indices indices = Indices(mesh.index_address);
+    Vertices vertices = Vertices(mesh.vertex_address);
+    TextureCoordinates tex_coords = TextureCoordinates(mesh.texcoord_address);
 
     const vec3 barycentric = vec3(1 - attribs.x - attribs.y, attribs.x, attribs.y);
 
-    const int32_t start_index = 3 * gl_PrimitiveID + offsets.data[gl_InstanceCustomIndexEXT].x;
+    const int32_t start_index = 3 * gl_PrimitiveID;
     const int32_t i0 = indices.data[start_index];
     const int32_t i1 = indices.data[start_index + 1];
     const int32_t i2 = indices.data[start_index + 2];
 
-    const int32_t start_vertex = offsets.data[gl_InstanceCustomIndexEXT].y;
-    const vec3 v0 = gl_ObjectToWorldEXT * vec4(vertices.data[start_vertex + i0], 1);
-    const vec3 v1 = gl_ObjectToWorldEXT * vec4(vertices.data[start_vertex + i1], 1);
-    const vec3 v2 = gl_ObjectToWorldEXT * vec4(vertices.data[start_vertex + i2], 1);
+    const vec3 v0 = gl_ObjectToWorldEXT * vec4(vertices.data[i0], 1);
+    const vec3 v1 = gl_ObjectToWorldEXT * vec4(vertices.data[i1], 1);
+    const vec3 v2 = gl_ObjectToWorldEXT * vec4(vertices.data[i2], 1);
 
     const vec3 pv0 = barycentric.x * v0;
     const vec3 pv1 = barycentric.y * v1;
     const vec3 pv2 = barycentric.z * v2;
 
-    const vec2 uv0 = barycentric.x * tex_coords.data[start_vertex + i0];
-    const vec2 uv1 = barycentric.y * tex_coords.data[start_vertex + i1];
-    const vec2 uv2 = barycentric.z * tex_coords.data[start_vertex + i2];
+    const vec2 uv0 = barycentric.x * tex_coords.data[i0];
+    const vec2 uv1 = barycentric.y * tex_coords.data[i1];
+    const vec2 uv2 = barycentric.z * tex_coords.data[i2];
 
     const vec2 uv = uv0 + uv1 + uv2;
 
-    const vec3 n0 = gl_ObjectToWorldEXT * vec4(normals.data[start_vertex + i0], 0);
-    const vec3 n1 = gl_ObjectToWorldEXT * vec4(normals.data[start_vertex + i1], 0);
-    const vec3 n2 = gl_ObjectToWorldEXT * vec4(normals.data[start_vertex + i2], 0);
+    const vec3 n0 = gl_ObjectToWorldEXT * vec4(normals.data[i0], 0);
+    const vec3 n1 = gl_ObjectToWorldEXT * vec4(normals.data[i1], 0);
+    const vec3 n2 = gl_ObjectToWorldEXT * vec4(normals.data[i2], 0);
 
     const vec3 N0 = barycentric.x * n0;
     const vec3 N1 = barycentric.y * n1;

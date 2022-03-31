@@ -1,8 +1,11 @@
+use crate::scene_graph::SceneGraph;
+
 use super::schema;
 use super::server::Server;
 use futures::lock::Mutex;
-use renderer::cpu_scene::Scene;
+use renderer::gpu_scene::GpuResourceCache;
 use renderer::renderer::Renderer;
+use renderer::resources::Resources;
 use std::sync::Arc;
 use vk_utils::device_context::DeviceContext;
 
@@ -20,7 +23,9 @@ impl Broadcasters {
 pub struct Model {
     pub device: DeviceContext,
     pub renderer: Renderer,
-    pub scenes: Vec<Scene>,
+    pub cpu_resource_cache: Resources,
+    pub gpu_resource_cache: GpuResourceCache,
+    pub scenes: Vec<SceneGraph>,
     pub current_scene: Option<usize>,
     pub has_new_frame: bool,
     pub broadcasters: Broadcasters,
@@ -31,6 +36,8 @@ impl Model {
         Self {
             device,
             renderer,
+            cpu_resource_cache: Resources::default(),
+            gpu_resource_cache: GpuResourceCache::new(),
             scenes: vec![],
             current_scene: None,
             has_new_frame: false,

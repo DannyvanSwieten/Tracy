@@ -10,6 +10,7 @@ use ash::vk::{
     GeometryInstanceFlagsKHR, GeometryTypeKHR, IndexType, MemoryPropertyFlags,
 };
 use ash::Device;
+use glm::{Mat4x3, Mat4x4};
 use vk_utils::buffer_resource::BufferResource;
 use vk_utils::device_context::DeviceContext;
 
@@ -161,10 +162,10 @@ impl GeometryInstance {
         hit_group_offset: u32,
         _flags: GeometryInstanceFlagsKHR,
         acceleration_structure_handle: u64,
+        transform: Mat4x3,
     ) -> Self {
         let id_and_mask = ((mask as u32) << 24) | instance_id;
         let hit_group_offset_and_flags = ((1 as u32) << 24) | hit_group_offset;
-        let transform = glm::Mat4x3::default();
         Self {
             transform,
             id_and_mask,
@@ -172,6 +173,11 @@ impl GeometryInstance {
             acceleration_structure_handle,
         }
     }
+
+    // pub fn with_uniform_scale(mut self, scale: f32) -> Self {
+    //     self.transform = self.transform.scaled
+    //     self
+    // }
 
     pub fn geometry_id(&self) -> usize {
         self.acceleration_structure_handle as usize

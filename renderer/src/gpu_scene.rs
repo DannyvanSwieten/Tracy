@@ -1,18 +1,22 @@
 use crate::context::RtxContext;
-use crate::cpu_scene::{CpuMesh, Material, Scene};
+use crate::cpu_scene::{Material, Scene, TextureImageData};
 use crate::geometry::{
-    BottomLevelAccelerationStructure, GeometryInstance, GeometryOffset, Normal, Position, Tangent,
-    Texcoord, TopLevelAccelerationStructure, Vertex,
+    BottomLevelAccelerationStructure, GeometryInstance, GeometryOffset, Normal, Tangent, Texcoord,
+    TopLevelAccelerationStructure, Vertex,
 };
+use crate::mesh_resource::MeshResource;
+use glm::Mat4x4;
 use std::collections::HashMap;
 use vk_utils::buffer_resource::BufferResource;
 use vk_utils::device_context::DeviceContext;
 use vk_utils::image_resource::Image2DResource;
 
-use ash::vk::{
-    BufferUsageFlags, DescriptorSet, GeometryAABBNV, GeometryFlagsKHR, GeometryInstanceFlagsKHR,
-    MemoryPropertyFlags,
-};
+use ash::vk::{BufferUsageFlags, DescriptorSet, GeometryInstanceFlagsKHR, MemoryPropertyFlags};
+
+pub struct GpuTexture {
+    image: Image2DResource,
+    pub image_view: ash::vk::ImageView,
+}
 
 pub struct GpuMesh {
     pub index_buffer: BufferResource,
@@ -24,7 +28,7 @@ pub struct GpuMesh {
 }
 
 impl GpuMesh {
-    pub fn new(device: &DeviceContext, rtx: &RtxContext, mesh: &CpuMesh) -> Self {
+    pub fn new(device: &DeviceContext, rtx: &RtxContext, mesh: &MeshResource) -> Self {
         let mut index_buffer = device.buffer(
             (mesh.indices.len() * std::mem::size_of::<u32>()) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
@@ -118,11 +122,10 @@ impl GpuMeshAddress {
 }
 
 pub struct GpuResourceCache {
-    meshes: HashMap<usize, GpuMesh>,
-    mesh_addresses: HashMap<usize, GpuMeshAddress>,
-    images: HashMap<usize, Image2DResource>,
-    pub image_views: HashMap<usize, ash::vk::ImageView>,
-    samplers: HashMap<usize, ash::vk::Sampler>,
+    pub meshes: HashMap<usize, GpuMesh>,
+    pub mesh_addresses: HashMap<usize, GpuMeshAddress>,
+    pub textures: HashMap<usize, GpuTexture>,
+    pub samplers: HashMap<usize, ash::vk::Sampler>,
 }
 
 impl GpuResourceCache {
@@ -130,8 +133,7 @@ impl GpuResourceCache {
         Self {
             meshes: HashMap::new(),
             mesh_addresses: HashMap::new(),
-            images: HashMap::new(),
-            image_views: HashMap::new(),
+            textures: HashMap::new(),
             samplers: HashMap::new(),
         }
     }
@@ -140,7 +142,7 @@ impl GpuResourceCache {
         &mut self,
         device: &DeviceContext,
         rtx: &RtxContext,
-        mesh: &CpuMesh,
+        mesh: &MeshResource,
         id: usize,
     ) -> usize {
         if let Some(_) = self.meshes.get(&id) {
@@ -153,6 +155,49 @@ impl GpuResourceCache {
             }
             id
         }
+    }
+
+    pub fn add_texture(&mut self, device: &DeviceContext, texture: &TextureImageData, id: usize) {
+        let image = device.image_2d(
+            texture.width,
+            texture.height,
+            texture.format,
+            ash::vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            ash::vk::ImageUsageFlags::TRANSFER_DST | ash::vk::ImageUsageFlags::SAMPLED,
+        );
+
+        let buffer = device.buffer(
+            texture.pixels.len() as u64,
+            ash::vk::MemoryPropertyFlags::HOST_VISIBLE,
+            ash::vk::BufferUsageFlags::TRANSFER_SRC,
+        );
+
+        device
+            .graphics_queue()
+            .unwrap()
+            .begin(|command_buffer_handle| {
+                command_buffer_handle.copy_buffer_to_image_2d(&buffer, &image);
+                command_buffer_handle
+            });
+
+        let view_info = *ash::vk::ImageViewCreateInfo::builder()
+            .format(texture.format)
+            .image(*image.vk_image())
+            .subresource_range(
+                *ash::vk::ImageSubresourceRange::builder()
+                    .layer_count(1)
+                    .level_count(1)
+                    .aspect_mask(ash::vk::ImageAspectFlags::COLOR),
+            );
+
+        let image_view = unsafe {
+            device
+                .vk_device()
+                .create_image_view(&view_info, None)
+                .expect("Image view creation failed")
+        };
+
+        self.textures.insert(id, GpuTexture { image_view, image });
     }
 
     pub fn buffer_addresses(&self, id: usize) -> &GpuMeshAddress {
@@ -185,13 +230,7 @@ impl GpuScene {
         self.images.push(id);
     }
 
-    pub fn create_instance(
-        &mut self,
-        mesh_id: usize,
-        position: &Position,
-        scale: f32,
-        material: Material,
-    ) {
+    pub fn create_instance(&mut self, mesh_id: usize, transform: &Mat4x4, material: Material) {
         self.materials.push(material);
         self.instances.push(GeometryInstance::new(
             self.instances.len() as u32,
@@ -199,19 +238,27 @@ impl GpuScene {
             0,
             GeometryInstanceFlagsKHR::empty(),
             mesh_id as u64,
+            transform.remove_column(3),
         ));
     }
 
     pub fn materials(&self) -> &[Material] {
         &self.materials
     }
+
+    pub fn materials_mut(&mut self) -> &mut [Material] {
+        &mut self.materials
+    }
 }
+
+unsafe impl Send for GpuResourceCache {}
 
 pub struct Frame {
     pub material_buffer: BufferResource,
+    pub material_address_buffer: BufferResource,
     pub address_buffer: BufferResource,
     pub descriptor_sets: Vec<DescriptorSet>,
-    pub acceleration_structuce: TopLevelAccelerationStructure,
+    pub acceleration_structure: TopLevelAccelerationStructure,
 }
 
 pub struct SceneData {
@@ -327,6 +374,7 @@ impl SceneData {
                     0,
                     GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE,
                     bottom_level_acceleration_structures[instance.geometry_id()].address(),
+                    instance.transform,
                 );
                 ni.transform = instance.transform;
                 ni
