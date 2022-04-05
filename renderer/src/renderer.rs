@@ -1,12 +1,11 @@
 use crate::context::RtxContext;
-use crate::cpu_scene::Material;
 use crate::descriptor_sets::{
     RTXDescriptorSets, ACCELERATION_STRUCTURE_LOCATION, ACCUMULATION_IMAGE_LOCATION,
-    CAMERA_BUFFER_LOCATION, MATERIAL_BUFFER_ADDRESS_LOCATION, MATERIAL_TEXTURE_LOCATION,
-    MESH_BUFFERS_LOCATION, OUTPUT_IMAGE_LOCATION,
+    CAMERA_BUFFER_LOCATION, MATERIAL_BUFFER_ADDRESS_LOCATION, MESH_BUFFERS_LOCATION,
+    OUTPUT_IMAGE_LOCATION,
 };
 use crate::geometry::{GeometryInstance, TopLevelAccelerationStructure};
-use crate::gpu_scene::{Frame, GpuMeshAddress, GpuResourceCache, GpuScene, SceneData};
+use crate::gpu_scene::{Frame, GpuScene, Material, Mesh, MeshAddress};
 use nalgebra_glm::{vec3, Vec3};
 
 use vk_utils::buffer_resource::BufferResource;
@@ -181,128 +180,139 @@ impl Renderer {
         }
     }
 
-    pub fn build_frame(
-        &self,
-        device: &DeviceContext,
-        rtx: &RtxContext,
-        cache: &GpuResourceCache,
-        mut scene: GpuScene,
-    ) -> Frame {
-        let descriptor_sets = self.descriptor_sets.descriptor_sets(device);
+    // pub fn build_frame(&mut self, device: &DeviceContext, scene: GpuScene) -> Frame {
+    //     let descriptor_sets = self.descriptor_sets.descriptor_sets(device);
 
-        let mut image_map = std::collections::HashMap::new();
-        let image_writes: Vec<ash::vk::DescriptorImageInfo> = scene
-            .image_views
-            .iter()
-            .enumerate()
-            .map(|(index, id)| {
-                let texture = cache.textures.get(id).unwrap();
-                let view = texture.image_view;
-                image_map.insert(*id, index);
-                *DescriptorImageInfo::builder()
-                    .image_view(view)
-                    .image_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-                // .sampler(scene_data.samplers[0])
-            })
-            .collect();
+    //     // let mut image_map = std::collections::HashMap::new();
+    //     // let image_writes: Vec<ash::vk::DescriptorImageInfo> = scene
+    //     //     .textures
+    //     //     .iter()
+    //     //     .enumerate()
+    //     //     .map(|(index, id)| {
+    //     //         let texture = cache.textures.get(id).unwrap();
+    //     //         let view = texture.image_view;
+    //     //         image_map.insert(*id, index);
+    //     //         *DescriptorImageInfo::builder()
+    //     //             .image_view(view)
+    //     //             .image_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+    //     //         // .sampler(scene_data.samplers[0])
+    //     //     })
+    //     //     .collect();
 
-        // for mat in scene.materials_mut() {
-        //     for i in 0..4 {
-        //         if mat.maps[i] != -1 {
-        //             mat.maps[i] = (*image_map.get(&(mat.maps[i] as usize)).unwrap()) as i32;
-        //         }
-        //     }
-        // }
+    //     // // for mat in scene.materials_mut() {
+    //     // //     for i in 0..4 {
+    //     // //         if mat.maps[i] != -1 {
+    //     // //             mat.maps[i] = (*image_map.get(&(mat.maps[i] as usize)).unwrap()) as i32;
+    //     // //         }
+    //     // //     }
+    //     // // }
 
-        if image_writes.len() > 0 {
-            let writes = [*WriteDescriptorSet::builder()
-                .dst_binding(MATERIAL_TEXTURE_LOCATION.1)
-                .dst_set(descriptor_sets[MATERIAL_TEXTURE_LOCATION.0 as usize])
-                .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
-                .image_info(&image_writes)];
-            unsafe {
-                device.vk_device().update_descriptor_sets(&writes, &[]);
-            }
-        }
+    //     // if image_writes.len() > 0 {
+    //     //     let writes = [*WriteDescriptorSet::builder()
+    //     //         .dst_binding(MATERIAL_TEXTURE_LOCATION.1)
+    //     //         .dst_set(descriptor_sets[MATERIAL_TEXTURE_LOCATION.0 as usize])
+    //     //         .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
+    //     //         .image_info(&image_writes)];
+    //     //     unsafe {
+    //     //         device.vk_device().update_descriptor_sets(&writes, &[]);
+    //     //     }
+    //     // }
 
-        let mut material_buffer = device.buffer(
-            (scene.materials().len() * std::mem::size_of::<Material>()) as u64,
-            MemoryPropertyFlags::HOST_VISIBLE,
-            BufferUsageFlags::STORAGE_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
-        );
+    //     // scene.instances.iter().map(|instance| {
 
-        material_buffer.copy_to(scene.materials());
+    //     // }).collect()
 
-        let addresses: Vec<GpuMeshAddress> = scene
-            .instances
-            .iter()
-            .map(|instance| {
-                cache
-                    .mesh_addresses
-                    .get(&instance.geometry_id())
-                    .unwrap()
-                    .clone()
-            })
-            .collect();
+    //     scene.meshes.iter().for_each(|mesh| {
+    //         self.cache.add_mesh(device, &self.rtx, mesh);
+    //     });
 
-        let mut address_buffer = device.buffer(
-            (addresses.len() * std::mem::size_of::<GpuMeshAddress>()) as u64,
-            MemoryPropertyFlags::HOST_VISIBLE,
-            BufferUsageFlags::STORAGE_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
-        );
+    //     let mesh_addresses: Vec<MeshAddress> = self
+    //         .cache
+    //         .meshes
+    //         .iter()
+    //         .map(|mesh| MeshAddress::new(mesh.1))
+    //         .collect();
 
-        address_buffer.copy_to(&addresses);
+    //     let mut material_buffer = device.buffer(
+    //         (scene.materials.len() * std::mem::size_of::<Material>()) as u64,
+    //         MemoryPropertyFlags::HOST_VISIBLE,
+    //         BufferUsageFlags::STORAGE_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+    //     );
 
-        let instances: Vec<GeometryInstance> = scene
-            .instances
-            .iter()
-            .enumerate()
-            .map(|(i, instance)| {
-                let mesh = cache
-                    .meshes
-                    .get(&(instance.geometry_id() as usize))
-                    .unwrap();
-                let ni = GeometryInstance::new(
-                    i as u32,
-                    0xff,
-                    0,
-                    ash::vk::GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE,
-                    mesh.blas.address(),
-                    instance.transform,
-                );
-                ni
-            })
-            .collect();
+    //     material_buffer.copy_to(&materials);
 
-        let acceleration_structure = TopLevelAccelerationStructure::new(&device, &rtx, &instances);
+    //     let addresses: Vec<MeshAddress> = scene
+    //         .instances
+    //         .iter()
+    //         .map(|instance| {
+    //             self.cache
+    //                 .mesh_addresses
+    //                 .get(&instance.geometry_id())
+    //                 .unwrap()
+    //                 .clone()
+    //         })
+    //         .collect();
 
-        Self::update_acceleration_structure_descriptors(
-            device,
-            &acceleration_structure,
-            &descriptor_sets,
-        );
+    //     let mut address_buffer = device.buffer(
+    //         (addresses.len() * std::mem::size_of::<MeshAddress>()) as u64,
+    //         MemoryPropertyFlags::HOST_VISIBLE,
+    //         BufferUsageFlags::STORAGE_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+    //     );
 
-        let mut material_address_buffer = device.buffer(
-            (addresses.len() * std::mem::size_of::<u64>()) as u64,
-            MemoryPropertyFlags::HOST_VISIBLE,
-            BufferUsageFlags::UNIFORM_BUFFER,
-        );
+    //     address_buffer.copy_to(&addresses);
 
-        material_address_buffer.copy_to(&[material_buffer.device_address()]);
+    //     let instances: Vec<GeometryInstance> = scene
+    //         .instances
+    //         .iter()
+    //         .enumerate()
+    //         .map(|(i, instance)| {
+    //             let mesh = self
+    //                 .cache
+    //                 .meshes
+    //                 .get(&(instance.geometry_id() as usize))
+    //                 .unwrap();
+    //             let ni = GeometryInstance::new(
+    //                 i as u32,
+    //                 0xff,
+    //                 0,
+    //                 ash::vk::GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE,
+    //                 mesh.blas.address(),
+    //                 instance.transform,
+    //             );
+    //             ni
+    //         })
+    //         .collect();
 
-        Self::update_material_descriptor(device, &descriptor_sets, &material_address_buffer);
-        Self::update_mesh_address_descriptor(device, &descriptor_sets, &address_buffer);
-        self.update_camera_descriptors(device, &descriptor_sets);
-        self.update_image_descriptors(device, &descriptor_sets);
+    //     let acceleration_structure =
+    //         TopLevelAccelerationStructure::new(&device, &self.rtx, &instances);
 
-        Frame {
-            material_buffer,
-            material_address_buffer,
-            address_buffer,
-            descriptor_sets,
-            acceleration_structure,
-        }
-    }
+    //     Self::update_acceleration_structure_descriptors(
+    //         device,
+    //         &acceleration_structure,
+    //         &descriptor_sets,
+    //     );
+
+    //     let mut material_address_buffer = device.buffer(
+    //         (addresses.len() * std::mem::size_of::<u64>()) as u64,
+    //         MemoryPropertyFlags::HOST_VISIBLE,
+    //         BufferUsageFlags::UNIFORM_BUFFER,
+    //     );
+
+    //     material_address_buffer.copy_to(&[material_buffer.device_address()]);
+
+    //     Self::update_material_descriptor(device, &descriptor_sets, &material_address_buffer);
+    //     Self::update_mesh_address_descriptor(device, &descriptor_sets, &address_buffer);
+    //     self.update_camera_descriptors(device, &descriptor_sets);
+    //     self.update_image_descriptors(device, &descriptor_sets);
+
+    //     Frame {
+    //         material_buffer,
+    //         material_address_buffer,
+    //         address_buffer,
+    //         descriptor_sets,
+    //         acceleration_structure,
+    //     }
+    // }
 }
 
 impl Renderer {
@@ -336,7 +346,7 @@ impl Renderer {
             wait_handles: [None, None, None],
             current_frame_index: 0,
 
-            camera_position: Vec3::new(0., 5., 12.5),
+            camera_position: Vec3::new(0., 0., 5.),
             camera_target: vec3(0.0, 0.0, 0.0),
             current_batch: 0,
         };

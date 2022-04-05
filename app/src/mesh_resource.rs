@@ -1,14 +1,11 @@
-use std::sync::Arc;
-
+use renderer::{
+    context::RtxContext,
+    geometry::{Normal, Position, Tangent, Texcoord},
+    gpu_scene::Mesh,
+};
 use vk_utils::device_context::DeviceContext;
 
-use crate::{
-    context::RtxContext,
-    cpu_scene::Material,
-    geometry::{Normal, Position, Tangent, Texcoord},
-    gpu_scene::GpuMesh,
-    resource::{GpuResource, Resource},
-};
+use crate::resource::GpuResource;
 
 pub struct MeshResource {
     pub indices: Vec<u32>,
@@ -16,7 +13,7 @@ pub struct MeshResource {
     pub normals: Vec<Normal>,
     pub tangents: Vec<Tangent>,
     pub tex_coords: Vec<Texcoord>,
-    pub material: Option<Arc<Resource<Material>>>,
+    //pub material: Option<Arc<Resource<Material>>>,
 }
 
 impl MeshResource {
@@ -34,7 +31,6 @@ impl MeshResource {
             normals,
             tangents,
             tex_coords,
-            material: None,
         }
     }
 
@@ -45,10 +41,18 @@ impl MeshResource {
 }
 
 impl GpuResource for MeshResource {
-    type Item = GpuMesh;
+    type Item = Mesh;
 
     fn prepare(&self, device: &DeviceContext, rtx: &RtxContext) -> Self::Item {
         // Turn Cpu mesh into Gpu mesh
-        GpuMesh::new(device, rtx, &self)
+        Mesh::new(
+            device,
+            rtx,
+            &self.indices,
+            &self.positions,
+            &self.normals,
+            &self.tangents,
+            &self.tex_coords,
+        )
     }
 }

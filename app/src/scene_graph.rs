@@ -1,13 +1,10 @@
-use renderer::resources::Resources;
+use std::sync::Arc;
+
+use crate::{mesh_resource::MeshResource, resource::Resource, resources::Resources};
 
 use super::instancer::Instancer;
 use nalgebra_glm::{vec3, vec4, Mat4x4};
-use renderer::{
-    context::RtxContext,
-    cpu_scene::Material,
-    geometry::Position,
-    gpu_scene::{GpuResourceCache, GpuScene},
-};
+use renderer::{context::RtxContext, geometry::Position, gpu_scene::GpuScene};
 use vk_utils::device_context::DeviceContext;
 
 pub struct DefaultInstancer {}
@@ -18,23 +15,9 @@ impl Instancer for DefaultInstancer {
     }
 }
 
-pub struct Mesh {
-    pub id: usize,
-    instancer: Box<dyn Instancer>,
-}
-
-impl Mesh {
-    pub fn new(id: usize) -> Self {
-        Self {
-            id,
-            instancer: Box::new(DefaultInstancer {}),
-        }
-    }
-}
-
 pub struct Actor {
     local_transform: Mat4x4,
-    mesh: Option<Mesh>,
+    mesh: Option<Arc<Resource<MeshResource>>>,
     children: Vec<usize>,
 }
 
@@ -74,12 +57,8 @@ impl Actor {
         self
     }
 
-    pub fn with_mesh(&mut self, id: Option<usize>) -> &mut Self {
-        if let Some(mesh_id) = id {
-            self.mesh = Some(Mesh::new(mesh_id));
-        } else {
-            self.mesh = None;
-        }
+    pub fn with_mesh(&mut self, mesh: Arc<Resource<MeshResource>>) -> &mut Self {
+        self.mesh = Some(mesh);
         self
     }
 
@@ -132,7 +111,7 @@ impl Actor {
         scene
     }
 
-    pub fn mesh(&self) -> &Option<Mesh> {
+    pub fn mesh(&self) -> &Option<Arc<Resource<MeshResource>>> {
         &self.mesh
     }
 
@@ -162,7 +141,7 @@ impl SceneGraph {
             .enumerate()
             .filter_map(|(i, node)| {
                 if let Some(mesh) = &node.mesh {
-                    if mesh.id == id {
+                    if mesh.uid() == id {
                         Some(i)
                     } else {
                         None
@@ -174,13 +153,13 @@ impl SceneGraph {
             .collect()
     }
 
-    pub fn expand_node(&mut self, node_id: usize, primitives: &Vec<usize>) {
+    pub fn expand_node(&mut self, node_id: usize, primitives: &Vec<Arc<Resource<MeshResource>>>) {
         self.nodes[node_id].mesh = None;
         for primitive in primitives {
             let child_id = self.create_node();
             self.nodes[node_id]
                 .with_child(child_id)
-                .with_mesh(Some(*primitive));
+                .with_mesh(primitive.clone());
         }
     }
 
@@ -223,29 +202,17 @@ impl SceneGraph {
     pub fn build(
         &self,
         parent_transform: Mat4x4,
-        resources: &Resources,
-        gpu_cache: &mut GpuResourceCache,
         device: &DeviceContext,
         rtx: &RtxContext,
     ) -> GpuScene {
-        let scene = GpuScene::new();
-        self.nodes[self.root].allocate_resources(
-            parent_transform,
-            self,
-            resources,
-            device,
-            rtx,
-            scene,
-        )
-    }
-
-    pub fn build_scene(&self) {
         let mut scene = GpuScene::new();
         for node in &self.nodes {
             if let Some(mesh) = &node.mesh {
-                scene.add_mesh(mesh.id);
+                //scene.add_mesh(mesh.clone());
             }
         }
+
+        scene
     }
 }
 

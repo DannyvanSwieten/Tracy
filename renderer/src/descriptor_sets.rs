@@ -5,7 +5,6 @@ use ash::vk::{
     PipelineLayoutCreateInfo, PushConstantRange, ShaderStageFlags, WriteDescriptorSet,
 };
 
-use crate::gpu_scene::SceneData;
 use vk_utils::device_context::DeviceContext;
 
 pub const CAMERA_BUFFER_LOCATION: (u32, u32) = (1, 0);
@@ -148,46 +147,6 @@ impl RTXDescriptorSets {
                 descriptor_set_layouts,
                 pipeline_layout,
                 descriptor_pool,
-            }
-        }
-    }
-
-    pub(crate) fn update_scene_descriptors(&self, ctx: &DeviceContext, scene_data: &SceneData) {
-        let descriptor_sets = self.descriptor_sets(ctx);
-
-        let buffer_writes = [*DescriptorBufferInfo::builder()
-            .range(scene_data.address_buffer.content_size())
-            .buffer(scene_data.address_buffer.buffer)];
-
-        let image_writes: Vec<DescriptorImageInfo> = scene_data
-            .image_views
-            .iter()
-            .map(|view| {
-                *DescriptorImageInfo::builder()
-                    .image_view(*view)
-                    .image_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-                    .sampler(scene_data.samplers[0])
-            })
-            .collect();
-
-        let writes = [*WriteDescriptorSet::builder()
-            .dst_binding(1)
-            .dst_set(descriptor_sets[1])
-            .descriptor_type(DescriptorType::UNIFORM_BUFFER)
-            .buffer_info(&buffer_writes)];
-
-        unsafe {
-            ctx.vk_device().update_descriptor_sets(&writes, &[]);
-        }
-
-        if image_writes.len() > 0 {
-            let writes = [*WriteDescriptorSet::builder()
-                .dst_binding(2)
-                .dst_set(descriptor_sets[1])
-                .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
-                .image_info(&image_writes)];
-            unsafe {
-                ctx.vk_device().update_descriptor_sets(&writes, &[]);
             }
         }
     }

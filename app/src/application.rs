@@ -1,11 +1,10 @@
+use crate::resources::{GpuResourceCache, Resources};
 use crate::scene_graph::SceneGraph;
 
 use super::schema;
 use super::server::Server;
 use futures::lock::Mutex;
-use renderer::gpu_scene::GpuResourceCache;
 use renderer::renderer::Renderer;
-use renderer::resources::Resources;
 use std::sync::Arc;
 use vk_utils::device_context::DeviceContext;
 

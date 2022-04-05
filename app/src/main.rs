@@ -1,7 +1,12 @@
 pub mod application;
+pub mod image_resource;
 pub mod instancer;
 pub mod load_scene;
+pub mod material_resource;
+pub mod mesh_resource;
 pub mod parameter;
+pub mod resource;
+pub mod resources;
 pub mod scene_graph;
 pub mod schema;
 pub mod server;
@@ -17,11 +22,13 @@ use winit::{
 use winit_blit::*;
 
 use ash::extensions::ext::DebugUtils;
-use renderer::{cpu_scene::Material, renderer::Renderer, resources::Resources};
+use renderer::renderer::Renderer;
 use vk_utils::vulkan::Vulkan;
 
 use futures::lock::Mutex;
 use std::sync::Arc;
+
+use crate::resources::Resources;
 
 type ServerContext = Arc<Mutex<application::Model>>;
 fn main() {
@@ -46,21 +53,17 @@ fn main() {
 
     if mode == "--file".to_string() {
         let mut renderer = Renderer::new(&context, image_width, image_height);
-        let mut gpu_resource_cache = renderer::gpu_scene::GpuResourceCache::new();
-        let mut cpu_resource_cache = Resources::default();
-        //cpu_resource_cache.add_material(Material::default());
+        let mut resources = Resources::default();
 
-        let scenes = load_scene_gltf(&args[2], &mut cpu_resource_cache).unwrap();
+        let scenes = load_scene_gltf(&args[2], &mut resources).unwrap();
         let gpu_scene = scenes[0].build(
             Mat4x4::new_nonuniform_scaling(&vec3(1.0, 1.0, 1.0)),
-            &cpu_resource_cache,
-            &mut gpu_resource_cache,
             &context,
             &renderer.rtx,
         );
-        let frame = renderer.build_frame(&context, &renderer.rtx, &gpu_resource_cache, gpu_scene);
+        // let frame = renderer.build_frame(&context, gpu_scene);
 
-        renderer.render_frame(&context, &frame, 16);
+        // renderer.render_frame(&context, &frame, 16);
 
         let buffer = renderer.download_image(&context);
         let data = buffer.copy_data::<u8>();

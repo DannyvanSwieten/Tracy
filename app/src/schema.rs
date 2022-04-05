@@ -5,6 +5,7 @@ use super::load_scene_gltf;
 use async_graphql::{Context, Object, Result, Subscription};
 use futures::lock::Mutex;
 use futures::stream::Stream;
+use renderer::gpu_scene;
 use std::sync::Arc;
 use tokio_stream::StreamExt;
 
@@ -41,7 +42,9 @@ impl Node {
                 name: "Untitled".to_string(),
                 material: Material::new(
                     &"Untitled".to_string(),
-                    &renderer::cpu_scene::Material::default(),
+                    &Material {
+                        name: "".to_string(),
+                    },
                 ),
             })
         } else {
@@ -84,14 +87,14 @@ impl Node {
 #[derive(Clone)]
 pub struct Material {
     name: String,
-    mat: renderer::cpu_scene::Material,
+    //mat: gpu_scene::Material,
 }
 
 impl Material {
-    pub fn new(name: &String, scene_material: &renderer::cpu_scene::Material) -> Self {
+    pub fn new(name: &String, scene_material: &Material) -> Self {
         Self {
             name: name.clone(),
-            mat: scene_material.clone(),
+            //mat: scene_material.clone(),
         }
     }
 }
@@ -103,19 +106,20 @@ impl Material {
     }
 
     async fn roughness(&self, _context: &Context<'_>) -> Result<f32> {
-        Ok(self.mat.metalness)
+        Ok(1.)
     }
 
     async fn metalness(&self, _context: &Context<'_>) -> Result<f32> {
-        Ok(self.mat.roughness)
+        Ok(0.)
     }
 
     async fn base_color(&self, _context: &Context<'_>) -> Result<[f32; 4]> {
         Ok([
-            self.mat.base_color[0],
-            self.mat.base_color[1],
-            self.mat.base_color[2],
-            self.mat.base_color[3],
+            // self.mat.base_color[0],
+            // self.mat.base_color[1],
+            // self.mat.base_color[2],
+            // self.mat.base_color[3],
+            0., 0., 0., 0.,
         ])
     }
 }
