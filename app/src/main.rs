@@ -19,8 +19,6 @@ use winit::{
     window::WindowBuilder,
 };
 
-use winit_blit::*;
-
 use ash::extensions::ext::DebugUtils;
 use renderer::renderer::Renderer;
 use vk_utils::vulkan::Vulkan;
@@ -96,27 +94,27 @@ fn main() {
                 window_id,
             } if window_id == window.id() => *control_flow = ControlFlow::Exit,
             Event::RedrawRequested(window_id) => {
-                if window_id == window.id() {
-                    let (width, height): (u32, u32) = window.inner_size().into();
+                // if window_id == window.id() {
+                //     let (width, height): (u32, u32) = window.inner_size().into();
 
-                    if let Some(mut model) = server.model.try_lock() {
-                        let data = model.download_image();
+                //     if let Some(mut model) = server.model.try_lock() {
+                //         let data = model.download_image();
 
-                        let mut pixel_buffer =
-                            PixelBufferTyped::<NativeFormat>::new_supported(width, height, &window);
+                //         let mut pixel_buffer =
+                //             PixelBufferTyped::<NativeFormat>::new_supported(width, height, &window);
 
-                        for (i, row) in pixel_buffer.rows_mut().enumerate() {
-                            let w = row.len();
-                            for (j, pixel) in row.into_iter().enumerate() {
-                                let index = (i * w + j) * 4;
-                                let value = &data[index..index + 3];
-                                *pixel = NativeFormat::from_rgb(value[0], value[1], value[2]);
-                            }
-                        }
+                //         for (i, row) in pixel_buffer.rows_mut().enumerate() {
+                //             let w = row.len();
+                //             for (j, pixel) in row.into_iter().enumerate() {
+                //                 let index = (i * w + j) * 4;
+                //                 let value = &data[index..index + 3];
+                //                 *pixel = NativeFormat::from_rgb(value[0], value[1], value[2]);
+                //             }
+                //         }
 
-                        pixel_buffer.blit(&window).unwrap();
-                    }
-                }
+                //         pixel_buffer.blit(&window).unwrap();
+                //     }
+                // }
             }
             _ => {
                 if let Some(model) = server.model.try_lock() {

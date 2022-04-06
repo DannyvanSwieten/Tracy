@@ -149,7 +149,9 @@ impl Scene {
         self.shapes.push(shape);
     }
 }
-pub struct Instance;
+pub struct Instance{
+    transform: glm::Mat4,
+}
 pub struct Shape {
     uid: usize,
     mesh: RefCell<Mesh>,

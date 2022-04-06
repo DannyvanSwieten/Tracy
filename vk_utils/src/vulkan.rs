@@ -47,7 +47,7 @@ unsafe extern "system" fn vulkan_debug_callback(
 
 #[cfg(target_os = "macos")]
 fn surface_extension_name() -> &'static CStr {
-    ExtMetalSurfaceFn::name()
+    ash::vk::MvkMacosSurfaceFn::name()
 }
 
 #[cfg(target_os = "windows")]
