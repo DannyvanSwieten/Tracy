@@ -5,7 +5,7 @@ use crate::descriptor_sets::{
     OUTPUT_IMAGE_LOCATION,
 };
 use crate::geometry::{GeometryInstance, TopLevelAccelerationStructure};
-use crate::gpu_scene::{Frame, GpuScene, Material, Mesh, MeshAddress};
+use crate::gpu_scene::{Frame, GpuScene, Mesh, MeshAddress};
 use nalgebra_glm::{vec3, Vec3};
 
 use vk_utils::buffer_resource::BufferResource;

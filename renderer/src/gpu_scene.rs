@@ -6,6 +6,8 @@ use crate::geometry::{
     BottomLevelAccelerationStructure, GeometryInstance, Normal, Position, Tangent, Texcoord,
     TopLevelAccelerationStructure,
 };
+use crate::material::Material;
+use crate::shape::Shape;
 
 use glm::Mat4x4;
 use vk_utils::buffer_resource::BufferResource;
@@ -130,8 +132,6 @@ impl MeshAddress {
     }
 }
 
-pub struct Material {}
-
 #[derive(Default)]
 pub struct GpuScene {
     pub instances: Vec<ResourceHandle<GeometryInstance>>,
@@ -148,14 +148,6 @@ impl Scene {
     pub fn attach_shape(&mut self, shape: Rc<Shape>) {
         self.shapes.push(shape);
     }
-}
-pub struct Instance{
-    transform: glm::Mat4,
-}
-pub struct Shape {
-    uid: usize,
-    mesh: RefCell<Mesh>,
-    instances: Vec<GeometryInstance>,
 }
 
 #[derive(Clone)]

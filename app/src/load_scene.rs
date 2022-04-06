@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use nalgebra_glm::vec4;
 use renderer::geometry::Position;
-use renderer::gpu_scene::Material;
 
 use crate::image_resource::TextureImageData;
 use crate::mesh_resource::MeshResource;

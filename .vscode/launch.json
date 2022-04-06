@@ -5,13 +5,28 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch debug",
+            "type": "lldb",
+            "request": "launch",
+            "name": "Launch Debug MacOS",
+            "program": "${workspaceFolder}/target/debug/tracey",
+            "args": [
+                "--file",
+                "${workspaceFolder}/assets/Duck/glTF/Duck.gltf",
+                "1280",
+                "720"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Launch debug Windows",
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/target/debug/tracey.exe",
-            "args": ["--file",
+            "args": [
+                "--file",
                 "${workspaceFolder}/assets/Duck/glTF/Duck.gltf",
-                "1280", "720"
+                "1280",
+                "720"
             ],
             // "args": ["--server",
             //         "127.0.0.1:7000",
@@ -22,7 +37,7 @@
             "console": "externalTerminal"
         },
         {
-            "name": "Launch release",
+            "name": "Launch release Windows",
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/target/release/tracey.exe",
@@ -30,10 +45,12 @@
             //     "${workspaceFolder}/assets/Sponza/glTF/Sponza.gltf",
             //     "1920", "1080"
             // ],
-            "args": ["--server",
-                    "127.0.0.1:7000",
-                    "1920", "1080"
-                ],
+            "args": [
+                "--server",
+                "127.0.0.1:7000",
+                "1920",
+                "1080"
+            ],
             "stopOnEntry": false,
             "cwd": "${workspaceFolder}",
             "console": "externalTerminal"

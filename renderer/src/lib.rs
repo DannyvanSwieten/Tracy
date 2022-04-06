@@ -5,3 +5,6 @@ pub mod renderer;
 pub use ash::vk;
 pub mod descriptor_sets;
 pub mod gpu_scene;
+pub mod material;
+pub mod instance;
+pub mod shape;
