@@ -12,7 +12,7 @@ pub mod schema;
 pub mod server;
 
 use load_scene::load_scene_gltf;
-use nalgebra_glm::{vec3, Mat4x4};
+use nalgebra_glm::{vec3, Mat4};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -20,13 +20,13 @@ use winit::{
 };
 
 use ash::extensions::ext::DebugUtils;
-use renderer::renderer::Renderer;
+use renderer::{renderer::Renderer, resource::ResourceBuilder};
 use vk_utils::vulkan::Vulkan;
 
 use futures::lock::Mutex;
 use std::sync::Arc;
 
-use crate::resources::Resources;
+use crate::resources::{GpuResourceCache, Resources};
 
 type ServerContext = Arc<Mutex<application::Model>>;
 fn main() {
@@ -51,17 +51,21 @@ fn main() {
 
     if mode == "--file".to_string() {
         let mut renderer = Renderer::new(&context, image_width, image_height);
-        let mut resources = Resources::default();
+        let mut cpu_cache = Resources::default();
+        let mut gpu_cache = GpuResourceCache::default();
 
-        let scenes = load_scene_gltf(&args[2], &mut resources).unwrap();
+        let mut resource_builder = ResourceBuilder::new();
+
+        let scenes = load_scene_gltf(&args[2], &mut cpu_cache).unwrap();
         let gpu_scene = scenes[0].build(
-            Mat4x4::new_nonuniform_scaling(&vec3(1.0, 1.0, 1.0)),
+            &mut gpu_cache,
+            Mat4::new_nonuniform_scaling(&vec3(1.0, 1.0, 1.0)),
             &context,
             &renderer.rtx,
         );
-        // let frame = renderer.build_frame(&context, gpu_scene);
+        let frame = renderer.build_frame(&context, &gpu_scene);
 
-        // renderer.render_frame(&context, &frame, 16);
+        renderer.render_frame(&context, &frame, 16);
 
         let buffer = renderer.download_image(&context);
         let data = buffer.copy_data::<u8>();

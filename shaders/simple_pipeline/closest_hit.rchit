@@ -97,16 +97,16 @@ void main()
     float pdf = 0.0;
     vec3 wi = vec3(0.0);
     vec3 wo = -gl_WorldRayDirectionEXT;
-    vec3 base_color = material.albedo.rgb;
-    if(material.maps[0] != -1)
+    vec3 base_color = material.base_color.rgb;
+    if(material.base_color_texture != -1)
     {
-        base_color *= texture(images[material.maps[0]], uv).rgb;
+        base_color *= texture(images[material.base_color_texture], uv).rgb;
     }
-    float metal = material.metallic_roughness[1];
-    float roughness = material.metallic_roughness[0];
-    if(material.maps[1] != -1)
+    float metal = material.metallic;
+    float roughness = material.roughness;
+    if(material.metallic_roughness_texture != -1)
     {
-        vec2 mr = texture(images[material.maps[1]], uv).bg;
+        vec2 mr = texture(images[material.metallic_roughness_texture], uv).bg;
         metal *= mr.x;
         roughness *= mr.y;
     }
@@ -150,9 +150,9 @@ void main()
 
     ray.color = vec4(c, 1);
     ray.emission = material.emission;
-    if(material.maps[3] != -1)
+    if(material.emission_texture != -1)
     {
-        ray.emission *= texture(images[material.maps[3]], uv);
+        ray.emission *= texture(images[material.emission_texture], uv);
     }
 
     c += ray.emission.rgb * ray.emission.a;

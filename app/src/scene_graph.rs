@@ -1,10 +1,14 @@
 use std::sync::Arc;
 
-use crate::{mesh_resource::MeshResource, resource::Resource, resources::Resources};
+use crate::{
+    mesh_resource::MeshResource,
+    resource::{GpuResource, Resource},
+    resources::{GpuResourceCache, Resources},
+};
 
 use super::instancer::Instancer;
-use nalgebra_glm::{vec3, vec4, Mat4x4};
-use renderer::{context::RtxContext, geometry::Position, gpu_scene::GpuScene};
+use nalgebra_glm::{vec3, Mat4x4};
+use renderer::{context::RtxContext, gpu_scene::Scene, shape::Shape};
 use vk_utils::device_context::DeviceContext;
 
 pub struct DefaultInstancer {}
@@ -15,13 +19,13 @@ impl Instancer for DefaultInstancer {
     }
 }
 
-pub struct Actor {
+pub struct Entity {
     local_transform: Mat4x4,
     mesh: Option<Arc<Resource<MeshResource>>>,
     children: Vec<usize>,
 }
 
-impl Actor {
+impl Entity {
     pub fn new() -> Self {
         Self {
             local_transform: Mat4x4::new_nonuniform_scaling(&vec3(1.0, 1.0, 1.0)),
@@ -79,8 +83,8 @@ impl Actor {
         resources: &Resources,
         device: &DeviceContext,
         rtx: &RtxContext,
-        mut scene: GpuScene,
-    ) -> GpuScene {
+        mut scene: Scene,
+    ) -> Scene {
         let this_transform = parent_transform * self.local_transform;
         // if let Some(mesh) = &self.mesh {
         //     let m = &cpu_cache.mesh(mesh.id).mesh;
@@ -123,7 +127,7 @@ impl Actor {
 pub struct SceneGraph {
     name: String,
     root: usize,
-    nodes: Vec<Actor>,
+    nodes: Vec<Entity>,
 }
 
 impl SceneGraph {
@@ -153,39 +157,39 @@ impl SceneGraph {
             .collect()
     }
 
-    pub fn expand_node(&mut self, node_id: usize, primitives: &Vec<Arc<Resource<MeshResource>>>) {
+    pub fn expand_node(&mut self, resources: &Resources, node_id: usize, primitives: &Vec<usize>) {
         self.nodes[node_id].mesh = None;
         for primitive in primitives {
             let child_id = self.create_node();
             self.nodes[node_id]
                 .with_child(child_id)
-                .with_mesh(primitive.clone());
+                .with_mesh(resources.get_unchecked(*primitive));
         }
     }
 
     pub fn create_node(&mut self) -> usize {
-        self.nodes.push(Actor::new());
+        self.nodes.push(Entity::new());
         self.nodes.len() - 1
     }
 
-    pub fn add_node(&mut self, actor: Actor) -> usize {
+    pub fn add_node(&mut self, actor: Entity) -> usize {
         self.nodes.push(actor);
         self.nodes.len() - 1
     }
 
-    pub fn node(&self, id: usize) -> &Actor {
+    pub fn node(&self, id: usize) -> &Entity {
         &self.nodes[id]
     }
 
-    pub fn node_mut(&mut self, id: usize) -> &mut Actor {
+    pub fn node_mut(&mut self, id: usize) -> &mut Entity {
         &mut self.nodes[id]
     }
 
-    pub fn nodes(&self) -> &[Actor] {
+    pub fn nodes(&self) -> &[Entity] {
         &self.nodes
     }
 
-    pub fn nodes_mut(&mut self) -> &mut Vec<Actor> {
+    pub fn nodes_mut(&mut self) -> &mut Vec<Entity> {
         &mut self.nodes
     }
 
@@ -201,14 +205,25 @@ impl SceneGraph {
 impl SceneGraph {
     pub fn build(
         &self,
+        gpu_cache: &mut GpuResourceCache,
         parent_transform: Mat4x4,
         device: &DeviceContext,
         rtx: &RtxContext,
-    ) -> GpuScene {
-        let mut scene = GpuScene::new();
+    ) -> Scene {
+        let mut scene = Scene::default();
         for node in &self.nodes {
             if let Some(mesh) = &node.mesh {
-                //scene.add_mesh(mesh.clone());
+                let gpu_mat = gpu_cache.add_material(device, rtx, &mesh.material);
+                let gpu_mesh = gpu_cache.add_mesh(device, rtx, mesh);
+                let mut shape = Shape::new(gpu_mesh);
+                shape.create_instance(
+                    gpu_mat,
+                    &vec3(0., 0., 0.),
+                    &vec3(1., 1., 1.),
+                    &vec3(0., 0., 0.),
+                );
+
+                scene.attach_shape(Arc::new(shape))
             }
         }
 

@@ -5,6 +5,7 @@ use super::schema;
 use super::server::Server;
 use futures::lock::Mutex;
 use renderer::renderer::Renderer;
+use renderer::resource::ResourceBuilder;
 use std::sync::Arc;
 use vk_utils::device_context::DeviceContext;
 
@@ -22,6 +23,7 @@ impl Broadcasters {
 pub struct Model {
     pub device: DeviceContext,
     pub renderer: Renderer,
+    pub resource_builder: ResourceBuilder,
     pub cpu_resource_cache: Resources,
     pub gpu_resource_cache: GpuResourceCache,
     pub scenes: Vec<SceneGraph>,
@@ -35,8 +37,9 @@ impl Model {
         Self {
             device,
             renderer,
+            resource_builder: ResourceBuilder::new(),
             cpu_resource_cache: Resources::default(),
-            gpu_resource_cache: GpuResourceCache::new(),
+            gpu_resource_cache: GpuResourceCache::default(),
             scenes: vec![],
             current_scene: None,
             has_new_frame: false,

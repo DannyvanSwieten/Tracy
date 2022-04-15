@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use renderer::{
     context::RtxContext,
     geometry::{Normal, Position, Tangent, Texcoord},
@@ -5,7 +7,11 @@ use renderer::{
 };
 use vk_utils::device_context::DeviceContext;
 
-use crate::resource::GpuResource;
+use crate::{
+    material_resource::{Material, MaterialResource},
+    resource::{GpuResource, Resource},
+    resources::GpuResourceCache,
+};
 
 pub struct MeshResource {
     pub indices: Vec<u32>,
@@ -13,29 +19,30 @@ pub struct MeshResource {
     pub normals: Vec<Normal>,
     pub tangents: Vec<Tangent>,
     pub tex_coords: Vec<Texcoord>,
-    //pub material: Option<Arc<Resource<Material>>>,
+    pub material: Arc<Resource<Material>>,
 }
 
 impl MeshResource {
-    pub fn new(indices: Vec<u32>, positions: Vec<Position>, normals: Vec<Normal>) -> Self {
-        let tangents = positions
-            .iter()
-            .map(|_| Tangent::new(0.0, 0.0, 0.0))
-            .collect();
-
-        let tex_coords = positions.iter().map(|_| Texcoord::new(0.0, 0.0)).collect();
-
+    pub fn new(
+        indices: Vec<u32>,
+        positions: Vec<Position>,
+        normals: Vec<Normal>,
+        tangents: Vec<Tangent>,
+        tex_coords: Vec<Texcoord>,
+        material: Arc<Resource<Material>>,
+    ) -> Self {
         Self {
             indices,
             positions,
             normals,
             tangents,
             tex_coords,
+            material,
         }
     }
 
-    pub fn with_tangents(mut self, tangents: Vec<Tangent>) -> Self {
-        self.tangents = tangents.to_vec();
+    pub fn with_material(mut self, material: Arc<Resource<Material>>) -> Self {
+        self.material = material;
         self
     }
 }
@@ -43,7 +50,12 @@ impl MeshResource {
 impl GpuResource for MeshResource {
     type Item = Mesh;
 
-    fn prepare(&self, device: &DeviceContext, rtx: &RtxContext) -> Self::Item {
+    fn prepare(
+        &self,
+        device: &DeviceContext,
+        rtx: &RtxContext,
+        _: &GpuResourceCache,
+    ) -> Self::Item {
         // Turn Cpu mesh into Gpu mesh
         Mesh::new(
             device,

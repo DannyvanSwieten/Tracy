@@ -1,10 +1,19 @@
+use std::{ops::Deref, sync::Arc};
+
 use renderer::context::RtxContext;
 use vk_utils::device_context::DeviceContext;
+
+use crate::resources::GpuResourceCache;
 
 pub trait GpuResource {
     type Item;
 
-    fn prepare(&self, device: &DeviceContext, rtx: &RtxContext) -> Self::Item;
+    fn prepare(
+        &self,
+        device: &DeviceContext,
+        rtx: &RtxContext,
+        cache: &GpuResourceCache,
+    ) -> Self::Item;
 }
 
 pub struct Resource<T>
@@ -13,6 +22,14 @@ where
 {
     uid: usize,
     item: T,
+}
+
+impl<T: GpuResource> Deref for Resource<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.item
+    }
 }
 
 impl<T: GpuResource> Resource<T> {
@@ -28,7 +45,15 @@ impl<T: GpuResource> Resource<T> {
         &self.item
     }
 
-    pub fn prepare(&self, device: &DeviceContext, rtx: &RtxContext) -> T::Item {
-        self.item.prepare(device, rtx)
+    pub fn prepare(
+        &self,
+        device: &DeviceContext,
+        rtx: &RtxContext,
+        cache: &GpuResourceCache,
+    ) -> Arc<renderer::resource::Resource<T::Item>> {
+        Arc::new(renderer::resource::Resource::new(
+            self.uid,
+            self.item.prepare(device, rtx, cache),
+        ))
     }
 }

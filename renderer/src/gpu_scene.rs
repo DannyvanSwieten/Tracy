@@ -1,5 +1,5 @@
-use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::context::RtxContext;
 use crate::geometry::{
@@ -7,6 +7,7 @@ use crate::geometry::{
     TopLevelAccelerationStructure,
 };
 use crate::material::Material;
+use crate::resource::Resource;
 use crate::shape::Shape;
 
 use glm::Mat4x4;
@@ -131,73 +132,25 @@ impl MeshAddress {
         }
     }
 }
-
 #[derive(Default)]
-pub struct GpuScene {
-    pub instances: Vec<ResourceHandle<GeometryInstance>>,
-    pub materials: Vec<ResourceHandle<Material>>,
-    pub meshes: Vec<ResourceHandle<Mesh>>,
-    pub textures: Vec<ResourceHandle<GpuTexture>>,
-}
-
 pub struct Scene {
-    shapes: Vec<Rc<Shape>>,
+    shapes: Vec<Arc<Shape>>,
 }
 
 impl Scene {
-    pub fn attach_shape(&mut self, shape: Rc<Shape>) {
+    pub fn attach_shape(&mut self, shape: Arc<Shape>) {
         self.shapes.push(shape);
     }
-}
 
-#[derive(Clone)]
-pub struct ResourceHandle<T> {
-    id: usize,
-    data: Rc<T>,
-}
-
-impl GpuScene {
-    pub fn new() -> Self {
-        Self {
-            ..Default::default()
-        }
+    pub fn shapes(&self) -> &Vec<Arc<Shape>> {
+        &self.shapes
     }
-
-    pub fn add_mesh(&mut self, mesh: Rc<Mesh>) -> Rc<Mesh> {
-        self.meshes.push(ResourceHandle { id: 0, data: mesh });
-        self.meshes.last().unwrap().data.clone()
-    }
-
-    // fn add_material(&mut self, material: Material) {
-    //     // if let Some(albedo_map) = &material.item().albedo_map {
-    //     //     self.add_image(albedo_map.clone());
-    //     // }
-    //     // if let Some(normal_map) = &material.item().normal_map {
-    //     //     self.add_image(normal_map.clone());
-    //     // }
-    //     self.materials.push(material)
-    // }
-
-    // fn add_image(&mut self, texture: GpuTexture) {
-    //     self.textures.push(texture);
-    // }
-
-    // pub fn create_instance(&mut self, mesh_id: usize, transform: &Mat4x4) {
-    //     self.instances.push(GeometryInstance::new(
-    //         self.instances.len() as u32,
-    //         0,
-    //         0,
-    //         GeometryInstanceFlagsKHR::empty(),
-    //         mesh_id as u64,
-    //         transform.remove_column(3),
-    //     ));
-    // }
 }
-
 pub struct Frame {
     pub material_buffer: BufferResource,
     pub material_address_buffer: BufferResource,
-    pub address_buffer: BufferResource,
+    pub mesh_address_buffer: BufferResource,
     pub descriptor_sets: Vec<DescriptorSet>,
+    pub camera_buffer: BufferResource,
     pub acceleration_structure: TopLevelAccelerationStructure,
 }

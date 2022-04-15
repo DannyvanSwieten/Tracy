@@ -1,11 +1,10 @@
-use crate::scene_graph::{Actor, SceneGraph};
+use crate::scene_graph::{Entity, SceneGraph};
 
 use super::application::Model;
 use super::load_scene_gltf;
 use async_graphql::{Context, Object, Result, Subscription};
 use futures::lock::Mutex;
 use futures::stream::Stream;
-use renderer::gpu_scene;
 use std::sync::Arc;
 use tokio_stream::StreamExt;
 
@@ -36,7 +35,7 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn new(id: usize, scene: &SceneGraph, actor: &Actor) -> Self {
+    pub fn new(id: usize, scene: &SceneGraph, actor: &Entity) -> Self {
         let mesh = if let Some(meshes) = actor.mesh() {
             Some(Mesh {
                 name: "Untitled".to_string(),
@@ -245,13 +244,13 @@ pub struct Mutation {}
 impl Mutation {
     async fn look_at(&self, context: &Context<'_>, x: f32, y: f32, z: f32) -> Result<bool> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        model.renderer.look_at(&nalgebra_glm::vec3(x, y, z));
+        //model.renderer.look_at(&nalgebra_glm::vec3(x, y, z));
         Ok(true)
     }
 
     async fn move_camera(&self, context: &Context<'_>, x: f32, y: f32, z: f32) -> Result<Vec<f32>> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        model.renderer.move_camera(&nalgebra_glm::vec3(x, y, z));
+        //model.renderer.move_camera(&nalgebra_glm::vec3(x, y, z));
         let new_position = model.renderer.camera_position();
         Ok(vec![new_position[0], new_position[1], new_position[2]])
     }
@@ -264,9 +263,9 @@ impl Mutation {
         z: f32,
     ) -> Result<bool> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        model
-            .renderer
-            .set_camera_position(&nalgebra_glm::vec3(x, y, z));
+        // model
+        //     .renderer
+        //     .set_camera_position(&nalgebra_glm::vec3(x, y, z));
         Ok(true)
     }
 

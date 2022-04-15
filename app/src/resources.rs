@@ -1,14 +1,19 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use renderer::context::RtxContext;
-use renderer::gpu_scene::{GpuTexture, Mesh, MeshAddress};
+use renderer::gpu_scene::{GpuTexture, Mesh};
 use vk_utils::device_context::DeviceContext;
 
-use crate::image_resource::TextureImageData;
+use crate::image_resource::{self, TextureImageData};
+use crate::material_resource::Material;
 use crate::mesh_resource;
 use crate::resource::{GpuResource, Resource};
+
+static GLOBAL_CPU_RESOURCE_ID: AtomicUsize = AtomicUsize::new(0);
+
 #[derive(Default)]
 pub struct Resources {
     pub data: HashMap<TypeId, HashMap<usize, Arc<dyn Any>>>,
@@ -18,9 +23,10 @@ impl Resources {
     pub fn add<T: 'static + GpuResource>(&mut self, resource: T) -> Arc<Resource<T>> {
         let type_id = TypeId::of::<T>();
         if let Some(map) = self.data.get_mut(&type_id) {
-            let any: Arc<dyn Any> = Arc::new(Arc::new(Resource::<T>::new(0, resource)));
-            map.insert(0, any.clone());
-            map.get(&0)
+            let uid = GLOBAL_CPU_RESOURCE_ID.fetch_add(1, Ordering::SeqCst);
+            let any: Arc<dyn Any> = Arc::new(Arc::new(Resource::<T>::new(uid, resource)));
+            map.insert(uid, any.clone());
+            map.get(&uid)
                 .unwrap()
                 .downcast_ref::<Arc<Resource<T>>>()
                 .unwrap()
@@ -31,86 +37,95 @@ impl Resources {
         }
     }
 
-    //pub fn get<T: GpuResource>(&self, id: usize) -> &Resource<T> {}
+    pub fn get_unchecked<T: 'static + GpuResource>(&self, uid: usize) -> Arc<Resource<T>> {
+        let type_id = TypeId::of::<T>();
+        self.data
+            .get(&type_id)
+            .unwrap()
+            .get(&uid)
+            .unwrap()
+            .downcast_ref::<Arc<Resource<T>>>()
+            .unwrap()
+            .clone()
+    }
 }
 
 unsafe impl Send for Resources {}
 
+#[derive(Default)]
 pub struct GpuResourceCache {
-    pub meshes: HashMap<usize, Mesh>,
-    pub mesh_addresses: HashMap<usize, MeshAddress>,
-    pub textures: HashMap<usize, GpuTexture>,
-    pub samplers: HashMap<usize, ash::vk::Sampler>,
+    pub meshes: HashMap<usize, Arc<renderer::resource::Resource<Mesh>>>,
+    pub textures: HashMap<usize, Arc<renderer::resource::Resource<GpuTexture>>>,
+    pub samplers: HashMap<usize, Arc<renderer::resource::Resource<ash::vk::Sampler>>>,
+    pub materials: HashMap<usize, Arc<renderer::resource::Resource<renderer::material::Material>>>,
 }
 
 impl GpuResourceCache {
-    pub fn new() -> Self {
-        Self {
-            meshes: HashMap::new(),
-            mesh_addresses: HashMap::new(),
-            textures: HashMap::new(),
-            samplers: HashMap::new(),
-        }
-    }
-
     pub fn add_mesh(
         &mut self,
         device: &DeviceContext,
         rtx: &RtxContext,
         mesh: &Arc<Resource<mesh_resource::MeshResource>>,
-    ) -> &<mesh_resource::MeshResource as GpuResource>::Item {
+    ) -> Arc<renderer::resource::Resource<Mesh>> {
         let prepared = self.meshes.get(&mesh.uid());
         if prepared.is_none() {
-            self.meshes.insert(mesh.uid(), mesh.prepare(device, rtx));
+            self.meshes
+                .insert(mesh.uid(), mesh.prepare(device, rtx, self));
         }
-        self.meshes.get(&mesh.uid()).unwrap()
+        self.meshes.get(&mesh.uid()).unwrap().clone()
     }
 
-    pub fn add_texture(&mut self, device: &DeviceContext, texture: &TextureImageData, id: usize) {
-        let image = device.image_2d(
-            texture.width,
-            texture.height,
-            texture.format,
-            ash::vk::MemoryPropertyFlags::DEVICE_LOCAL,
-            ash::vk::ImageUsageFlags::TRANSFER_DST | ash::vk::ImageUsageFlags::SAMPLED,
-        );
+    pub fn add_material(
+        &mut self,
+        device: &DeviceContext,
+        rtx: &RtxContext,
+        material: &Arc<Resource<Material>>,
+    ) -> Arc<renderer::resource::Resource<renderer::material::Material>> {
+        let prepared = self.materials.get(&material.uid());
+        if prepared.is_none() {
+            if let Some(base_color) = &material.albedo_map {
+                self.add_texture(device, rtx, &base_color);
+            }
 
-        let buffer = device.buffer(
-            texture.pixels.len() as u64,
-            ash::vk::MemoryPropertyFlags::HOST_VISIBLE,
-            ash::vk::BufferUsageFlags::TRANSFER_SRC,
-        );
+            if let Some(metallic_roughness) = &material.metallic_roughness_map {
+                self.add_texture(device, rtx, &metallic_roughness);
+            }
 
-        device
-            .graphics_queue()
-            .unwrap()
-            .begin(|command_buffer_handle| {
-                command_buffer_handle.copy_buffer_to_image_2d(&buffer, &image);
-                command_buffer_handle
-            });
+            if let Some(normal) = &material.normal_map {
+                self.add_texture(device, rtx, &normal);
+            }
 
-        let view_info = *ash::vk::ImageViewCreateInfo::builder()
-            .format(texture.format)
-            .image(*image.vk_image())
-            .subresource_range(
-                *ash::vk::ImageSubresourceRange::builder()
-                    .layer_count(1)
-                    .level_count(1)
-                    .aspect_mask(ash::vk::ImageAspectFlags::COLOR),
-            );
+            if let Some(emission) = &material.emission_map {
+                self.add_texture(device, rtx, &emission);
+            }
 
-        let image_view = unsafe {
-            device
-                .vk_device()
-                .create_image_view(&view_info, None)
-                .expect("Image view creation failed")
-        };
+            self.materials
+                .insert(material.uid(), material.prepare(device, rtx, self));
+        }
 
-        self.textures.insert(id, GpuTexture { image_view, image });
+        self.materials.get(&material.uid()).unwrap().clone()
     }
 
-    pub fn buffer_addresses(&self, id: usize) -> &MeshAddress {
-        &self.mesh_addresses.get(&id).unwrap()
+    pub fn add_texture(
+        &mut self,
+        device: &DeviceContext,
+        rtx: &RtxContext,
+        texture: &Arc<Resource<TextureImageData>>,
+    ) -> Arc<renderer::resource::Resource<GpuTexture>> {
+        let prepared = self.textures.get(&texture.uid());
+        if prepared.is_none() {
+            self.textures
+                .insert(texture.uid(), texture.prepare(device, rtx, self));
+        }
+
+        self.textures.get(&texture.uid()).unwrap().clone()
+    }
+
+    pub fn get_texture(
+        &self,
+        uid: usize,
+    ) -> Option<&Arc<renderer::resource::Resource<GpuTexture>>> {
+        self.textures.get(&uid)
     }
 }
 
