@@ -39,19 +39,3 @@ impl<T> DerefMut for Resource<T> {
         &mut self.data
     }
 }
-
-pub struct ResourceBuilder {}
-
-impl ResourceBuilder {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    pub fn create<T>(&mut self, value: T) -> Rc<Resource<T>> {
-        Rc::new(Resource::new(Self::next_uid(), value))
-    }
-
-    fn next_uid() -> usize {
-        GLOBAL_RESOURCE_ID.fetch_add(1, Ordering::SeqCst)
-    }
-}

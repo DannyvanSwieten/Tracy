@@ -125,7 +125,6 @@ impl Material {
 
 #[derive(Clone)]
 pub struct Scene {
-    id: usize,
     name: String,
     materials: Vec<Material>,
     meshes: Vec<Mesh>,
@@ -134,9 +133,8 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn new(id: usize, scene: &SceneGraph) -> Self {
+    pub fn new(scene: &SceneGraph) -> Self {
         Self {
-            id,
             name: scene.name().to_string(),
             materials: Vec::new(),
             nodes: scene
@@ -153,10 +151,6 @@ impl Scene {
 
 #[Object]
 impl Scene {
-    async fn id(&self, _context: &Context<'_>) -> Result<usize> {
-        Ok(self.id)
-    }
-
     async fn name(&self, _context: &Context<'_>) -> Result<&String> {
         Ok(&self.name)
     }
@@ -195,16 +189,10 @@ pub struct Query;
 
 #[Object]
 impl Query {
-    async fn scenes(&self, context: &Context<'_>) -> Result<Vec<Scene>> {
+    async fn scenes(&self, context: &Context<'_>) -> Result<Scene> {
         let model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        let scenes = model
-            .scenes
-            .iter()
-            .enumerate()
-            .map(|(id, scene)| Scene::new(id, scene))
-            .collect();
-
-        Ok(scenes)
+        let scene = Scene::new(&model.project.scene_graph);
+        Ok(scene)
     }
 
     async fn width(&self, context: &Context<'_>) -> Result<u32> {
@@ -229,12 +217,8 @@ impl Query {
         node_id: usize,
     ) -> Result<Node> {
         let model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        if scene_id < model.scenes.len() {
-            let n = model.scenes[scene_id].node(node_id);
-            Ok(Node::new(node_id, &model.scenes[scene_id], n))
-        } else {
-            Err(async_graphql::Error::new("Nope"))
-        }
+        let n = model.project.scene_graph.node(node_id);
+        Ok(Node::new(node_id, &model.project.scene_graph, n))
     }
 }
 
@@ -244,13 +228,19 @@ pub struct Mutation {}
 impl Mutation {
     async fn look_at(&self, context: &Context<'_>, x: f32, y: f32, z: f32) -> Result<bool> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        //model.renderer.look_at(&nalgebra_glm::vec3(x, y, z));
+        model.renderer.set_camera_target(x, y, z);
         Ok(true)
     }
 
-    async fn move_camera(&self, context: &Context<'_>, x: f32, y: f32, z: f32) -> Result<Vec<f32>> {
+    async fn move_camera(
+        &self,
+        context: &Context<'_>,
+        dx: f32,
+        dy: f32,
+        dz: f32,
+    ) -> Result<Vec<f32>> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        //model.renderer.move_camera(&nalgebra_glm::vec3(x, y, z));
+        model.renderer.move_camera_position(dx, dy, dz);
         let new_position = model.renderer.camera_position();
         Ok(vec![new_position[0], new_position[1], new_position[2]])
     }
@@ -263,50 +253,36 @@ impl Mutation {
         z: f32,
     ) -> Result<bool> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        // model
-        //     .renderer
-        //     .set_camera_position(&nalgebra_glm::vec3(x, y, z));
+        model.renderer.set_camera_position(x, y, z);
         Ok(true)
     }
 
     async fn load(&self, context: &Context<'_>, path: String) -> Result<bool> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
         match load_scene_gltf(&path, &mut model.cpu_resource_cache) {
-            Ok(scenes) => {
-                model.scenes.extend(scenes);
-                let scene = model.scenes.last().unwrap();
-                let scene_data = Scene::new(model.scenes.len() - 1, scene);
+            Ok(mut scenes) => {
+                model.project.scene_graph = scenes.pop().unwrap();
+                let scene_data = Scene::new(&model.project.scene_graph);
 
                 match model.broadcasters.scene_loaded_broadcaster.send(scene_data) {
                     Ok(_) => (),
                     Err(error) => println!("{}", error.to_string()),
                 }
-                model.current_scene = Some(model.scenes.len() - 1);
                 Ok(true)
             }
             Err(e) => Err(async_graphql::Error::new(e.to_string())),
         }
     }
 
-    async fn build(&self, context: &Context<'_>, scene_id: usize) -> Result<bool> {
+    async fn build(&self, context: &Context<'_>) -> Result<bool> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        Ok(model.build_scene(scene_id))
+        Ok(model.build_scene())
     }
 
-    async fn set_active_scene(&self, context: &Context<'_>, scene_id: usize) -> Result<bool> {
+    async fn render(&self, context: &Context<'_>, batches: u32) -> Result<bool> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        model.current_scene = Some(scene_id);
+        model.render(batches);
         Ok(true)
-    }
-
-    async fn render(&self, context: &Context<'_>, scene_id: usize, batches: u32) -> Result<bool> {
-        let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        if scene_id < model.scenes.len() {
-            model.render(scene_id, batches);
-            Ok(true)
-        } else {
-            Ok(false)
-        }
     }
 }
 

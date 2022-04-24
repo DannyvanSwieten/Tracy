@@ -7,7 +7,7 @@ use renderer::context::RtxContext;
 use renderer::gpu_scene::{GpuTexture, Mesh};
 use vk_utils::device_context::DeviceContext;
 
-use crate::image_resource::{self, TextureImageData};
+use crate::image_resource::TextureImageData;
 use crate::material_resource::Material;
 use crate::mesh_resource;
 use crate::resource::{GpuResource, Resource};
@@ -20,11 +20,17 @@ pub struct Resources {
 }
 
 impl Resources {
-    pub fn add<T: 'static + GpuResource>(&mut self, resource: T) -> Arc<Resource<T>> {
+    pub fn add<T: 'static + GpuResource>(
+        &mut self,
+        origin: &str,
+        name: &str,
+        resource: T,
+    ) -> Arc<Resource<T>> {
         let type_id = TypeId::of::<T>();
         if let Some(map) = self.data.get_mut(&type_id) {
             let uid = GLOBAL_CPU_RESOURCE_ID.fetch_add(1, Ordering::SeqCst);
-            let any: Arc<dyn Any> = Arc::new(Arc::new(Resource::<T>::new(uid, resource)));
+            let any: Arc<dyn Any> =
+                Arc::new(Arc::new(Resource::<T>::new(uid, origin, name, resource)));
             map.insert(uid, any.clone());
             map.get(&uid)
                 .unwrap()
@@ -33,7 +39,7 @@ impl Resources {
                 .clone()
         } else {
             self.data.insert(type_id, HashMap::new());
-            self.add(resource)
+            self.add(origin, name, resource)
         }
     }
 

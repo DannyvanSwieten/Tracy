@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::context::RtxContext;
 use crate::descriptor_sets::{
     RTXDescriptorSets, ACCELERATION_STRUCTURE_LOCATION, ACCUMULATION_IMAGE_LOCATION,
@@ -37,6 +39,7 @@ struct CameraData {
 }
 
 pub struct Renderer {
+    pub device: Rc<DeviceContext>,
     pub rtx: RtxContext,
     pipeline: Pipeline,
     accumulation_image: Option<Image2DResource>,
@@ -92,15 +95,15 @@ impl Renderer {
         })
     }
 
-    pub fn download_image(&self, device: &DeviceContext) -> BufferResource {
-        device.wait();
-        let buffer = device.buffer(
+    pub fn download_image(&self) -> BufferResource {
+        self.device.wait();
+        let buffer = self.device.buffer(
             (self.output_width * self.output_height * 4) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::TRANSFER_DST,
         );
 
-        if let Some(queue) = device.graphics_queue() {
+        if let Some(queue) = &self.device.graphics_queue() {
             queue.begin(|command_buffer| {
                 command_buffer
                     .copy_image_2d_to_buffer(&self.output_image.as_ref().unwrap(), &buffer);
@@ -109,14 +112,9 @@ impl Renderer {
         }
         buffer
     }
-    pub fn render_frame(
-        &mut self,
-        device: &DeviceContext,
-        frame: &Frame,
-        spp: u32,
-    ) -> (Image, ImageView) {
+    pub fn render_frame(&mut self, frame: &Frame, spp: u32) -> (Image, ImageView) {
         unsafe {
-            if let Some(queue) = device.graphics_queue() {
+            if let Some(queue) = self.device.graphics_queue() {
                 self.wait_handles[self.current_frame_index] = Some(queue.begin(|command_buffer| {
                     if let Some(image) = self.output_image.as_mut() {
                         command_buffer.color_image_resource_transition(image, ImageLayout::GENERAL);
@@ -136,7 +134,7 @@ impl Renderer {
                         PipelineBindPoint::RAY_TRACING_KHR,
                         &frame.descriptor_sets,
                     );
-                    device.vk_device().cmd_bind_pipeline(
+                    self.device.vk_device().cmd_bind_pipeline(
                         *command_buffer.native_handle(),
                         PipelineBindPoint::RAY_TRACING_KHR,
                         self.pipeline,
@@ -149,7 +147,7 @@ impl Renderer {
                             bytes
                         })
                         .collect();
-                    device.vk_device().cmd_push_constants(
+                    self.device.vk_device().cmd_push_constants(
                         *command_buffer.native_handle(),
                         self.descriptor_sets.pipeline_layout,
                         ShaderStageFlags::RAYGEN_KHR,
@@ -181,7 +179,7 @@ impl Renderer {
         }
     }
 
-    pub fn build_frame(&self, device: &DeviceContext, scene: &Scene) -> Frame {
+    pub fn build_frame(&self, scene: &Scene) -> Frame {
         let mut mesh_addresses = Vec::new();
         let mut materials = Vec::new();
         let mut image_writes = Vec::new();
@@ -256,7 +254,7 @@ impl Renderer {
             }
         }
 
-        let mut material_buffer = device.buffer(
+        let mut material_buffer = self.device.buffer(
             (materials.len() * std::mem::size_of::<GpuMaterial>()) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::STORAGE_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
@@ -264,7 +262,7 @@ impl Renderer {
 
         material_buffer.copy_to(&materials);
 
-        let mut mesh_address_buffer = device.buffer(
+        let mut mesh_address_buffer = self.device.buffer(
             (mesh_addresses.len() * std::mem::size_of::<MeshAddress>()) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::STORAGE_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
@@ -272,7 +270,7 @@ impl Renderer {
 
         mesh_address_buffer.copy_to(&mesh_addresses);
 
-        let mut material_address_buffer = device.buffer(
+        let mut material_address_buffer = self.device.buffer(
             (std::mem::size_of::<u64>()) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::UNIFORM_BUFFER,
@@ -281,31 +279,31 @@ impl Renderer {
         material_address_buffer.copy_to(&[material_buffer.device_address()]);
 
         let acceleration_structure =
-            TopLevelAccelerationStructure::new(&device, &self.rtx, &instances);
+            TopLevelAccelerationStructure::new(&self.device, &self.rtx, &instances);
 
-        let descriptor_sets = self.descriptor_sets.descriptor_sets(device);
+        let descriptor_sets = self.descriptor_sets.descriptor_sets(&self.device);
         if image_writes.len() > 0 {
             let writes = [*WriteDescriptorSet::builder()
-                .dst_binding(MATERIAL_TEXTURE_LOCATION.1)
                 .dst_set(descriptor_sets[MATERIAL_TEXTURE_LOCATION.0 as usize])
+                .dst_binding(MATERIAL_TEXTURE_LOCATION.1)
                 .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
                 .image_info(&image_writes)];
             unsafe {
-                device.vk_device().update_descriptor_sets(&writes, &[]);
+                self.device.vk_device().update_descriptor_sets(&writes, &[]);
             }
         }
 
         Self::update_acceleration_structure_descriptors(
-            device,
+            &self.device,
             &acceleration_structure,
             &descriptor_sets,
         );
 
-        let camera_buffer = self.build_camera_buffer(device);
-        Self::update_material_descriptor(device, &descriptor_sets, &material_address_buffer);
-        Self::update_mesh_address_descriptor(device, &descriptor_sets, &mesh_address_buffer);
-        Self::update_camera_descriptors(device, &camera_buffer, &descriptor_sets);
-        self.update_image_descriptors(device, &descriptor_sets);
+        let camera_buffer = self.build_camera_buffer(&self.device);
+        Self::update_material_descriptor(&self.device, &descriptor_sets, &material_address_buffer);
+        Self::update_mesh_address_descriptor(&self.device, &descriptor_sets, &mesh_address_buffer);
+        Self::update_camera_descriptors(&self.device, &camera_buffer, &descriptor_sets);
+        self.update_image_descriptors(&self.device, &descriptor_sets);
 
         Frame {
             material_buffer,
@@ -319,24 +317,28 @@ impl Renderer {
 }
 
 impl Renderer {
-    pub fn new(device: &DeviceContext, width: u32, height: u32) -> Self {
-        let rtx = RtxContext::new(device);
-
-        let camera_buffer = device.buffer(
-            128,
-            MemoryPropertyFlags::HOST_COHERENT | MemoryPropertyFlags::HOST_VISIBLE,
-            BufferUsageFlags::UNIFORM_BUFFER,
-        );
+    pub fn new(device: Rc<DeviceContext>, width: u32, height: u32) -> Self {
+        let rtx = RtxContext::new(&device);
 
         let descriptor_sets = RTXDescriptorSets::new(&device);
         let sampler = unsafe {
             device
                 .vk_device()
-                .create_sampler(&ash::vk::SamplerCreateInfo::builder(), None)
+                .create_sampler(
+                    &ash::vk::SamplerCreateInfo::builder()
+                        .min_filter(ash::vk::Filter::LINEAR)
+                        .mag_filter(ash::vk::Filter::LINEAR)
+                        .anisotropy_enable(true)
+                        .max_anisotropy(8.0),
+                    None,
+                )
                 .expect("Sampler creation failed")
         };
 
+        let d = device.clone();
+
         let mut result = Self {
+            device,
             rtx,
             pipeline: Pipeline::null(),
             accumulation_image: None,
@@ -355,15 +357,14 @@ impl Renderer {
             wait_handles: [None, None, None],
             current_frame_index: 0,
 
-            camera_position: Vec3::new(0., 0., 25.),
+            camera_position: Vec3::new(0., 20., 0.),
             camera_target: vec3(0.0, 0.0, 0.0),
             current_batch: 0,
         };
 
-        result.load_shaders_and_pipeline(device);
-        result.create_shader_binding_table(device);
-        result.create_images_and_views(device, width, height);
-        result.build_camera_buffer(device);
+        result.load_shaders_and_pipeline(&d);
+        result.create_shader_binding_table(&d);
+        result.create_images_and_views(&d, width, height);
         result.output_width = width;
         result.output_height = height;
         result
@@ -729,5 +730,17 @@ impl Renderer {
         unsafe {
             device.vk_device().update_descriptor_sets(&writes, &[]);
         }
+    }
+
+    pub fn set_camera_target(&mut self, x: f32, y: f32, z: f32) {
+        self.camera_target = vec3(x, y, z)
+    }
+
+    pub fn set_camera_position(&mut self, x: f32, y: f32, z: f32) {
+        self.camera_position = vec3(x, y, z)
+    }
+
+    pub fn move_camera_position(&mut self, dx: f32, dy: f32, dz: f32) {
+        self.camera_position += vec3(dx, dy, dz)
     }
 }

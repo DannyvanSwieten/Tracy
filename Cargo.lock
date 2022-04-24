@@ -1801,6 +1801,16 @@ dependencies = [
 
 [[package]]
 name = "raw-window-handle"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e28f55143d0548dad60bb4fbdc835a3d7ac6acc3324506450c5fdd6e42903a76"
+dependencies = [
+ "libc",
+ "raw-window-handle 0.4.3",
+]
+
+[[package]]
+name = "raw-window-handle"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b800beb9b6e7d2df1fe337c9e3d04e3af22a124460fb4c30fcc22c9117cefb41"
@@ -2264,6 +2274,7 @@ dependencies = [
  "tokio-stream",
  "vk_utils",
  "winit",
+ "winit-blit",
 ]
 
 [[package]]
@@ -2651,7 +2662,7 @@ dependencies = [
  "objc",
  "parking_lot 0.11.2",
  "percent-encoding",
- "raw-window-handle",
+ "raw-window-handle 0.4.3",
  "smithay-client-toolkit",
  "wasm-bindgen",
  "wayland-client",
@@ -2659,6 +2670,15 @@ dependencies = [
  "web-sys",
  "winapi",
  "x11-dl",
+]
+
+[[package]]
+name = "winit-blit"
+version = "0.0.0"
+source = "git+https://github.com/rust-windowing/winit-blit.git#17a03190d4682f253739f75c7e94aee7289b3ea3"
+dependencies = [
+ "raw-window-handle 0.3.4",
+ "winapi",
 ]
 
 [[package]]

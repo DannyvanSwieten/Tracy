@@ -1,21 +1,17 @@
-use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::context::RtxContext;
 use crate::geometry::{
-    BottomLevelAccelerationStructure, GeometryInstance, Normal, Position, Tangent, Texcoord,
+    BottomLevelAccelerationStructure, Normal, Position, Tangent, Texcoord,
     TopLevelAccelerationStructure,
 };
-use crate::material::Material;
-use crate::resource::Resource;
 use crate::shape::Shape;
 
-use glm::Mat4x4;
 use vk_utils::buffer_resource::BufferResource;
 use vk_utils::device_context::DeviceContext;
 use vk_utils::image_resource::Image2DResource;
 
-use ash::vk::{BufferUsageFlags, DescriptorSet, GeometryInstanceFlagsKHR, MemoryPropertyFlags};
+use ash::vk::{BufferUsageFlags, DescriptorSet, MemoryPropertyFlags};
 
 pub struct GpuTexture {
     pub image: Image2DResource,

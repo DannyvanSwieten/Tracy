@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use glm::{vec4, Mat4, Mat4x3, Vec3};
 
-use crate::geometry::{GeometryInstance, Position};
+use crate::geometry::GeometryInstance;
 use crate::resource::Resource;
 use crate::{gpu_scene::Mesh, material::Material};
 
@@ -15,15 +15,12 @@ impl Instance {
     pub fn new(
         mesh: Arc<Resource<Mesh>>,
         material: Arc<Resource<Material>>,
-        position: &Position,
-        scale: &Vec3,
-        rotation: &Vec3,
+        transform: &Mat4,
     ) -> Self {
-        let transform = Mat4::identity().scale(scale[0]) * Mat4::new_translation(position);
         Self {
             material,
             mesh,
-            transform,
+            transform: *transform,
         }
     }
 
@@ -46,7 +43,7 @@ impl Instance {
             0,
             ash::vk::GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE,
             self.mesh.blas.address(),
-            self.transform.remove_column(3),
+            self.transform.transpose().remove_column(3),
         )
     }
 }

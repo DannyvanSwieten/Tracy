@@ -22,16 +22,16 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/target/debug/tracey.exe",
-            "args": [
-                "--file",
-                "${workspaceFolder}/assets/Duck/glTF/Duck.gltf",
-                "1280",
-                "720"
-            ],
-            // "args": ["--server",
-            //         "127.0.0.1:7000",
-            //         "1280", "720"
-            //     ],
+            // "args": [
+            //     "--file",
+            //     "${workspaceFolder}/assets/Sponza/glTF/Sponza.gltf",
+            //     "1280",
+            //     "720"
+            // ],
+            "args": ["--server",
+                    "127.0.0.1:7000",
+                    "1280", "720"
+                ],
             "stopOnEntry": false,
             "cwd": "${workspaceFolder}",
             "console": "externalTerminal"

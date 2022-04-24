@@ -1,11 +1,12 @@
+use crate::project::Project;
 use crate::resources::{GpuResourceCache, Resources};
-use crate::scene_graph::SceneGraph;
 
 use super::schema;
 use super::server::Server;
 use futures::lock::Mutex;
+use renderer::gpu_scene::{Frame, Scene};
 use renderer::renderer::Renderer;
-use renderer::resource::ResourceBuilder;
+use std::rc::Rc;
 use std::sync::Arc;
 use vk_utils::device_context::DeviceContext;
 
@@ -20,54 +21,70 @@ impl Broadcasters {
         }
     }
 }
+
 pub struct Model {
-    pub device: DeviceContext,
     pub renderer: Renderer,
-    pub resource_builder: ResourceBuilder,
     pub cpu_resource_cache: Resources,
     pub gpu_resource_cache: GpuResourceCache,
-    pub scenes: Vec<SceneGraph>,
+    pub built_scenes: Vec<Scene>,
+    pub cached_frames: Vec<Frame>,
     pub current_scene: Option<usize>,
     pub has_new_frame: bool,
     pub broadcasters: Broadcasters,
+    pub project: Project,
 }
 
 impl Model {
-    pub fn new(device: DeviceContext, renderer: Renderer) -> Self {
+    pub fn new(renderer: Renderer) -> Self {
         Self {
-            device,
             renderer,
-            resource_builder: ResourceBuilder::new(),
             cpu_resource_cache: Resources::default(),
             gpu_resource_cache: GpuResourceCache::default(),
-            scenes: vec![],
+            built_scenes: Vec::new(),
+            cached_frames: Vec::new(),
             current_scene: None,
             has_new_frame: false,
             broadcasters: Broadcasters::new(),
+            project: Project::new("Untitled Scene"),
         }
     }
 
-    pub fn build_scene(&mut self, scene_id: usize) -> bool {
-        if scene_id < self.scenes.len() {
-            //self.renderer.build(&self.device, &self.scenes[scene_id]);
-            self.renderer.clear();
-            true
+    pub fn new_project(&mut self, name: &str) {
+        self.project = Project::new(name)
+    }
+
+    pub fn build_scene(&mut self) -> bool {
+        let scene = self.project.scene_graph.build(
+            &mut self.gpu_resource_cache,
+            nalgebra_glm::Mat4x4::identity(),
+            &self.renderer.device,
+            &self.renderer.rtx,
+        );
+        let frame = self.renderer.build_frame(&scene);
+        if self.cached_frames.len() == 0 {
+            self.cached_frames.push(frame);
         } else {
-            false
+            self.cached_frames[0] = frame;
         }
+
+        self.renderer.clear();
+        true
     }
 
-    pub fn render(&mut self, scene_id: usize, batches: u32) {
+    pub fn render(&mut self, batches: u32) {
         for _ in 0..batches {
-            //self.renderer.render(2, &self.device);
+            self.renderer.render_frame(&self.cached_frames[0], 1);
         }
         self.has_new_frame = true;
     }
 
-    pub fn download_image(&mut self) -> Vec<u8> {
-        let buffer = self.renderer.download_image(&self.device);
+    pub fn download_image<T>(&mut self) -> Vec<T>
+    where
+        T: Copy,
+    {
+        let buffer = self.renderer.download_image();
         self.has_new_frame = false;
-        buffer.copy_data::<u8>()
+        buffer.copy_data::<T>()
     }
 }
 
@@ -77,12 +94,14 @@ pub struct ServerApplication {
 }
 
 impl ServerApplication {
-    pub fn new(device: DeviceContext, address: &str, width: u32, height: u32) -> Self {
-        let renderer = Renderer::new(&device, width, height);
-        let model = Arc::new(Mutex::new(Model::new(device, renderer)));
+    pub fn new(device: Rc<DeviceContext>, address: &str, width: u32, height: u32) -> Self {
+        let renderer = Renderer::new(device, width, height);
+        let model = Arc::new(Mutex::new(Model::new(renderer)));
         Self {
             model: model.clone(),
             server: Server::new(model.clone(), address, true),
         }
     }
 }
+
+unsafe impl Send for Model {}

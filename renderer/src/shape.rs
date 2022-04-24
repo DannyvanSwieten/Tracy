@@ -1,4 +1,4 @@
-use glm::Vec3;
+use glm::{Mat4, Vec3};
 
 use crate::{
     geometry::Position, gpu_scene::Mesh, instance::Instance, material::Material, resource::Resource,
@@ -18,20 +18,9 @@ impl Shape {
         }
     }
 
-    pub fn create_instance(
-        &mut self,
-        material: Arc<Resource<Material>>,
-        position: &Position,
-        scale: &Vec3,
-        rotation: &Vec3,
-    ) {
-        self.instances.push(Instance::new(
-            self.mesh.clone(),
-            material,
-            position,
-            scale,
-            rotation,
-        ))
+    pub fn create_instance(&mut self, material: Arc<Resource<Material>>, transform: &Mat4) {
+        self.instances
+            .push(Instance::new(self.mesh.clone(), material, transform))
     }
     pub fn mesh(&self) -> &Arc<Resource<Mesh>> {
         &self.mesh

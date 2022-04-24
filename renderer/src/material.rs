@@ -65,7 +65,7 @@ impl Material {
 impl Default for Material {
     fn default() -> Self {
         Self {
-            base_color: vec4(0.5, 0.5, 0.5, 1.),
+            base_color: vec4(1., 1., 1., 1.),
             emission: glm::Vec4::default(),
             roughness: 1.0,
             metallic: 0.0,
@@ -78,7 +78,7 @@ impl Default for Material {
         }
     }
 }
-
+#[repr(C)]
 pub(crate) struct GpuMaterial {
     pub _base_color: glm::Vec4,
     pub _emission: glm::Vec4,

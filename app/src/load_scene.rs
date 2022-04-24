@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use nalgebra_glm::{vec2, vec3, vec4};
+use nalgebra_glm::{vec2, vec3, vec4, Mat4};
 use renderer::geometry::Position;
 
 use crate::image_resource::TextureImageData;
@@ -15,29 +15,33 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
     let (document, buffers, images) = gltf::import(path)?;
 
     let mut image_map: HashMap<usize, Arc<Resource<TextureImageData>>> = HashMap::new();
-    images.iter().enumerate().for_each(|(index, image)| {
-        let format = match image.format {
-            gltf::image::Format::R8 => ash::vk::Format::R8_UNORM,
-            gltf::image::Format::R8G8 => ash::vk::Format::R8G8_UNORM,
-            gltf::image::Format::R8G8B8 => ash::vk::Format::R8G8B8_UNORM,
-            gltf::image::Format::R8G8B8A8 => ash::vk::Format::R8G8B8A8_UNORM,
-            gltf::image::Format::B8G8R8 => ash::vk::Format::B8G8R8_UNORM,
-            gltf::image::Format::B8G8R8A8 => ash::vk::Format::B8G8R8A8_UNORM,
-            gltf::image::Format::R16 => ash::vk::Format::R16_SFLOAT,
-            gltf::image::Format::R16G16 => ash::vk::Format::R16G16_SFLOAT,
-            gltf::image::Format::R16G16B16 => ash::vk::Format::R16G16B16_SFLOAT,
-            gltf::image::Format::R16G16B16A16 => ash::vk::Format::R16G16B16A16_SFLOAT,
-        };
-        image_map.insert(
-            index,
-            resources.add(TextureImageData::new(
-                format,
-                image.width,
-                image.height,
-                &image.pixels,
-            )),
-        );
-    });
+
+    for texture in document.textures() {
+        let image_source = &texture.source();
+        let image = &images[image_source.index()];
+        if !image_map.contains_key(&image_source.index()) {
+            let format = match image.format {
+                gltf::image::Format::R8 => ash::vk::Format::R8_UNORM,
+                gltf::image::Format::R8G8 => ash::vk::Format::R8G8_UNORM,
+                gltf::image::Format::R8G8B8 => ash::vk::Format::R8G8B8_UNORM,
+                gltf::image::Format::R8G8B8A8 => ash::vk::Format::R8G8B8A8_UNORM,
+                gltf::image::Format::B8G8R8 => ash::vk::Format::B8G8R8_UNORM,
+                gltf::image::Format::B8G8R8A8 => ash::vk::Format::B8G8R8A8_UNORM,
+                gltf::image::Format::R16 => ash::vk::Format::R16_SFLOAT,
+                gltf::image::Format::R16G16 => ash::vk::Format::R16G16_SFLOAT,
+                gltf::image::Format::R16G16B16 => ash::vk::Format::R16G16B16_SFLOAT,
+                gltf::image::Format::R16G16B16A16 => ash::vk::Format::R16G16B16A16_SFLOAT,
+            };
+            image_map.insert(
+                image_source.index(),
+                resources.add(
+                    "",
+                    image_source.name().unwrap_or("Untitled"),
+                    TextureImageData::new(format, image.width, image.height, &image.pixels),
+                ),
+            );
+        }
+    }
 
     let mut mesh_map: HashMap<usize, Vec<usize>> = HashMap::new();
     let mut material_map: HashMap<usize, usize> = HashMap::new();
@@ -89,7 +93,12 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
             );
         }
 
-        material_map.insert(material.index().unwrap(), resources.add(mat).uid());
+        material_map.insert(
+            material.index().unwrap(),
+            resources
+                .add("", material.name().unwrap_or("Untitled"), mat)
+                .uid(),
+        );
     }
 
     for mesh in document.meshes() {
@@ -134,23 +143,31 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
 
                 if let Some(material_id) = primitive.material().index() {
                     resources
-                        .add(MeshResource::new(
-                            indices,
-                            vertices,
-                            normals,
-                            tangents,
-                            tex_coords,
-                            resources.get_unchecked::<Material>(
-                                *material_map.get(&material_id).unwrap(),
+                        .add(
+                            "",
+                            mesh.name().unwrap_or("Untitled"),
+                            MeshResource::new(
+                                indices,
+                                vertices,
+                                normals,
+                                tangents,
+                                tex_coords,
+                                resources.get_unchecked::<Material>(
+                                    *material_map.get(&material_id).unwrap(),
+                                ),
                             ),
-                        ))
+                        )
                         .uid()
                 } else {
-                    let material = resources.add(Material::default());
+                    let material = resources.add("", "Default Material", Material::default());
                     resources
-                        .add(MeshResource::new(
-                            indices, vertices, normals, tangents, tex_coords, material,
-                        ))
+                        .add(
+                            "",
+                            mesh.name().unwrap_or("Untitled"),
+                            MeshResource::new(
+                                indices, vertices, normals, tangents, tex_coords, material,
+                            ),
+                        )
                         .uid()
                 }
             })
@@ -177,12 +194,15 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
     for node in document.nodes() {
         let node_id = scene_graph.create_node();
 
-        let (position, rotation, scale) = node.transform().decomposed();
-        scene_graph
-            .node_mut(node_id)
-            .with_scale(&scale)
-            .with_orientation(&rotation)
-            .with_position(&position);
+        let transform = node.transform().matrix();
+        let mut glm_matrix = Mat4::default();
+        for (idx, mut column) in glm_matrix.column_iter_mut().enumerate() {
+            column[0] = transform[idx][0];
+            column[1] = transform[idx][1];
+            column[2] = transform[idx][2];
+            column[3] = transform[idx][3];
+        }
+        scene_graph.node_mut(node_id).with_transform(glm_matrix);
 
         for child in node.children() {
             scene_graph.node_mut(node_id).with_child(child.index());

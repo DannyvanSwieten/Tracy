@@ -21,6 +21,8 @@ where
     T: GpuResource,
 {
     uid: usize,
+    origin: String,
+    name: String,
     item: T,
 }
 
@@ -33,8 +35,13 @@ impl<T: GpuResource> Deref for Resource<T> {
 }
 
 impl<T: GpuResource> Resource<T> {
-    pub fn new(uid: usize, data: T) -> Self {
-        Self { uid, item: data }
+    pub fn new(uid: usize, origin: &str, name: &str, data: T) -> Self {
+        Self {
+            uid,
+            item: data,
+            origin: origin.to_string(),
+            name: name.to_string(),
+        }
     }
 
     pub fn uid(&self) -> usize {

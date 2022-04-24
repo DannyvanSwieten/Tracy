@@ -5,6 +5,7 @@ pub mod load_scene;
 pub mod material_resource;
 pub mod mesh_resource;
 pub mod parameter;
+pub mod project;
 pub mod resource;
 pub mod resources;
 pub mod scene_graph;
@@ -20,11 +21,12 @@ use winit::{
 };
 
 use ash::extensions::ext::DebugUtils;
-use renderer::{renderer::Renderer, resource::ResourceBuilder};
+use renderer::renderer::Renderer;
 use vk_utils::vulkan::Vulkan;
 
 use futures::lock::Mutex;
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
+use winit_blit::{NativeFormat, PixelBufferTyped};
 
 use crate::resources::{GpuResourceCache, Resources};
 
@@ -36,7 +38,7 @@ fn main() {
         &[DebugUtils::name()],
     );
     let gpu = &vulkan.hardware_devices_with_queue_support(ash::vk::QueueFlags::GRAPHICS)[0];
-    let context = Renderer::create_suitable_device(gpu);
+    let context = Rc::new(Renderer::create_suitable_device(gpu));
 
     let args: Vec<String> = std::env::args().collect();
     let mode = if args.len() == 5 {
@@ -50,24 +52,22 @@ fn main() {
     let image_height = args[4].parse::<u32>().expect("Invalid height argument");
 
     if mode == "--file".to_string() {
-        let mut renderer = Renderer::new(&context, image_width, image_height);
+        let mut renderer = Renderer::new(context, image_width, image_height);
         let mut cpu_cache = Resources::default();
         let mut gpu_cache = GpuResourceCache::default();
 
-        let mut resource_builder = ResourceBuilder::new();
-
-        let scenes = load_scene_gltf(&args[2], &mut cpu_cache).unwrap();
+        let mut scenes = load_scene_gltf(&args[2], &mut cpu_cache).unwrap();
         let gpu_scene = scenes[0].build(
             &mut gpu_cache,
             Mat4::new_nonuniform_scaling(&vec3(1.0, 1.0, 1.0)),
-            &context,
+            &renderer.device,
             &renderer.rtx,
         );
-        let frame = renderer.build_frame(&context, &gpu_scene);
+        let frame = renderer.build_frame(&gpu_scene);
 
-        renderer.render_frame(&context, &frame, 16);
+        renderer.render_frame(&frame, 16);
 
-        let buffer = renderer.download_image(&context);
+        let buffer = renderer.download_image();
         let data = buffer.copy_data::<u8>();
         image::save_buffer(
             "Camera_1.png",
@@ -98,27 +98,27 @@ fn main() {
                 window_id,
             } if window_id == window.id() => *control_flow = ControlFlow::Exit,
             Event::RedrawRequested(window_id) => {
-                // if window_id == window.id() {
-                //     let (width, height): (u32, u32) = window.inner_size().into();
+                if window_id == window.id() {
+                    let (width, height): (u32, u32) = window.inner_size().into();
 
-                //     if let Some(mut model) = server.model.try_lock() {
-                //         let data = model.download_image();
+                    if let Some(mut model) = server.model.try_lock() {
+                        let data = model.download_image();
 
-                //         let mut pixel_buffer =
-                //             PixelBufferTyped::<NativeFormat>::new_supported(width, height, &window);
+                        let mut pixel_buffer =
+                            PixelBufferTyped::<NativeFormat>::new_supported(width, height, &window);
 
-                //         for (i, row) in pixel_buffer.rows_mut().enumerate() {
-                //             let w = row.len();
-                //             for (j, pixel) in row.into_iter().enumerate() {
-                //                 let index = (i * w + j) * 4;
-                //                 let value = &data[index..index + 3];
-                //                 *pixel = NativeFormat::from_rgb(value[0], value[1], value[2]);
-                //             }
-                //         }
+                        for (i, row) in pixel_buffer.rows_mut().enumerate() {
+                            let w = row.len();
+                            for (j, pixel) in row.into_iter().enumerate() {
+                                let index = (i * w + j) * 4;
+                                let value = &data[index..index + 3];
+                                *pixel = NativeFormat::from_rgb(value[0], value[1], value[2]);
+                            }
+                        }
 
-                //         pixel_buffer.blit(&window).unwrap();
-                //     }
-                // }
+                        pixel_buffer.blit(&window).unwrap();
+                    }
+                }
             }
             _ => {
                 if let Some(model) = server.model.try_lock() {

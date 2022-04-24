@@ -1,8 +1,8 @@
 use ash::vk::{
-    DescriptorBufferInfo, DescriptorImageInfo, DescriptorPool, DescriptorPoolCreateInfo,
-    DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout,
-    DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo, DescriptorType, PipelineLayout,
-    PipelineLayoutCreateInfo, PushConstantRange, ShaderStageFlags, WriteDescriptorSet,
+    DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet,
+    DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding,
+    DescriptorSetLayoutCreateInfo, DescriptorType, PipelineLayout, PipelineLayoutCreateInfo,
+    PushConstantRange, ShaderStageFlags,
 };
 
 use vk_utils::device_context::DeviceContext;

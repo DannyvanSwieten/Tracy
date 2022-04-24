@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     mesh_resource::MeshResource,
-    resource::{GpuResource, Resource},
+    resource::Resource,
     resources::{GpuResourceCache, Resources},
 };
 
@@ -21,6 +21,7 @@ impl Instancer for DefaultInstancer {
 
 pub struct Entity {
     local_transform: Mat4x4,
+    global_transform: Mat4x4,
     mesh: Option<Arc<Resource<MeshResource>>>,
     children: Vec<usize>,
 }
@@ -29,9 +30,19 @@ impl Entity {
     pub fn new() -> Self {
         Self {
             local_transform: Mat4x4::new_nonuniform_scaling(&vec3(1.0, 1.0, 1.0)),
+            global_transform: Mat4x4::new_nonuniform_scaling(&vec3(1.0, 1.0, 1.0)),
             mesh: None,
             children: Vec::new(),
         }
+    }
+
+    pub fn with_transform(&mut self, local_transform: Mat4x4) -> &mut Self {
+        self.local_transform = local_transform;
+        self
+    }
+
+    pub fn transform(&mut self, t: &Mat4x4) {
+        self.global_transform = t * self.local_transform
     }
 
     pub fn with_position(&mut self, position: &[f32; 3]) -> &mut Self {
@@ -71,50 +82,6 @@ impl Entity {
         self
     }
 
-    pub fn with_transform(&mut self, transform: Mat4x4) -> &mut Self {
-        self.local_transform = transform;
-        self
-    }
-
-    pub fn allocate_resources(
-        &self,
-        parent_transform: Mat4x4,
-        scene_graph: &SceneGraph,
-        resources: &Resources,
-        device: &DeviceContext,
-        rtx: &RtxContext,
-        mut scene: Scene,
-    ) -> Scene {
-        let this_transform = parent_transform * self.local_transform;
-        // if let Some(mesh) = &self.mesh {
-        //     let m = &cpu_cache.mesh(mesh.id).mesh;
-        //     let id = gpu_cache.add_mesh(device, rtx, m, mesh.id);
-        //     scene.create_instance(id, &this_transform, cpu_cache.material(m.material).material);
-        //     scene.add_mesh(id);
-
-        //     let material = cpu_cache.material(m.material);
-        //     for i in 0..4 {
-        //         if material.material.maps[i] != -1 {
-        //             let image = cpu_cache.texture(material.material.maps[i] as usize);
-        //             gpu_cache.add_texture(device, &image.image, image.id);
-        //         }
-        //     }
-        // }
-
-        // for child in &self.children {
-        //     scene = scene_graph.node(*child).allocate_resources(
-        //         this_transform,
-        //         scene_graph,
-        //         cpu_cache,
-        //         gpu_cache,
-        //         device,
-        //         rtx,
-        //         scene,
-        //     );
-        // }
-        scene
-    }
-
     pub fn mesh(&self) -> &Option<Arc<Resource<MeshResource>>> {
         &self.mesh
     }
@@ -136,6 +103,18 @@ impl SceneGraph {
             name: name.to_string(),
             root: 0,
             nodes: Vec::new(),
+        }
+    }
+
+    pub fn transform(&mut self, t: &Mat4x4) {
+        self.transform_node(self.root, t)
+    }
+
+    fn transform_node(&mut self, id: usize, t: &Mat4x4) {
+        self.nodes[id].transform(t);
+        let child_t = self.nodes[id].global_transform;
+        for child in self.nodes[id].children.clone() {
+            self.transform_node(child, &child_t);
         }
     }
 
@@ -204,24 +183,20 @@ impl SceneGraph {
 
 impl SceneGraph {
     pub fn build(
-        &self,
+        &mut self,
         gpu_cache: &mut GpuResourceCache,
         parent_transform: Mat4x4,
         device: &DeviceContext,
         rtx: &RtxContext,
     ) -> Scene {
+        self.transform(&parent_transform);
         let mut scene = Scene::default();
         for node in &self.nodes {
             if let Some(mesh) = &node.mesh {
                 let gpu_mat = gpu_cache.add_material(device, rtx, &mesh.material);
                 let gpu_mesh = gpu_cache.add_mesh(device, rtx, mesh);
                 let mut shape = Shape::new(gpu_mesh);
-                shape.create_instance(
-                    gpu_mat,
-                    &vec3(0., 0., 0.),
-                    &vec3(1., 1., 1.),
-                    &vec3(0., 0., 0.),
-                );
+                shape.create_instance(gpu_mat, &node.global_transform);
 
                 scene.attach_shape(Arc::new(shape))
             }

@@ -1,4 +1,4 @@
-use std::{borrow::BorrowMut, sync::Arc};
+use std::sync::Arc;
 
 use renderer::{context::RtxContext, gpu_scene::GpuTexture};
 
@@ -55,26 +55,25 @@ impl GpuResource for TextureImageData {
             ash::vk::ImageUsageFlags::TRANSFER_DST | ash::vk::ImageUsageFlags::SAMPLED,
         );
 
-        let buffer = device.buffer(
+        let mut buffer = device.buffer(
             self.pixels.len() as u64,
             ash::vk::MemoryPropertyFlags::HOST_VISIBLE,
             ash::vk::BufferUsageFlags::TRANSFER_SRC,
         );
 
+        buffer.copy_to(&self.pixels);
+
         device
             .graphics_queue()
             .unwrap()
             .begin(|command_buffer_handle| {
-                command_buffer_handle.color_image_transition(
-                    image.vk_image(),
-                    ash::vk::ImageLayout::UNDEFINED,
+                command_buffer_handle.color_image_resource_transition(
+                    &mut image,
                     ash::vk::ImageLayout::TRANSFER_DST_OPTIMAL,
                 );
 
                 command_buffer_handle
             });
-
-        image.layout = ash::vk::ImageLayout::TRANSFER_DST_OPTIMAL;
 
         device
             .graphics_queue()
@@ -88,16 +87,13 @@ impl GpuResource for TextureImageData {
             .graphics_queue()
             .unwrap()
             .begin(|command_buffer_handle| {
-                command_buffer_handle.color_image_transition(
-                    image.vk_image(),
-                    ash::vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                command_buffer_handle.color_image_resource_transition(
+                    &mut image,
                     ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
                 );
 
                 command_buffer_handle
             });
-
-        image.layout = ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
 
         let view_info = *ash::vk::ImageViewCreateInfo::builder()
             .format(self.format)

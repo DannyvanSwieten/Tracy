@@ -78,6 +78,14 @@ impl GpuResource for Material {
                 cache.get_texture(base_color_texture.uid()).unwrap().clone(),
             )
         }
+        if let Some(metallic_roughness_texture) = &self.metallic_roughness_map {
+            mat = mat.with_metallic_roughness_texture(
+                cache
+                    .get_texture(metallic_roughness_texture.uid())
+                    .unwrap()
+                    .clone(),
+            )
+        }
         if let Some(emission_texture) = &self.emission_map {
             mat = mat
                 .with_emission_texture(cache.get_texture(emission_texture.uid()).unwrap().clone())

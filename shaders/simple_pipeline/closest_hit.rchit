@@ -13,7 +13,6 @@
 #include "scatter.glsl"
 #include "random.glsl"
 
-
 struct BufferAddresses {
     uint64_t index_address;
     uint64_t vertex_address;
@@ -54,6 +53,7 @@ void main()
 
     Materials materials = Materials(material_address);
     Normals normals = Normals(mesh.normal_address);
+    Tangents tangents = Tangents(mesh.tangent_address);
     Indices indices = Indices(mesh.index_address);
     Vertices vertices = Vertices(mesh.vertex_address);
     TextureCoordinates tex_coords = TextureCoordinates(mesh.texcoord_address);
@@ -86,27 +86,46 @@ void main()
     const vec3 N0 = barycentric.x * n0;
     const vec3 N1 = barycentric.y * n1;
     const vec3 N2 = barycentric.z * n2;
-    ray.normal = normalize(N0 + N1 + N2);
-    vec3 N = ray.normal;
 
     vec2 Xi = vec2(rand_float(ray.seed), rand_float(ray.seed));
 
     int instance_id = gl_InstanceCustomIndexEXT;
     Material material = materials.data[instance_id];
 
+    const vec3 t0 = gl_ObjectToWorldEXT * vec4(tangents.data[i0], 0);
+    const vec3 t1 = gl_ObjectToWorldEXT * vec4(tangents.data[i1], 0);
+    const vec3 t2 = gl_ObjectToWorldEXT * vec4(tangents.data[i2], 0);
+
+    const vec3 T0 = barycentric.x * t0;
+    const vec3 T1 = barycentric.y * t1;
+    const vec3 T2 = barycentric.z * t2;
+
+    vec3 N = normalize(N0 + N1 + N2);
+    const vec3 T = (T0 + T1 + T2) / 3;
+    const vec3 B = cross(N, T);
+
+    if(material.maps[2] != -1)
+    {
+        mat3 m = mat3(T, B, N);
+        N = m *  (-1 + 0.5 * texture(images[material.maps[2]], uv).rgb);
+        N = normalize(N);
+    }
+
+    ray.normal = N;
+
     float pdf = 0.0;
     vec3 wi = vec3(0.0);
     vec3 wo = -gl_WorldRayDirectionEXT;
     vec3 base_color = material.base_color.rgb;
-    if(material.base_color_texture != -1)
+    if(material.maps[0] != -1)
     {
-        base_color *= texture(images[material.base_color_texture], uv).rgb;
+        base_color *= texture(images[material.maps[0]], uv).rgb;
     }
-    float metal = material.metallic;
-    float roughness = material.roughness;
-    if(material.metallic_roughness_texture != -1)
+    float metal = material.properties[1];
+    float roughness = material.properties[0];
+    if(material.maps[1] != -1)
     {
-        vec2 mr = texture(images[material.metallic_roughness_texture], uv).bg;
+        vec2 mr = texture(images[material.maps[1]], uv).bg;
         metal *= mr.x;
         roughness *= mr.y;
     }
@@ -143,16 +162,16 @@ void main()
 
     ray.hit = true;
     vec3 c = color_according_to_disney;
-    if(pdf > 0.0001 && dot(c, c) > 0.0001)
+    if(pdf > 0.01 && dot(c, c) > 0.01)
         c /= pdf;
     else
-        c = vec3(0);
+        c = vec3(1);
 
     ray.color = vec4(c, 1);
     ray.emission = material.emission;
-    if(material.emission_texture != -1)
+    if(material.maps[3] != -1)
     {
-        ray.emission *= texture(images[material.emission_texture], uv);
+        ray.emission *= texture(images[material.maps[3]], uv);
     }
 
     c += ray.emission.rgb * ray.emission.a;
