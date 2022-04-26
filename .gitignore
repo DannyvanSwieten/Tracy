@@ -1,4 +1,4 @@
-app/target/**
+server/target/**
 renderer/target/**
 target/**
 ui/target**
