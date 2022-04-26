@@ -142,7 +142,7 @@ impl SceneGraph {
             let child_id = self.create_node();
             self.nodes[node_id]
                 .with_child(child_id)
-                .with_mesh(resources.get_unchecked(*primitive));
+                .with_mesh(resources.get_mesh_unchecked(*primitive));
         }
     }
 

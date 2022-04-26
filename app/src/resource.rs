@@ -1,4 +1,4 @@
-use std::{ops::Deref, sync::Arc};
+use std::{any::TypeId, ops::Deref, sync::Arc};
 
 use renderer::context::RtxContext;
 use vk_utils::device_context::DeviceContext;
@@ -24,6 +24,7 @@ where
     origin: String,
     name: String,
     item: T,
+    type_id: TypeId,
 }
 
 impl<T: GpuResource> Deref for Resource<T> {
@@ -34,13 +35,14 @@ impl<T: GpuResource> Deref for Resource<T> {
     }
 }
 
-impl<T: GpuResource> Resource<T> {
+impl<T: GpuResource + 'static> Resource<T> {
     pub fn new(uid: usize, origin: &str, name: &str, data: T) -> Self {
         Self {
             uid,
             item: data,
             origin: origin.to_string(),
             name: name.to_string(),
+            type_id: TypeId::of::<T>(),
         }
     }
 
@@ -48,8 +50,20 @@ impl<T: GpuResource> Resource<T> {
         self.uid
     }
 
+    pub fn origin(&self) -> &str {
+        &self.origin
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     pub fn item(&self) -> &T {
         &self.item
+    }
+
+    pub fn type_id(&self) -> &TypeId {
+        &self.type_id
     }
 
     pub fn prepare(

@@ -8,51 +8,66 @@ use renderer::gpu_scene::{GpuTexture, Mesh};
 use vk_utils::device_context::DeviceContext;
 
 use crate::image_resource::TextureImageData;
-use crate::material_resource::Material;
-use crate::mesh_resource;
+use crate::material_resource::{Material, MaterialResource};
+use crate::mesh_resource::{self, MeshResource};
 use crate::resource::{GpuResource, Resource};
 
 static GLOBAL_CPU_RESOURCE_ID: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Default)]
 pub struct Resources {
-    pub data: HashMap<TypeId, HashMap<usize, Arc<dyn Any>>>,
+    pub meshes: HashMap<usize, Arc<Resource<MeshResource>>>,
+    pub materials: HashMap<usize, Arc<Resource<Material>>>,
+    pub textures: HashMap<usize, Arc<Resource<TextureImageData>>>,
 }
 
 impl Resources {
-    pub fn add<T: 'static + GpuResource>(
+    pub fn add_mesh(
         &mut self,
         origin: &str,
         name: &str,
-        resource: T,
-    ) -> Arc<Resource<T>> {
-        let type_id = TypeId::of::<T>();
-        if let Some(map) = self.data.get_mut(&type_id) {
-            let uid = GLOBAL_CPU_RESOURCE_ID.fetch_add(1, Ordering::SeqCst);
-            let any: Arc<dyn Any> =
-                Arc::new(Arc::new(Resource::<T>::new(uid, origin, name, resource)));
-            map.insert(uid, any.clone());
-            map.get(&uid)
-                .unwrap()
-                .downcast_ref::<Arc<Resource<T>>>()
-                .unwrap()
-                .clone()
-        } else {
-            self.data.insert(type_id, HashMap::new());
-            self.add(origin, name, resource)
-        }
+        resource: MeshResource,
+    ) -> Arc<Resource<MeshResource>> {
+        let uid = GLOBAL_CPU_RESOURCE_ID.fetch_add(1, Ordering::SeqCst);
+        let mesh = Arc::new(Resource::<MeshResource>::new(uid, origin, name, resource));
+        self.meshes.insert(uid, mesh.clone());
+        mesh
     }
 
-    pub fn get_unchecked<T: 'static + GpuResource>(&self, uid: usize) -> Arc<Resource<T>> {
-        let type_id = TypeId::of::<T>();
-        self.data
-            .get(&type_id)
-            .unwrap()
-            .get(&uid)
-            .unwrap()
-            .downcast_ref::<Arc<Resource<T>>>()
-            .unwrap()
-            .clone()
+    pub fn add_texture(
+        &mut self,
+        origin: &str,
+        name: &str,
+        resource: TextureImageData,
+    ) -> Arc<Resource<TextureImageData>> {
+        let uid = GLOBAL_CPU_RESOURCE_ID.fetch_add(1, Ordering::SeqCst);
+        let texture = Arc::new(Resource::<TextureImageData>::new(
+            uid, origin, name, resource,
+        ));
+        self.textures.insert(uid, texture.clone());
+        texture
+    }
+
+    pub fn add_material(
+        &mut self,
+        origin: &str,
+        name: &str,
+        resource: Material,
+    ) -> Arc<Resource<Material>> {
+        let uid = GLOBAL_CPU_RESOURCE_ID.fetch_add(1, Ordering::SeqCst);
+        let material = Arc::new(Resource::<Material>::new(uid, origin, name, resource));
+        self.materials.insert(uid, material.clone());
+        material
+    }
+
+    pub fn get_mesh_unchecked(&self, uid: usize) -> Arc<Resource<MeshResource>> {
+        self.meshes.get(&uid).unwrap().clone()
+    }
+    pub fn get_texture_unchecked(&self, uid: usize) -> Arc<Resource<TextureImageData>> {
+        self.textures.get(&uid).unwrap().clone()
+    }
+    pub fn get_material_unchecked(&self, uid: usize) -> Arc<Resource<Material>> {
+        self.materials.get(&uid).unwrap().clone()
     }
 }
 

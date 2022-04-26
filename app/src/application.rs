@@ -45,12 +45,12 @@ impl Model {
             current_scene: None,
             has_new_frame: false,
             broadcasters: Broadcasters::new(),
-            project: Project::new("Untitled Scene"),
+            project: Project::tmp(),
         }
     }
 
     pub fn new_project(&mut self, name: &str) {
-        self.project = Project::new(name)
+        self.project = Project::new(name).unwrap()
     }
 
     pub fn build_scene(&mut self) -> bool {

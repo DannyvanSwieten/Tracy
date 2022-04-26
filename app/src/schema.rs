@@ -279,6 +279,17 @@ impl Mutation {
         Ok(model.build_scene())
     }
 
+    async fn new_project(&self, context: &Context<'_>, name: String) -> Result<bool> {
+        let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
+        model.new_project(&name);
+        Ok(true)
+    }
+
+    async fn import(&self, context: &Context<'_>, path: String) -> Result<Option<usize>> {
+        let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
+        Ok(model.project.import(&path))
+    }
+
     async fn render(&self, context: &Context<'_>, batches: u32) -> Result<bool> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
         model.render(batches);

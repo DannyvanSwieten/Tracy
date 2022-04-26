@@ -32,12 +32,13 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
                 gltf::image::Format::R16G16B16 => ash::vk::Format::R16G16B16_SFLOAT,
                 gltf::image::Format::R16G16B16A16 => ash::vk::Format::R16G16B16A16_SFLOAT,
             };
+
             image_map.insert(
                 image_source.index(),
-                resources.add(
-                    "",
+                resources.add_texture(
+                    &(path.to_string() + "#" + &image_source.index().to_string()),
                     image_source.name().unwrap_or("Untitled"),
-                    TextureImageData::new(format, image.width, image.height, &image.pixels),
+                    TextureImageData::new(format, image.width, image.height, &image.pixels, None),
                 ),
             );
         }
@@ -96,7 +97,7 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
         material_map.insert(
             material.index().unwrap(),
             resources
-                .add("", material.name().unwrap_or("Untitled"), mat)
+                .add_material("", material.name().unwrap_or("Untitled"), mat)
                 .uid(),
         );
     }
@@ -143,7 +144,7 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
 
                 if let Some(material_id) = primitive.material().index() {
                     resources
-                        .add(
+                        .add_mesh(
                             "",
                             mesh.name().unwrap_or("Untitled"),
                             MeshResource::new(
@@ -152,16 +153,17 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
                                 normals,
                                 tangents,
                                 tex_coords,
-                                resources.get_unchecked::<Material>(
+                                resources.get_material_unchecked(
                                     *material_map.get(&material_id).unwrap(),
                                 ),
                             ),
                         )
                         .uid()
                 } else {
-                    let material = resources.add("", "Default Material", Material::default());
+                    let material =
+                        resources.add_material("", "Default Material", Material::default());
                     resources
-                        .add(
+                        .add_mesh(
                             "",
                             mesh.name().unwrap_or("Untitled"),
                             MeshResource::new(
@@ -218,13 +220,13 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
                     let child_id = scene_graph.create_node();
                     scene_graph
                         .node_mut(child_id)
-                        .with_mesh(resources.get_unchecked(*primitive));
+                        .with_mesh(resources.get_mesh_unchecked(*primitive));
                     scene_graph.node_mut(node_id).with_child(child_id);
                 }
             } else {
                 scene_graph
                     .node_mut(node_id)
-                    .with_mesh(resources.get_unchecked(primitives[0]));
+                    .with_mesh(resources.get_mesh_unchecked(primitives[0]));
             }
         }
     }
@@ -240,7 +242,7 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
             for id in ids {
                 scene_graph
                     .node_mut(id)
-                    .with_mesh(resources.get_unchecked(primitives[0]));
+                    .with_mesh(resources.get_mesh_unchecked(primitives[0]));
             }
         }
     }
