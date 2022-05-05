@@ -74,25 +74,22 @@ impl GpuResource for Material {
         );
 
         if let Some(base_color_texture) = &self.albedo_map {
-            mat = mat.with_base_color_texture(
-                cache.get_texture(base_color_texture.uid()).unwrap().clone(),
-            )
+            mat = mat
+                .with_base_color_texture(cache.texture(base_color_texture.uid()).unwrap().clone())
         }
         if let Some(metallic_roughness_texture) = &self.metallic_roughness_map {
             mat = mat.with_metallic_roughness_texture(
                 cache
-                    .get_texture(metallic_roughness_texture.uid())
+                    .texture(metallic_roughness_texture.uid())
                     .unwrap()
                     .clone(),
             )
         }
         if let Some(emission_texture) = &self.emission_map {
-            mat = mat
-                .with_emission_texture(cache.get_texture(emission_texture.uid()).unwrap().clone())
+            mat = mat.with_emission_texture(cache.texture(emission_texture.uid()).unwrap().clone())
         }
         if let Some(normal_texture) = &self.emission_map {
-            mat =
-                mat.with_emission_texture(cache.get_texture(normal_texture.uid()).unwrap().clone())
+            mat = mat.with_emission_texture(cache.texture(normal_texture.uid()).unwrap().clone())
         }
 
         mat

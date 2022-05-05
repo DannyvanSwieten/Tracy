@@ -46,6 +46,7 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
 
     let mut mesh_map: HashMap<usize, Vec<usize>> = HashMap::new();
     let mut material_map: HashMap<usize, usize> = HashMap::new();
+    let mut primitive_material_map: HashMap<usize, usize> = HashMap::new();
 
     for material in document.materials() {
         let m = material.pbr_metallic_roughness();
@@ -143,32 +144,21 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
                     };
 
                 if let Some(material_id) = primitive.material().index() {
+                    primitive_material_map.insert(primitive.index(), material_id);
+
                     resources
                         .add_mesh(
                             "",
                             mesh.name().unwrap_or("Untitled"),
-                            MeshResource::new(
-                                indices,
-                                vertices,
-                                normals,
-                                tangents,
-                                tex_coords,
-                                resources.get_material_unchecked(
-                                    *material_map.get(&material_id).unwrap(),
-                                ),
-                            ),
+                            MeshResource::new(indices, vertices, normals, tangents, tex_coords),
                         )
                         .uid()
                 } else {
-                    let material =
-                        resources.add_material("", "Default Material", Material::default());
                     resources
                         .add_mesh(
                             "",
                             mesh.name().unwrap_or("Untitled"),
-                            MeshResource::new(
-                                indices, vertices, normals, tangents, tex_coords, material,
-                            ),
+                            MeshResource::new(indices, vertices, normals, tangents, tex_coords),
                         )
                         .uid()
                 }
@@ -221,7 +211,19 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
                     scene_graph
                         .node_mut(child_id)
                         .with_mesh(resources.get_mesh_unchecked(*primitive));
-                    scene_graph.node_mut(node_id).with_child(child_id);
+
+                    let material = if let Some(material_id) = primitive_material_map.get(primitive)
+                    {
+                        let id = material_map.get(material_id).unwrap();
+                        resources.get_material_unchecked(*id)
+                    } else {
+                        resources.default_material()
+                    };
+
+                    scene_graph
+                        .node_mut(node_id)
+                        .with_material(material)
+                        .with_child(child_id);
                 }
             } else {
                 scene_graph

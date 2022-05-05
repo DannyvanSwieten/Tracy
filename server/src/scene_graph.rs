@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
+    material_resource::Material,
     mesh_resource::MeshResource,
     resource::Resource,
     resources::{GpuResourceCache, Resources},
@@ -23,6 +24,7 @@ pub struct Entity {
     local_transform: Mat4x4,
     global_transform: Mat4x4,
     mesh: Option<Arc<Resource<MeshResource>>>,
+    material: Option<Arc<Resource<Material>>>,
     children: Vec<usize>,
 }
 
@@ -32,6 +34,7 @@ impl Entity {
             local_transform: Mat4x4::new_nonuniform_scaling(&vec3(1.0, 1.0, 1.0)),
             global_transform: Mat4x4::new_nonuniform_scaling(&vec3(1.0, 1.0, 1.0)),
             mesh: None,
+            material: None,
             children: Vec::new(),
         }
     }
@@ -74,6 +77,10 @@ impl Entity {
 
     pub fn with_mesh(&mut self, mesh: Arc<Resource<MeshResource>>) -> &mut Self {
         self.mesh = Some(mesh);
+        self
+    }
+    pub fn with_material(&mut self, material: Arc<Resource<Material>>) -> &mut Self {
+        self.material = Some(material);
         self
     }
 
@@ -185,15 +192,23 @@ impl SceneGraph {
     pub fn build(
         &mut self,
         gpu_cache: &mut GpuResourceCache,
+        cpu_cache: &Resources,
         parent_transform: Mat4x4,
         device: &DeviceContext,
         rtx: &RtxContext,
     ) -> Scene {
-        self.transform(&parent_transform);
         let mut scene = Scene::default();
+        if self.nodes.len() == 0 {
+            return scene;
+        }
+        self.transform(&parent_transform);
         for node in &self.nodes {
             if let Some(mesh) = &node.mesh {
-                let gpu_mat = gpu_cache.add_material(device, rtx, &mesh.material);
+                let gpu_mat = if let Some(material) = &node.material {
+                    gpu_cache.add_material(device, rtx, &material)
+                } else {
+                    gpu_cache.add_material(device, rtx, &cpu_cache.default_material())
+                };
                 let gpu_mesh = gpu_cache.add_mesh(device, rtx, mesh);
                 let mut shape = Shape::new(gpu_mesh);
                 shape.create_instance(gpu_mat, &node.global_transform);

@@ -12,12 +12,14 @@ use vk_utils::device_context::DeviceContext;
 
 pub struct Broadcasters {
     pub scene_loaded_broadcaster: tokio::sync::broadcast::Sender<schema::Scene>,
+    pub new_project_created: tokio::sync::broadcast::Sender<bool>,
 }
 
 impl Broadcasters {
     pub fn new() -> Self {
         Self {
             scene_loaded_broadcaster: tokio::sync::broadcast::channel(16).0,
+            new_project_created: tokio::sync::broadcast::channel(16).0,
         }
     }
 }
@@ -38,7 +40,7 @@ impl Model {
     pub fn new(renderer: Renderer) -> Self {
         Self {
             renderer,
-            cpu_resource_cache: Resources::default(),
+            cpu_resource_cache: Resources::default().with_default_material(),
             gpu_resource_cache: GpuResourceCache::default(),
             built_scenes: Vec::new(),
             cached_frames: Vec::new(),
@@ -56,6 +58,7 @@ impl Model {
     pub fn build_scene(&mut self) -> bool {
         let scene = self.project.scene_graph.build(
             &mut self.gpu_resource_cache,
+            &self.cpu_resource_cache,
             nalgebra_glm::Mat4x4::identity(),
             &self.renderer.device,
             &self.renderer.rtx,

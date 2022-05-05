@@ -11,6 +11,7 @@ pub mod resources;
 pub mod scene_graph;
 pub mod schema;
 pub mod server;
+pub mod simple_shapes;
 
 use load_scene::load_scene_gltf;
 use nalgebra_glm::{vec3, Mat4};
@@ -21,14 +22,17 @@ use winit::{
 };
 
 use ash::extensions::ext::DebugUtils;
-use renderer::renderer::Renderer;
+use renderer::{geometry::Position, renderer::Renderer};
 use vk_utils::vulkan::Vulkan;
 
 use futures::lock::Mutex;
 use std::{rc::Rc, sync::Arc};
 use winit_blit::{NativeFormat, PixelBufferTyped};
 
-use crate::resources::{GpuResourceCache, Resources};
+use crate::{
+    resources::{GpuResourceCache, Resources},
+    simple_shapes::MeshBuilder,
+};
 
 type ServerContext = Arc<Mutex<application::Model>>;
 fn main() {
@@ -59,6 +63,7 @@ fn main() {
         let mut scenes = load_scene_gltf(&args[2], &mut cpu_cache).unwrap();
         let gpu_scene = scenes[0].build(
             &mut gpu_cache,
+            &cpu_cache,
             Mat4::new_nonuniform_scaling(&vec3(1.0, 1.0, 1.0)),
             &renderer.device,
             &renderer.rtx,

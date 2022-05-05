@@ -1,10 +1,4 @@
-use std::{
-    ops::{Deref, DerefMut},
-    rc::Rc,
-    sync::atomic::{AtomicUsize, Ordering},
-};
-
-static GLOBAL_RESOURCE_ID: AtomicUsize = AtomicUsize::new(0);
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone)]
 pub struct Resource<T> {

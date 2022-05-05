@@ -1,10 +1,13 @@
+use crate::mesh_resource::MeshResource;
 use crate::scene_graph::{Entity, SceneGraph};
+use crate::simple_shapes::create_triangle;
 
 use super::application::Model;
 use super::load_scene_gltf;
-use async_graphql::{Context, Object, Result, Subscription};
+use async_graphql::{Context, EmptySubscription, Object, Result, Subscription};
 use futures::lock::Mutex;
 use futures::stream::Stream;
+use poem::web::headers::AccessControlAllowOrigin;
 use std::sync::Arc;
 use tokio_stream::StreamExt;
 
@@ -132,6 +135,18 @@ pub struct Scene {
     root: usize,
 }
 
+#[derive(Clone)]
+pub struct Project {
+    pub name: String,
+}
+
+#[Object]
+impl Project {
+    async fn name(&self, _context: &Context<'_>) -> Result<&String> {
+        Ok(&self.name)
+    }
+}
+
 impl Scene {
     pub fn new(scene: &SceneGraph) -> Self {
         Self {
@@ -183,6 +198,14 @@ impl Sub {
             tokio_stream::wrappers::BroadcastStream::new(rx).filter_map(|result| result.ok());
         Ok(stream)
     }
+
+    async fn new_project_created(&self, ctx: &Context<'_>) -> Result<impl Stream<Item = bool>> {
+        let model = ctx.data::<Arc<Mutex<Model>>>()?.lock().await;
+        let rx = model.broadcasters.new_project_created.subscribe();
+        let stream =
+            tokio_stream::wrappers::BroadcastStream::new(rx).filter_map(|result| result.ok());
+        Ok(stream)
+    }
 }
 
 pub struct Query;
@@ -193,6 +216,14 @@ impl Query {
         let model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
         let scene = Scene::new(&model.project.scene_graph);
         Ok(scene)
+    }
+
+    async fn project(&self, context: &Context<'_>) -> Result<Project> {
+        let model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
+        let project = Project {
+            name: model.project.name.clone(),
+        };
+        Ok(project)
     }
 
     async fn width(&self, context: &Context<'_>) -> Result<u32> {
@@ -226,6 +257,20 @@ pub struct Mutation {}
 
 #[Object]
 impl Mutation {
+    async fn create_basic_shape(&self, context: &Context<'_>, shape: String) -> Result<bool> {
+        let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
+        let mesh_resource = create_triangle(&mut model.cpu_resource_cache);
+        let node_id = model.project.scene_graph.create_node();
+        let material = model.cpu_resource_cache.default_material();
+        model
+            .project
+            .scene_graph
+            .node_mut(node_id)
+            .with_mesh(mesh_resource)
+            .with_material(material);
+        Ok(true)
+    }
+
     async fn look_at(&self, context: &Context<'_>, x: f32, y: f32, z: f32) -> Result<bool> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
         model.renderer.set_camera_target(x, y, z);
@@ -297,10 +342,10 @@ impl Mutation {
     }
 }
 
-pub type Schema = async_graphql::Schema<Query, Mutation, Sub>;
+pub type Schema = async_graphql::Schema<Query, Mutation, EmptySubscription>;
 
 pub fn new_schema(model: Arc<Mutex<Model>>) -> Schema {
-    Schema::build(Query, Mutation {}, Sub {})
+    Schema::build(Query, Mutation {}, EmptySubscription::default())
         .data(model)
         .finish()
 }

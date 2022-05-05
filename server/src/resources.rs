@@ -19,6 +19,7 @@ pub struct Resources {
     pub meshes: HashMap<usize, Arc<Resource<MeshResource>>>,
     pub materials: HashMap<usize, Arc<Resource<Material>>>,
     pub textures: HashMap<usize, Arc<Resource<TextureImageData>>>,
+    default_material_id: usize,
 }
 
 impl Resources {
@@ -60,6 +61,20 @@ impl Resources {
         material
     }
 
+    pub fn default_material(&self) -> Arc<Resource<Material>> {
+        self.get_material_unchecked(self.default_material_id)
+    }
+
+    pub fn with_default_material(mut self) -> Self {
+        self.set_default_material(Material::default());
+        self
+    }
+
+    pub fn set_default_material(&mut self, resource: Material) {
+        let mat = self.add_material("Internal", "Default", resource);
+        self.default_material_id = mat.uid();
+    }
+
     pub fn get_mesh_unchecked(&self, uid: usize) -> Arc<Resource<MeshResource>> {
         self.meshes.get(&uid).unwrap().clone()
     }
@@ -79,6 +94,8 @@ pub struct GpuResourceCache {
     pub textures: HashMap<usize, Arc<renderer::resource::Resource<GpuTexture>>>,
     pub samplers: HashMap<usize, Arc<renderer::resource::Resource<ash::vk::Sampler>>>,
     pub materials: HashMap<usize, Arc<renderer::resource::Resource<renderer::material::Material>>>,
+
+    default_material_id: usize,
 }
 
 impl GpuResourceCache {
@@ -142,11 +159,15 @@ impl GpuResourceCache {
         self.textures.get(&texture.uid()).unwrap().clone()
     }
 
-    pub fn get_texture(
+    pub fn texture(&self, uid: usize) -> Option<&Arc<renderer::resource::Resource<GpuTexture>>> {
+        self.textures.get(&uid)
+    }
+
+    pub fn material(
         &self,
         uid: usize,
-    ) -> Option<&Arc<renderer::resource::Resource<GpuTexture>>> {
-        self.textures.get(&uid)
+    ) -> Option<&Arc<renderer::resource::Resource<renderer::material::Material>>> {
+        self.materials.get(&uid)
     }
 }
 

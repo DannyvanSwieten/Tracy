@@ -29,7 +29,7 @@
             //     "720"
             // ],
             "args": ["--server",
-                    "127.0.0.1:7000",
+                    "localhost:7000",
                     "1280", "720"
                 ],
             "stopOnEntry": false,
@@ -47,13 +47,20 @@
             // ],
             "args": [
                 "--server",
-                "127.0.0.1:7000",
+                "localhost:7000",
                 "1920",
                 "1080"
             ],
             "stopOnEntry": false,
             "cwd": "${workspaceFolder}",
             "console": "externalTerminal"
-        }
+        },
+        {
+            "type": "pwa-chrome",
+            "request": "launch",
+            "name": "Launch Chrome against localhost",
+            "url": "http://localhost:3000",
+            "webRoot": "${workspaceFolder}"
+          }
     ]
 }

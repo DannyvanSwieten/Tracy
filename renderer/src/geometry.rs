@@ -10,7 +10,7 @@ use ash::vk::{
     GeometryInstanceFlagsKHR, GeometryTypeKHR, IndexType, MemoryPropertyFlags,
 };
 use ash::Device;
-use glm::{Mat4x3, Mat4x4};
+use glm::Mat4x3;
 use vk_utils::buffer_resource::BufferResource;
 use vk_utils::device_context::DeviceContext;
 

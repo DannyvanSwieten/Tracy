@@ -8,7 +8,7 @@ use renderer::{
 use vk_utils::device_context::DeviceContext;
 
 use crate::{
-    material_resource::{Material, MaterialResource},
+    material_resource::Material,
     resource::{GpuResource, Resource},
     resources::GpuResourceCache,
 };
@@ -19,7 +19,6 @@ pub struct MeshResource {
     pub normals: Vec<Normal>,
     pub tangents: Vec<Tangent>,
     pub tex_coords: Vec<Texcoord>,
-    pub material: Arc<Resource<Material>>,
 }
 
 impl MeshResource {
@@ -29,7 +28,6 @@ impl MeshResource {
         normals: Vec<Normal>,
         tangents: Vec<Tangent>,
         tex_coords: Vec<Texcoord>,
-        material: Arc<Resource<Material>>,
     ) -> Self {
         Self {
             indices,
@@ -37,13 +35,7 @@ impl MeshResource {
             normals,
             tangents,
             tex_coords,
-            material,
         }
-    }
-
-    pub fn with_material(mut self, material: Arc<Resource<Material>>) -> Self {
-        self.material = material;
-        self
     }
 }
 
