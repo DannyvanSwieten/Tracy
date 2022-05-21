@@ -1,30 +1,24 @@
-use crate::mesh_resource::MeshResource;
 use crate::scene_graph::{Entity, SceneGraph};
-use crate::simple_shapes::create_triangle;
+use crate::simple_shapes::{create_cube, create_triangle, create_xz_plane};
 
 use super::application::Model;
 use super::load_scene_gltf;
-use async_graphql::{Context, EmptySubscription, Object, Result, Subscription};
+use async_graphql::{Context, Object, Result, Subscription};
 use futures::lock::Mutex;
 use futures::stream::Stream;
-use poem::web::headers::AccessControlAllowOrigin;
+use renderer::geometry::{Normal, Position};
 use std::sync::Arc;
 use tokio_stream::StreamExt;
 
 #[derive(Clone)]
 pub struct Mesh {
     pub name: String,
-    pub material: Material,
 }
 
 #[Object]
 impl Mesh {
     async fn name(&self, _context: &Context<'_>) -> Result<&String> {
         Ok(&self.name)
-    }
-
-    async fn material(&self, _context: &Context<'_>) -> Result<&Material> {
-        Ok(&self.material)
     }
 }
 
@@ -38,16 +32,10 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn new(id: usize, scene: &SceneGraph, actor: &Entity) -> Self {
-        let mesh = if let Some(meshes) = actor.mesh() {
+    pub(crate) fn new(id: usize, scene: &SceneGraph, actor: &Entity) -> Self {
+        let mesh = if let Some(mesh) = actor.mesh() {
             Some(Mesh {
-                name: "Untitled".to_string(),
-                material: Material::new(
-                    &"Untitled".to_string(),
-                    &Material {
-                        name: "".to_string(),
-                    },
-                ),
+                name: mesh.name().to_string(),
             })
         } else {
             None
@@ -73,7 +61,7 @@ impl Node {
         Ok(&self.camera)
     }
 
-    async fn meshes(&self, _context: &Context<'_>) -> Result<&Option<Mesh>> {
+    async fn mesh(&self, _context: &Context<'_>) -> Result<&Option<Mesh>> {
         Ok(&self.mesh)
     }
 
@@ -206,6 +194,14 @@ impl Sub {
             tokio_stream::wrappers::BroadcastStream::new(rx).filter_map(|result| result.ok());
         Ok(stream)
     }
+
+    async fn node_added(&self, ctx: &Context<'_>) -> Result<impl Stream<Item = Node>> {
+        let model = ctx.data::<Arc<Mutex<Model>>>()?.lock().await;
+        let rx = model.broadcasters.node_added.subscribe();
+        let stream =
+            tokio_stream::wrappers::BroadcastStream::new(rx).filter_map(|result| result.ok());
+        Ok(stream)
+    }
 }
 
 pub struct Query;
@@ -236,7 +232,7 @@ impl Query {
         Ok(model.renderer.output_height)
     }
 
-    async fn image(&self, context: &Context<'_>) -> Result<Vec<u8>> {
+    async fn image(&self, context: &Context<'_>) -> Result<Vec<u32>> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
         Ok(model.download_image())
     }
@@ -259,16 +255,53 @@ pub struct Mutation {}
 impl Mutation {
     async fn create_basic_shape(&self, context: &Context<'_>, shape: String) -> Result<bool> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        let mesh_resource = create_triangle(&mut model.cpu_resource_cache);
-        let node_id = model.project.scene_graph.create_node();
-        let material = model.cpu_resource_cache.default_material();
-        model
-            .project
-            .scene_graph
-            .node_mut(node_id)
-            .with_mesh(mesh_resource)
-            .with_material(material);
-        Ok(true)
+        let mesh_resource = if shape == "Triangle" {
+            Some(
+                model
+                    .cpu_resource_cache
+                    .add_mesh("Internal", &shape, create_triangle()),
+            )
+        } else if shape == "Cube" {
+            Some(
+                model
+                    .cpu_resource_cache
+                    .add_mesh("Internal", &shape, create_cube(1.0, 1.0, 1.0)),
+            )
+        } else {
+            Some(model.cpu_resource_cache.add_mesh(
+                "Internal",
+                &shape,
+                create_xz_plane(
+                    1000.0,
+                    1000.0,
+                    Position::new(0.0, -1.0, 0.0),
+                    Normal::new(0.0, 1.0, 0.0),
+                ),
+            ))
+        };
+        if let Some(mesh) = mesh_resource {
+            let node_id = model.project.scene_graph.create_node();
+            let material = model.cpu_resource_cache.default_material();
+            model
+                .project
+                .scene_graph
+                .node_mut(node_id)
+                .with_mesh(mesh)
+                .with_material(material);
+
+            match model.broadcasters.node_added.send(Node::new(
+                node_id,
+                &model.project.scene_graph,
+                model.project.scene_graph.node(node_id),
+            )) {
+                Ok(subscribers) => println!("{}", subscribers),
+                Err(error) => println!("{}", error),
+            }
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     async fn look_at(&self, context: &Context<'_>, x: f32, y: f32, z: f32) -> Result<bool> {
@@ -342,10 +375,10 @@ impl Mutation {
     }
 }
 
-pub type Schema = async_graphql::Schema<Query, Mutation, EmptySubscription>;
+pub type Schema = async_graphql::Schema<Query, Mutation, Sub>;
 
 pub fn new_schema(model: Arc<Mutex<Model>>) -> Schema {
-    Schema::build(Query, Mutation {}, EmptySubscription::default())
+    Schema::build(Query, Mutation {}, Sub {})
         .data(model)
         .finish()
 }

@@ -3,6 +3,8 @@ import SvgIcon from '@mui/material/SvgIcon';
 import { alpha, styled } from '@mui/material/styles';
 import TreeView from '@mui/lab/TreeView';
 import TreeItem, { treeItemClasses } from '@mui/lab/TreeItem';
+import { useSubscription } from '@apollo/client';
+import NODE_ADDED_SUBSCRIPTION from '../gql/subscriptions/project_subscriptions'
 
 function MinusSquare(props) {
     return (
@@ -55,6 +57,11 @@ const StyledTreeItem = styled((props) => (
 }));
 
 export default function CustomizedTreeView() {
+
+    const { data, error, loading } = useSubscription(
+        NODE_ADDED_SUBSCRIPTION,
+    );
+
     return (
         <TreeView
             aria-label="customized"
@@ -64,18 +71,8 @@ export default function CustomizedTreeView() {
             defaultEndIcon={<CloseSquare />}
             sx={{ height: 264, flexGrow: 1, maxWidth: 300, overflowY: 'auto' }}
         >
-            <StyledTreeItem nodeId="1" label="Car">
-                <StyledTreeItem nodeId="2" label="Body" />
-                <StyledTreeItem nodeId="3" label="Wheels">
-                    <StyledTreeItem nodeId="6" label="Wheel 1" />
-                    <StyledTreeItem nodeId="7" label="Wheel 2" />
-                    <StyledTreeItem nodeId="8" label="Wheel 3" />
-                    <StyledTreeItem nodeId="9" label="Wheel 4" />
-                </StyledTreeItem>
-                <StyledTreeItem nodeId="4" label="Headlights">
-                    <StyledTreeItem nodeId="5" label="Light 1" />
-                    <StyledTreeItem nodeId="10" label="Light 2" />
-                </StyledTreeItem>
+            <StyledTreeItem nodeId="1" label="Root">
+                <StyledTreeItem nodeId="2" label={data ? data.nodeAdded.mesh.name : "None"} />
             </StyledTreeItem>
         </TreeView>
     );

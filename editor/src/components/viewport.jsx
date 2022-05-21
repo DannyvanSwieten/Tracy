@@ -11,7 +11,7 @@ export default function ViewPort(){
     const [render, {renderData, renderLoading, renderError}] = useMutation(RENDER);
     function doIt(item){
         createBasicShape({ variables: { shape: item.name } });
-        render({ variables: { batches: 8 } })
+        render({ variables: { batches: 64 } })
     }
     const [{ isOver }, dropRef] = useDrop({
         accept: 'mesh',

@@ -7,6 +7,7 @@ import PROJECT_QUERY from '../gql/queries/project_queries';
 import { ApolloClient, useQuery } from '@apollo/client';
 import Typography from '@mui/material/Typography';
 import Modal from '@mui/material/Modal';
+import CustomizedTreeView from './scene_graph_tree_view';
 
 
 export default function Middle(props) {
@@ -44,7 +45,7 @@ export default function Middle(props) {
             >
                 <Box sx={style}>
                     <Typography id="modal-modal-title" variant="h6" component="h2">
-                        {error.message}
+                        {"Server not available."}
                     </Typography>
                 </Box>
             </Modal>
@@ -60,7 +61,7 @@ export default function Middle(props) {
                 <AssetBrowser />
             </Box>
             <ViewPort />
-            <Box textAlign='center' width='20%' height='100%' bgcolor='#272727'>{data.project.name}</Box>
+            <CustomizedTreeView/>
         </Stack>
     )
 }

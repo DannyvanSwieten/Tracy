@@ -135,7 +135,7 @@ void main()
     float tmin = 0.1;
     float tmax = 1000.0;
     ray.hit = true;
-    vec3 L = normalize(vec3(-1, 1, 0.001));
+    vec3 L = normalize(vec3(-1, 1, 1));
     vec3 P = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
     traceRayEXT(topLevelAS, 
               rayFlags, 
@@ -154,7 +154,7 @@ void main()
     // Evaluate direct lighting
     if(!ray.hit)
     {
-        ray.direct = evaluate_disney_bsdf(L, wo, N, X, Y, base_color, roughness, metal, anisotropy) * max(0.0, dot(L, N));
+        ray.direct = evaluate_disney_bsdf(L, wo, N, X, Y, base_color, roughness, metal, anisotropy) * max(0.0, dot(L, N)) * vec3(0.992, 0.72, 0.075) * 5;
     }
 
     // Evaluate indirect lighting

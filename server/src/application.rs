@@ -13,6 +13,7 @@ use vk_utils::device_context::DeviceContext;
 pub struct Broadcasters {
     pub scene_loaded_broadcaster: tokio::sync::broadcast::Sender<schema::Scene>,
     pub new_project_created: tokio::sync::broadcast::Sender<bool>,
+    pub node_added: tokio::sync::broadcast::Sender<schema::Node>,
 }
 
 impl Broadcasters {
@@ -20,6 +21,7 @@ impl Broadcasters {
         Self {
             scene_loaded_broadcaster: tokio::sync::broadcast::channel(16).0,
             new_project_created: tokio::sync::broadcast::channel(16).0,
+            node_added: tokio::sync::broadcast::channel(16).0,
         }
     }
 }

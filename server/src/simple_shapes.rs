@@ -105,6 +105,152 @@ impl MeshBuilder {
         SurfaceBuilder::new(self)
     }
 
+    pub fn add_cube(self, width: f32, height: f32, depth: f32) -> SurfaceBuilder {
+        self.add_xy_plane(
+            width,
+            height,
+            Position::new(0.0, 0.0, -depth / 2.0),
+            Normal::new(0.0, 0.0, 1.0),
+        )
+        .done_face()
+        .add_xy_plane(
+            width,
+            height,
+            Position::new(0.0, 0.0, depth / 2.0),
+            Normal::new(0.0, 0.0, -1.0),
+        )
+        .done_face()
+        .add_xz_plane(
+            width,
+            height,
+            Position::new(0.0, -height / 2.0, 0.0),
+            Normal::new(0.0, -1.0, 0.0),
+        )
+        .done_face()
+        .add_xz_plane(
+            width,
+            height,
+            Position::new(0.0, height / 2.0, 0.0),
+            Normal::new(0.0, 1.0, 0.0),
+        )
+        .done_face()
+        .add_yz_plane(
+            width,
+            height,
+            Position::new(-width / 2.0, 0.0, 0.0),
+            Normal::new(-1.0, 0.0, 0.0),
+        )
+        .done_face()
+        .add_yz_plane(
+            width,
+            height,
+            Position::new(width / 2.0, 0.0, 0.0),
+            Normal::new(1.0, 0.0, 0.0),
+        )
+    }
+
+    pub fn add_xy_plane(
+        self,
+        width: f32,
+        height: f32,
+        position: Position,
+        normal: Normal,
+    ) -> SurfaceBuilder {
+        let left = -width / 2.0;
+        let right = width / 2.0;
+        let bttm = -height / 2.0;
+        let top = height / 2.0;
+        self.create_surface()
+            .with_vertices(vec![
+                vec3(left, bttm, 0.0) + position,
+                vec3(left, top, 0.0) + position,
+                vec3(right, top, 0.0) + position,
+                vec3(right, bttm, 0.0) + position,
+            ])
+            .with_indices(vec![0, 2, 1, 0, 3, 2])
+            .with_normals(vec![normal, normal, normal, normal])
+            .with_tangents(vec![
+                vec3(1.0, 0.0, 0.0),
+                vec3(1.0, 0.0, 0.0),
+                vec3(1.0, 0.0, 0.0),
+                vec3(1.0, 0.0, 0.0),
+            ])
+            .with_texcoords(vec![
+                vec2(0.0, 0.0),
+                vec2(0.0, 1.0),
+                vec2(1.0, 1.0),
+                vec2(1.0, 0.0),
+            ])
+    }
+
+    pub fn add_xz_plane(
+        self,
+        width: f32,
+        height: f32,
+        position: Position,
+        normal: Normal,
+    ) -> SurfaceBuilder {
+        let left = -width / 2.0;
+        let right = width / 2.0;
+        let bttm = -height / 2.0;
+        let top = height / 2.0;
+        self.create_surface()
+            .with_vertices(vec![
+                vec3(left, 0.0, bttm) + position,
+                vec3(left, 0.0, top) + position,
+                vec3(right, 0.0, top) + position,
+                vec3(right, 0.0, bttm) + position,
+            ])
+            .with_indices(vec![0, 2, 1, 0, 3, 2])
+            .with_normals(vec![normal, normal, normal, normal])
+            .with_tangents(vec![
+                vec3(1.0, 0.0, 0.0),
+                vec3(1.0, 0.0, 0.0),
+                vec3(1.0, 0.0, 0.0),
+                vec3(1.0, 0.0, 0.0),
+            ])
+            .with_texcoords(vec![
+                vec2(0.0, 0.0),
+                vec2(0.0, 1.0),
+                vec2(1.0, 1.0),
+                vec2(1.0, 0.0),
+            ])
+    }
+
+    pub fn add_yz_plane(
+        self,
+        width: f32,
+        height: f32,
+        position: Position,
+        normal: Normal,
+    ) -> SurfaceBuilder {
+        let left = -width / 2.0;
+        let right = width / 2.0;
+        let bttm = -height / 2.0;
+        let top = height / 2.0;
+        self.create_surface()
+            .with_vertices(vec![
+                vec3(0.0, left, bttm) + position,
+                vec3(0.0, left, top) + position,
+                vec3(0.0, right, top) + position,
+                vec3(0.0, right, bttm) + position,
+            ])
+            .with_indices(vec![0, 2, 1, 0, 3, 2])
+            .with_normals(vec![normal, normal, normal, normal])
+            .with_tangents(vec![
+                vec3(1.0, 0.0, 0.0),
+                vec3(1.0, 0.0, 0.0),
+                vec3(1.0, 0.0, 0.0),
+                vec3(1.0, 0.0, 0.0),
+            ])
+            .with_texcoords(vec![
+                vec2(0.0, 0.0),
+                vec2(0.0, 1.0),
+                vec2(1.0, 1.0),
+                vec2(1.0, 0.0),
+            ])
+    }
+
     pub(crate) fn add_surface(
         mut self,
         indices: Vec<u32>,
@@ -122,47 +268,46 @@ impl MeshBuilder {
     }
 }
 
-pub fn create_plane(
-    resource_cache: &mut Resources,
+pub fn create_xy_plane(
     width: f32,
     height: f32,
-) -> Arc<Resource<MeshResource>> {
-    let left = -width / 2.0;
-    let right = width / 2.0;
-    let bttm = -height / 2.0;
-    let top = height / 2.0;
+    position: Position,
+    normal: Normal,
+) -> MeshResource {
     let (indices, positions, normals, tangents, texcoords) = MeshBuilder::default()
-        .create_surface()
-        .with_vertices(vec![
-            vec3(left, 0.0, bttm),
-            vec3(left, 0.0, top),
-            vec3(right, 0.0, top),
-            vec3(right, 0.0, bttm),
-        ])
-        .with_indices(vec![0, 1, 2, 0, 2, 3])
-        .with_normals(vec![
-            vec3(0.0, 1.0, 0.0),
-            vec3(0.0, 1.0, 0.0),
-            vec3(0.0, 1.0, 0.0),
-            vec3(0.0, 1.0, 0.0),
-        ])
-        .with_tangents(vec![
-            vec3(1.0, 0.0, 0.0),
-            vec3(1.0, 0.0, 0.0),
-            vec3(1.0, 0.0, 0.0),
-            vec3(1.0, 0.0, 0.0),
-        ])
-        .with_texcoords(vec![vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(0.5, 1.0)])
+        .add_xy_plane(width, height, position, normal)
         .done();
 
-    resource_cache.add_mesh(
-        "Internal",
-        "X/Z Plane",
-        MeshResource::new(indices, positions, normals, tangents, texcoords),
-    )
+    MeshResource::new(indices, positions, normals, tangents, texcoords)
 }
 
-pub fn create_triangle(resource_cache: &mut Resources) -> Arc<Resource<MeshResource>> {
+pub fn create_yz_plane(
+    width: f32,
+    height: f32,
+    position: Position,
+    normal: Normal,
+) -> MeshResource {
+    let (indices, positions, normals, tangents, texcoords) = MeshBuilder::default()
+        .add_yz_plane(width, height, position, normal)
+        .done();
+
+    MeshResource::new(indices, positions, normals, tangents, texcoords)
+}
+
+pub fn create_xz_plane(
+    width: f32,
+    height: f32,
+    position: Position,
+    normal: Normal,
+) -> MeshResource {
+    let (indices, positions, normals, tangents, texcoords) = MeshBuilder::default()
+        .add_xz_plane(width, height, position, normal)
+        .done();
+
+    MeshResource::new(indices, positions, normals, tangents, texcoords)
+}
+
+pub fn create_triangle() -> MeshResource {
     let (indices, positions, normals, tangents, texcoords) = MeshBuilder::default()
         .create_surface()
         .with_vertices(vec![
@@ -184,9 +329,12 @@ pub fn create_triangle(resource_cache: &mut Resources) -> Arc<Resource<MeshResou
         .with_texcoords(vec![vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(0.5, 1.0)])
         .done();
 
-    resource_cache.add_mesh(
-        "Internal",
-        "Triangle",
-        MeshResource::new(indices, positions, normals, tangents, texcoords),
-    )
+    MeshResource::new(indices, positions, normals, tangents, texcoords)
+}
+
+pub fn create_cube(width: f32, height: f32, depth: f32) -> MeshResource {
+    let (indices, positions, normals, tangents, texcoords) =
+        MeshBuilder::default().add_cube(width, height, depth).done();
+
+    MeshResource::new(indices, positions, normals, tangents, texcoords)
 }

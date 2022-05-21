@@ -1,8 +1,8 @@
 import Middle from './middle';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import AppBar from './app_bar';
-import { Box, Stack, Typography } from '@mui/material';
-import { ApolloProvider, useQuery } from '@apollo/client';
+import { Box, Stack } from '@mui/material';
+import { ApolloProvider } from '@apollo/client';
 import { client } from '../gql/gql_client';
 import { DndProvider, useDrag } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'

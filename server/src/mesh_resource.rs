@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use renderer::{
     context::RtxContext,
     geometry::{Normal, Position, Tangent, Texcoord},
@@ -7,11 +5,7 @@ use renderer::{
 };
 use vk_utils::device_context::DeviceContext;
 
-use crate::{
-    material_resource::Material,
-    resource::{GpuResource, Resource},
-    resources::GpuResourceCache,
-};
+use crate::{resource::GpuResource, resources::GpuResourceCache};
 
 pub struct MeshResource {
     pub indices: Vec<u32>,

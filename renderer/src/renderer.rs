@@ -357,7 +357,7 @@ impl Renderer {
             wait_handles: [None, None, None],
             current_frame_index: 0,
 
-            camera_position: Vec3::new(0., 0., 5.),
+            camera_position: Vec3::new(1., 1., 5.),
             camera_target: vec3(0.0, 0.0, 0.0),
             current_batch: 0,
         };
