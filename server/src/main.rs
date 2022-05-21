@@ -25,7 +25,7 @@ use ash::extensions::{
     ext::DebugUtils,
     khr::{Surface, Swapchain},
 };
-use renderer::renderer::Renderer;
+use renderer::gpu_path_tracer::Renderer;
 use vk_utils::vulkan::Vulkan;
 
 use futures::lock::Mutex;

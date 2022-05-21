@@ -5,7 +5,7 @@ use super::schema;
 use super::server::Server;
 use futures::lock::Mutex;
 use renderer::gpu_scene::{Frame, Scene};
-use renderer::renderer::Renderer;
+use renderer::gpu_path_tracer::Renderer;
 use std::rc::Rc;
 use std::sync::Arc;
 use vk_utils::device_context::DeviceContext;
