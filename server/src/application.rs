@@ -62,7 +62,7 @@ impl Model {
             &mut self.gpu_resource_cache,
             &self.cpu_resource_cache,
             nalgebra_glm::Mat4x4::identity(),
-            &self.renderer.device,
+            self.renderer.device.clone(),
             &self.renderer.rtx,
         );
         let frame = self.renderer.build_frame(&scene);

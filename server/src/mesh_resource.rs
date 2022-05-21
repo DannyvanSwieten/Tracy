@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use renderer::{
     context::RtxContext,
     geometry::{Normal, Position, Tangent, Texcoord},
@@ -38,13 +40,13 @@ impl GpuResource for MeshResource {
 
     fn prepare(
         &self,
-        device: &DeviceContext,
+        device: Rc<DeviceContext>,
         rtx: &RtxContext,
         _: &GpuResourceCache,
     ) -> Self::Item {
         // Turn Cpu mesh into Gpu mesh
         Mesh::new(
-            device,
+            device.clone(),
             rtx,
             &self.indices,
             &self.positions,

@@ -1,11 +1,6 @@
-use crate::buffer_resource::BufferResource;
 use crate::gpu::Gpu;
-use crate::image_resource::Image2DResource;
 use crate::queue::QueueHandle;
-use ash::vk::{
-    BufferUsageFlags, DeviceCreateInfoBuilder, DeviceQueueCreateInfo, Format, ImageUsageFlags,
-    MemoryPropertyFlags, QueueFlags,
-};
+use ash::vk::{DeviceCreateInfoBuilder, DeviceQueueCreateInfo, QueueFlags};
 use ash::Device;
 use std::ffi::CStr;
 pub struct DeviceContext {
@@ -74,39 +69,5 @@ impl DeviceContext {
 
     pub fn gpu(&self) -> &Gpu {
         &self.gpu
-    }
-
-    pub fn buffer(
-        &self,
-        size: u64,
-        property_flags: MemoryPropertyFlags,
-        usage: BufferUsageFlags,
-    ) -> BufferResource {
-        BufferResource::new(
-            &self.gpu.memory_properties().memory_properties,
-            self,
-            size,
-            property_flags,
-            usage,
-        )
-    }
-
-    pub fn image_2d(
-        &self,
-        width: u32,
-        height: u32,
-        format: Format,
-        property_flags: MemoryPropertyFlags,
-        usage: ImageUsageFlags,
-    ) -> Image2DResource {
-        Image2DResource::new(
-            &self.gpu.memory_properties().memory_properties,
-            self,
-            width,
-            height,
-            format,
-            usage,
-            property_flags,
-        )
     }
 }

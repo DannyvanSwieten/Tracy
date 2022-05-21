@@ -1,5 +1,5 @@
-use std::any::{Any, TypeId};
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -8,9 +8,9 @@ use renderer::gpu_scene::{GpuTexture, Mesh};
 use vk_utils::device_context::DeviceContext;
 
 use crate::image_resource::TextureImageData;
-use crate::material_resource::{Material, MaterialResource};
+use crate::material_resource::{Material};
 use crate::mesh_resource::{self, MeshResource};
-use crate::resource::{GpuResource, Resource};
+use crate::resource::{Resource};
 
 static GLOBAL_CPU_RESOURCE_ID: AtomicUsize = AtomicUsize::new(0);
 
@@ -101,7 +101,7 @@ pub struct GpuResourceCache {
 impl GpuResourceCache {
     pub fn add_mesh(
         &mut self,
-        device: &DeviceContext,
+        device: Rc<DeviceContext>,
         rtx: &RtxContext,
         mesh: &Arc<Resource<mesh_resource::MeshResource>>,
     ) -> Arc<renderer::resource::Resource<Mesh>> {
@@ -115,26 +115,26 @@ impl GpuResourceCache {
 
     pub fn add_material(
         &mut self,
-        device: &DeviceContext,
+        device: Rc<DeviceContext>,
         rtx: &RtxContext,
         material: &Arc<Resource<Material>>,
     ) -> Arc<renderer::resource::Resource<renderer::material::Material>> {
         let prepared = self.materials.get(&material.uid());
         if prepared.is_none() {
             if let Some(base_color) = &material.albedo_map {
-                self.add_texture(device, rtx, &base_color);
+                self.add_texture(device.clone(), rtx, &base_color);
             }
 
             if let Some(metallic_roughness) = &material.metallic_roughness_map {
-                self.add_texture(device, rtx, &metallic_roughness);
+                self.add_texture(device.clone(), rtx, &metallic_roughness);
             }
 
             if let Some(normal) = &material.normal_map {
-                self.add_texture(device, rtx, &normal);
+                self.add_texture(device.clone(), rtx, &normal);
             }
 
             if let Some(emission) = &material.emission_map {
-                self.add_texture(device, rtx, &emission);
+                self.add_texture(device.clone(), rtx, &emission);
             }
 
             self.materials
@@ -146,7 +146,7 @@ impl GpuResourceCache {
 
     pub fn add_texture(
         &mut self,
-        device: &DeviceContext,
+        device: Rc<DeviceContext>,
         rtx: &RtxContext,
         texture: &Arc<Resource<TextureImageData>>,
     ) -> Arc<renderer::resource::Resource<GpuTexture>> {

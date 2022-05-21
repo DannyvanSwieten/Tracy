@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::device_context::DeviceContext;
 use crate::memory::memory_type_index;
 
@@ -19,8 +21,7 @@ pub struct Image2DResource {
 
 impl Image2DResource {
     pub fn new(
-        properties: &PhysicalDeviceMemoryProperties,
-        context: &DeviceContext,
+        context: Rc<DeviceContext>,
         width: u32,
         height: u32,
         format: Format,
@@ -52,7 +53,7 @@ impl Image2DResource {
             let memory_requirements = device.get_image_memory_requirements(image);
             let type_index = memory_type_index(
                 memory_requirements.memory_type_bits,
-                properties,
+                &context.gpu().memory_properties().memory_properties,
                 property_flags,
             );
             if let Some(type_index) = type_index {

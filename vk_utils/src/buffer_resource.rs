@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::device_context::DeviceContext;
 use crate::memory::memory_type_index;
 
@@ -7,11 +9,8 @@ use ash::vk::{
     MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags, PhysicalDeviceMemoryProperties,
     SharingMode,
 };
-
-use ash::Device;
-
 pub struct BufferResource {
-    device: Device,
+    device: Rc<DeviceContext>,
     pub buffer: Buffer,
     memory: DeviceMemory,
     size: u64,
@@ -23,6 +22,7 @@ impl BufferResource {
         unsafe {
             let ptr = self
                 .device
+                .vk_device()
                 .map_memory(self.memory, 0, self.size, MemoryMapFlags::default())
                 .expect("Memory map failed on buffer");
 
@@ -35,9 +35,10 @@ impl BufferResource {
                 .size(self.size)];
 
             self.device
+            .vk_device()
                 .flush_mapped_memory_ranges(&ranges)
                 .expect("Memory flush failed");
-            self.device.unmap_memory(self.memory);
+            self.device.vk_device().unmap_memory(self.memory);
         }
     }
 
@@ -53,6 +54,7 @@ impl BufferResource {
             for i in (0..self.content_size).step_by(stride) {
                 let ptr = self
                     .device
+                    .vk_device()
                     .map_memory(self.memory, i, stride as u64, MemoryMapFlags::default())
                     .expect("Memory map failed on buffer");
 
@@ -69,9 +71,10 @@ impl BufferResource {
                     .size(ash::vk::WHOLE_SIZE)];
 
                 self.device
+                    .vk_device()
                     .flush_mapped_memory_ranges(&ranges)
                     .expect("Memory flush failed");
-                self.device.unmap_memory(self.memory);
+                self.device.vk_device().unmap_memory(self.memory);
             }
         }
     }
@@ -80,6 +83,7 @@ impl BufferResource {
         unsafe {
             let ptr = self
                 .device
+                .vk_device()
                 .map_memory(self.memory, 0, self.size, MemoryMapFlags::default())
                 .expect("Memory map failed on buffer") as *mut T;
 
@@ -96,8 +100,7 @@ impl BufferResource {
 
 impl BufferResource {
     pub fn new(
-        properties: &PhysicalDeviceMemoryProperties,
-        device_context: &DeviceContext,
+        device_context: Rc<DeviceContext>,
         size: u64,
         property_flags: MemoryPropertyFlags,
         usage: BufferUsageFlags,
@@ -115,7 +118,7 @@ impl BufferResource {
             let memory_requirements = device.get_buffer_memory_requirements(buffer);
             let type_index = memory_type_index(
                 memory_requirements.memory_type_bits,
-                properties,
+                &device_context.gpu().memory_properties().memory_properties,
                 property_flags,
             );
 
@@ -136,7 +139,7 @@ impl BufferResource {
                     .expect("Buffer memory bind failed");
 
                 Self {
-                    device: device.clone(),
+                    device: device_context.clone(),
                     buffer,
                     memory,
                     size: memory_requirements.size,
@@ -158,13 +161,13 @@ impl BufferResource {
 
     pub fn device_address(&self) -> DeviceAddress {
         let v_address_info = BufferDeviceAddressInfo::builder().buffer(self.buffer);
-        unsafe { self.device.get_buffer_device_address(&v_address_info) }
+        unsafe { self.device.vk_device().get_buffer_device_address(&v_address_info) }
     }
 }
 
 impl Drop for BufferResource {
     fn drop(&mut self) {
-        unsafe { self.device.free_memory(self.memory, None) }
-        unsafe { self.device.destroy_buffer(self.buffer, None) }
+        unsafe { self.device.vk_device().free_memory(self.memory, None) }
+        unsafe { self.device.vk_device().destroy_buffer(self.buffer, None) }
     }
 }

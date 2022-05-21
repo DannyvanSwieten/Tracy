@@ -1,14 +1,17 @@
+use std::rc::Rc;
+
 use crate::device_context::DeviceContext;
 use crate::gpu::Gpu;
 use crate::vulkan::Vulkan;
 use ash::vk::SurfaceKHR;
 
 pub struct Swapchain {
+    device: Rc<DeviceContext>,
     swapchain_loader: ash::extensions::khr::Swapchain,
     surface: ash::vk::SurfaceKHR,
     handle: ash::vk::SwapchainKHR,
     images: Vec<ash::vk::Image>,
-    image_views: Vec<ash::vk::ImageView>,
+    _image_views: Vec<ash::vk::ImageView>,
     present_semaphores: Vec<ash::vk::Semaphore>,
     renderpass: ash::vk::RenderPass,
     framebuffers: Vec<ash::vk::Framebuffer>,
@@ -159,7 +162,7 @@ impl Swapchain {
     pub fn new(
         vulkan: &Vulkan,
         gpu: &Gpu,
-        device: &DeviceContext,
+        device: Rc<DeviceContext>,
         surface: ash::vk::SurfaceKHR,
         old_swapchain: Option<&ash::vk::SwapchainKHR>,
         queue_index: u32,
@@ -256,11 +259,12 @@ impl Swapchain {
         }
 
         Self {
+            device: device.clone(),
             surface,
             handle: swapchain,
             swapchain_loader,
             images,
-            image_views,
+            _image_views: image_views,
             present_semaphores,
             renderpass,
             framebuffers,
@@ -363,6 +367,30 @@ impl Swapchain {
             } else {
                 false
             }
+        }
+    }
+}
+
+impl Drop for Swapchain {
+    fn drop(&mut self) {
+        unsafe {
+            for view in &self._image_views {
+                self.device.vk_device().destroy_image_view(*view, None);
+            }
+
+            for semaphore in &self.present_semaphores {
+                self.device.vk_device().destroy_semaphore(*semaphore, None);
+            }
+
+            for framebuffer in &self.framebuffers {
+                self.device
+                    .vk_device()
+                    .destroy_framebuffer(*framebuffer, None);
+            }
+
+            self.device
+                .vk_device()
+                .destroy_render_pass(self.renderpass, None);
         }
     }
 }

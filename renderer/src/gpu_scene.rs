@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::context::RtxContext;
@@ -29,7 +30,7 @@ pub struct Mesh {
 
 impl Mesh {
     pub fn new(
-        device: &DeviceContext,
+        device: Rc<DeviceContext>,
         rtx: &RtxContext,
         indices: &[u32],
         positions: &[Position],
@@ -37,7 +38,8 @@ impl Mesh {
         tangents: &[Tangent],
         tex_coords: &[Texcoord],
     ) -> Self {
-        let mut index_buffer = device.buffer(
+        let mut index_buffer = BufferResource::new(
+            device.clone(),
             (indices.len() * std::mem::size_of::<u32>()) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::SHADER_DEVICE_ADDRESS
@@ -47,7 +49,8 @@ impl Mesh {
 
         index_buffer.copy_to(&indices);
 
-        let mut vertex_buffer = device.buffer(
+        let mut vertex_buffer = BufferResource::new(
+            device.clone(),
             (positions.len() * std::mem::size_of::<Position>()) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::SHADER_DEVICE_ADDRESS
@@ -57,7 +60,8 @@ impl Mesh {
 
         vertex_buffer.copy_to(&positions);
 
-        let mut normal_buffer = device.buffer(
+        let mut normal_buffer = BufferResource::new(
+            device.clone(),
             (normals.len() * std::mem::size_of::<Normal>()) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::SHADER_DEVICE_ADDRESS
@@ -67,7 +71,8 @@ impl Mesh {
 
         normal_buffer.copy_to(&normals);
 
-        let mut tangent_buffer = device.buffer(
+        let mut tangent_buffer = BufferResource::new(
+            device.clone(),
             (tangents.len() * std::mem::size_of::<Tangent>()) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::SHADER_DEVICE_ADDRESS
@@ -77,7 +82,8 @@ impl Mesh {
 
         tangent_buffer.copy_to(&tangents);
 
-        let mut tex_coord_buffer = device.buffer(
+        let mut tex_coord_buffer = BufferResource::new(
+            device.clone(),
             (tex_coords.len() * std::mem::size_of::<Texcoord>()) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::SHADER_DEVICE_ADDRESS
@@ -88,7 +94,7 @@ impl Mesh {
         tex_coord_buffer.copy_to(&tex_coords);
 
         let blas = BottomLevelAccelerationStructure::new(
-            device,
+            device.clone(),
             rtx,
             &vertex_buffer,
             positions.len() as u32,

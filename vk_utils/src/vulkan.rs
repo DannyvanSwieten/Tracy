@@ -45,19 +45,17 @@ unsafe extern "system" fn vulkan_debug_callback(
     FALSE
 }
 
-#[cfg(target_os = "macos")]
-fn surface_extension_name() -> &'static CStr {
-    ash::vk::MvkMacosSurfaceFn::name()
-}
-
-#[cfg(target_os = "windows")]
-fn surface_extension_name() -> &'static CStr {
-    Win32Surface::name()
+pub fn surface_extension_name() -> &'static CStr {
+    if cfg!(unix) {
+        ash::vk::MvkMacosSurfaceFn::name()
+    } else {
+        Win32Surface::name()
+    }
 }
 
 #[derive(Clone)]
 pub struct Vulkan {
-    _debug_callback: DebugUtilsMessengerEXT,
+    _debug_callback: Option<DebugUtilsMessengerEXT>,
     library: Entry,
     instance: Instance,
 }
@@ -103,9 +101,14 @@ impl Vulkan {
                 .pfn_user_callback(Some(vulkan_debug_callback));
 
             let debug_utils_loader = DebugUtils::new(&library, &instance);
-            let debug_callback = debug_utils_loader
-                .create_debug_utils_messenger(&debug_info, None)
-                .unwrap();
+            let debug_callback =
+                match debug_utils_loader.create_debug_utils_messenger(&debug_info, None) {
+                    Ok(succes) => Some(succes),
+                    Err(error) => {
+                        println!("{}", error);
+                        None
+                    }
+                };
 
             Self {
                 _debug_callback: debug_callback,

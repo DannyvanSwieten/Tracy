@@ -21,28 +21,40 @@ use winit::{
     window::WindowBuilder,
 };
 
-use ash::extensions::ext::DebugUtils;
-use renderer::{geometry::Position, renderer::Renderer};
+use ash::extensions::{
+    ext::DebugUtils,
+    khr::{Surface, Swapchain},
+};
+use renderer::renderer::Renderer;
 use vk_utils::vulkan::Vulkan;
 
 use futures::lock::Mutex;
 use std::{rc::Rc, sync::Arc};
-use winit_blit::{NativeFormat, PixelBufferTyped};
 
-use crate::{
-    resources::{GpuResourceCache, Resources},
-    simple_shapes::MeshBuilder,
-};
+use crate::resources::{GpuResourceCache, Resources};
 
 type ServerContext = Arc<Mutex<application::Model>>;
 fn main() {
     let vulkan = Vulkan::new(
         "tracey renderer",
         &[std::ffi::CString::new("VK_LAYER_KHRONOS_validation").expect("String Creation Failed")],
-        &[DebugUtils::name()],
+        &[
+            DebugUtils::name(),
+            Surface::name(),
+            vk_utils::vulkan::surface_extension_name(),
+        ],
     );
     let gpu = &vulkan.hardware_devices_with_queue_support(ash::vk::QueueFlags::GRAPHICS)[0];
-    let context = Rc::new(Renderer::create_suitable_device(gpu));
+    let extensions = gpu.device_extensions();
+    for extension in extensions {
+        let v = extension.extension_name.iter().map(|i| *i as u8).collect();
+        println!("{}", String::from_utf8(v).unwrap());
+    }
+    let context = if cfg!(unix) {
+        Rc::new(Renderer::create_suitable_device_mac(gpu))
+    } else {
+        Rc::new(Renderer::create_suitable_device_windows(gpu))
+    };
 
     let args: Vec<String> = std::env::args().collect();
     let mode = if args.len() == 5 {
@@ -56,7 +68,7 @@ fn main() {
     let image_height = args[4].parse::<u32>().expect("Invalid height argument");
 
     if mode == "--file".to_string() {
-        let mut renderer = Renderer::new(context, image_width, image_height);
+        let mut renderer = Renderer::new(context.clone(), image_width, image_height);
         let mut cpu_cache = Resources::default();
         let mut gpu_cache = GpuResourceCache::default();
 
@@ -65,7 +77,7 @@ fn main() {
             &mut gpu_cache,
             &cpu_cache,
             Mat4::new_nonuniform_scaling(&vec3(1.0, 1.0, 1.0)),
-            &renderer.device,
+            renderer.device.clone(),
             &renderer.rtx,
         );
         let frame = renderer.build_frame(&gpu_scene);
@@ -106,23 +118,23 @@ fn main() {
                 if window_id == window.id() {
                     let (width, height): (u32, u32) = window.inner_size().into();
 
-                    if let Some(mut model) = server.model.try_lock() {
-                        let data = model.download_image();
+                    // if let Some(mut model) = server.model.try_lock() {
+                    //     let data = model.download_image();
 
-                        let mut pixel_buffer =
-                            PixelBufferTyped::<NativeFormat>::new_supported(width, height, &window);
+                    //     let mut pixel_buffer =
+                    //         PixelBufferTyped::<NativeFormat>::new_supported(width, height, &window);
 
-                        for (i, row) in pixel_buffer.rows_mut().enumerate() {
-                            let w = row.len();
-                            for (j, pixel) in row.into_iter().enumerate() {
-                                let index = (i * w + j) * 4;
-                                let value = &data[index..index + 3];
-                                *pixel = NativeFormat::from_rgb(value[0], value[1], value[2]);
-                            }
-                        }
+                    //     for (i, row) in pixel_buffer.rows_mut().enumerate() {
+                    //         let w = row.len();
+                    //         for (j, pixel) in row.into_iter().enumerate() {
+                    //             let index = (i * w + j) * 4;
+                    //             let value = &data[index..index + 3];
+                    //             *pixel = NativeFormat::from_rgb(value[0], value[1], value[2]);
+                    //         }
+                    //     }
 
-                        pixel_buffer.blit(&window).unwrap();
-                    }
+                    //     pixel_buffer.blit(&window).unwrap();
+                    // }
                 }
             }
             _ => {

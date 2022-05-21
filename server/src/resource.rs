@@ -1,4 +1,4 @@
-use std::{any::TypeId, ops::Deref, sync::Arc};
+use std::{any::TypeId, ops::Deref, sync::Arc, rc::Rc};
 
 use renderer::context::RtxContext;
 use vk_utils::device_context::DeviceContext;
@@ -10,7 +10,7 @@ pub trait GpuResource {
 
     fn prepare(
         &self,
-        device: &DeviceContext,
+        device: Rc<DeviceContext>,
         rtx: &RtxContext,
         cache: &GpuResourceCache,
     ) -> Self::Item;
@@ -68,7 +68,7 @@ impl<T: GpuResource + 'static> Resource<T> {
 
     pub fn prepare(
         &self,
-        device: &DeviceContext,
+        device: Rc<DeviceContext>,
         rtx: &RtxContext,
         cache: &GpuResourceCache,
     ) -> Arc<renderer::resource::Resource<T::Item>> {

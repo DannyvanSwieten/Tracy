@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, rc::Rc};
 
 use crate::{
     material_resource::Material,
@@ -194,7 +194,7 @@ impl SceneGraph {
         gpu_cache: &mut GpuResourceCache,
         cpu_cache: &Resources,
         parent_transform: Mat4x4,
-        device: &DeviceContext,
+        device: Rc<DeviceContext>,
         rtx: &RtxContext,
     ) -> Scene {
         let mut scene = Scene::default();
@@ -205,11 +205,11 @@ impl SceneGraph {
         for node in &self.nodes {
             if let Some(mesh) = &node.mesh {
                 let gpu_mat = if let Some(material) = &node.material {
-                    gpu_cache.add_material(device, rtx, &material)
+                    gpu_cache.add_material(device.clone(), rtx, &material)
                 } else {
-                    gpu_cache.add_material(device, rtx, &cpu_cache.default_material())
+                    gpu_cache.add_material(device.clone(), rtx, &cpu_cache.default_material())
                 };
-                let gpu_mesh = gpu_cache.add_mesh(device, rtx, mesh);
+                let gpu_mesh = gpu_cache.add_mesh(device.clone(), rtx, mesh);
                 let mut shape = Shape::new(gpu_mesh);
                 shape.create_instance(gpu_mat, &node.global_transform);
 

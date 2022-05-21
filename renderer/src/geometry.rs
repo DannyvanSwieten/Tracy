@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::context::RtxContext;
 use ash::vk::{
     AccelerationStructureBuildGeometryInfoKHR, AccelerationStructureBuildRangeInfoKHR,
@@ -53,7 +55,7 @@ impl GeometryInstance {
 }
 
 pub struct BottomLevelAccelerationStructure {
-    _device: Device,
+    _device: Rc<DeviceContext>,
     rtx: RtxContext,
     _acceleration_structure_buffer: BufferResource,
     _acceleration_structure_scratch_buffer: BufferResource,
@@ -67,10 +69,10 @@ impl BottomLevelAccelerationStructure {
 }
 impl BottomLevelAccelerationStructure {
     pub fn new(
-        device: &DeviceContext,
+        device: Rc<DeviceContext>,
         rtx: &RtxContext,
         vertex_buffer: &BufferResource,
-        vertex_count: u32,
+        _vertex_count: u32,
         vertex_offset: u32,
         index_buffer: &BufferResource,
         index_count: u32,
@@ -111,7 +113,8 @@ impl BottomLevelAccelerationStructure {
                     &build_info,
                     &max_primitives,
                 );
-            let scratch_buffer = device.buffer(
+            let scratch_buffer = BufferResource::new(
+                device.clone(),
                 build_sizes.build_scratch_size,
                 MemoryPropertyFlags::DEVICE_LOCAL,
                 BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
@@ -119,7 +122,8 @@ impl BottomLevelAccelerationStructure {
                     | BufferUsageFlags::STORAGE_BUFFER,
             );
 
-            let acc_buffer = device.buffer(
+            let acc_buffer = BufferResource::new(
+                device.clone(),
                 build_sizes.acceleration_structure_size,
                 MemoryPropertyFlags::DEVICE_LOCAL,
                 BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
@@ -173,7 +177,7 @@ impl BottomLevelAccelerationStructure {
 
             Self {
                 rtx: rtx.clone(),
-                _device: device.vk_device().clone(),
+                _device: device.clone(),
                 _acceleration_structure_buffer: acc_buffer,
                 _acceleration_structure_scratch_buffer: scratch_buffer,
                 acceleration_structure,
@@ -212,8 +216,9 @@ impl Drop for TopLevelAccelerationStructure {
 }
 
 impl TopLevelAccelerationStructure {
-    pub fn new(device: &DeviceContext, rtx: &RtxContext, instances: &[GeometryInstance]) -> Self {
-        let mut _instance_buffer = device.buffer(
+    pub fn new(device: Rc<DeviceContext>, rtx: &RtxContext, instances: &[GeometryInstance]) -> Self {
+        let mut _instance_buffer = BufferResource::new(
+            device.clone(),
             instances.len() as u64 * 64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
@@ -252,7 +257,8 @@ impl TopLevelAccelerationStructure {
                     &max_primitives,
                 );
 
-            let scratch_buffer = device.buffer(
+            let scratch_buffer = BufferResource::new(
+                device.clone(),
                 build_sizes.build_scratch_size,
                 MemoryPropertyFlags::DEVICE_LOCAL,
                 BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
@@ -261,7 +267,8 @@ impl TopLevelAccelerationStructure {
                     | BufferUsageFlags::STORAGE_BUFFER,
             );
 
-            let acc_buffer = device.buffer(
+            let acc_buffer = BufferResource::new(
+                device.clone(),
                 build_sizes.acceleration_structure_size,
                 MemoryPropertyFlags::DEVICE_LOCAL,
                 BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR

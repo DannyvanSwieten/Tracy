@@ -1,4 +1,7 @@
+use std::rc::Rc;
+
 use renderer::{context::RtxContext, gpu_scene::GpuTexture};
+use vk_utils::{device_context::DeviceContext, buffer_resource::BufferResource, image_resource::Image2DResource};
 
 use crate::{resource::GpuResource, resources::GpuResourceCache};
 
@@ -50,19 +53,21 @@ impl GpuResource for TextureImageData {
 
     fn prepare(
         &self,
-        device: &vk_utils::device_context::DeviceContext,
+        device: Rc<DeviceContext>,
         _: &RtxContext,
         _: &GpuResourceCache,
     ) -> Self::Item {
-        let mut image = device.image_2d(
+        let mut image = Image2DResource::new(
+            device.clone(),
             self.width,
             self.height,
             self.format,
-            ash::vk::MemoryPropertyFlags::DEVICE_LOCAL,
             ash::vk::ImageUsageFlags::TRANSFER_DST | ash::vk::ImageUsageFlags::SAMPLED,
+            ash::vk::MemoryPropertyFlags::DEVICE_LOCAL,
         );
 
-        let mut buffer = device.buffer(
+        let mut buffer = BufferResource::new(
+            device.clone(),
             self.pixels.len() as u64,
             ash::vk::MemoryPropertyFlags::HOST_VISIBLE,
             ash::vk::BufferUsageFlags::TRANSFER_SRC,

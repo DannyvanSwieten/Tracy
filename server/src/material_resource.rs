@@ -1,7 +1,8 @@
-use std::sync::Arc;
+use std::{sync::Arc, rc::Rc};
 
 use nalgebra_glm::{vec4, Vec4};
 use renderer::context::RtxContext;
+use vk_utils::device_context::DeviceContext;
 
 use crate::{
     image_resource::TextureImageData,
@@ -60,7 +61,7 @@ impl GpuResource for Material {
 
     fn prepare(
         &self,
-        _: &vk_utils::device_context::DeviceContext,
+        _: Rc<DeviceContext>,
         _: &RtxContext,
         cache: &GpuResourceCache,
     ) -> Self::Item {

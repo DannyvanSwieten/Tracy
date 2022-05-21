@@ -1,8 +1,8 @@
 use ash::vk::{
-    DeviceCreateInfo, DeviceCreateInfoBuilder, PhysicalDevice, PhysicalDeviceFeatures,
-    PhysicalDeviceLimits, PhysicalDeviceMemoryProperties2, PhysicalDeviceProperties,
-    PhysicalDeviceProperties2, PhysicalDeviceProperties2Builder, PhysicalDeviceType,
-    QueueFamilyProperties, QueueFlags,
+    DeviceCreateInfo, DeviceCreateInfoBuilder, ExtensionProperties, PhysicalDevice,
+    PhysicalDeviceFeatures, PhysicalDeviceLimits, PhysicalDeviceMemoryProperties2,
+    PhysicalDeviceProperties, PhysicalDeviceProperties2, PhysicalDeviceProperties2Builder,
+    PhysicalDeviceType, QueueFamilyProperties, QueueFlags,
 };
 
 use crate::device_context::DeviceContext;
@@ -110,6 +110,15 @@ impl Gpu {
 
     pub fn queue_count(&self, queue_family_index: u32) -> u32 {
         self.queue_family_properties[queue_family_index as usize].queue_count
+    }
+
+    pub fn device_extensions(&self) -> Vec<ExtensionProperties> {
+        unsafe {
+            self.vulkan()
+                .vk_instance()
+                .enumerate_device_extension_properties(self.physical_device)
+                .expect("Device Extension enumeration failed")
+        }
     }
 
     pub fn extension_properties<'a, F>(&self, builder_function: F) -> PhysicalDeviceProperties2

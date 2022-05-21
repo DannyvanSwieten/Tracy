@@ -20,7 +20,8 @@ use vk_utils::wait_handle::WaitHandle;
 
 // Extension Objects
 use ash::vk::{
-    DeferredOperationKHR, RayTracingPipelineCreateInfoKHR, RayTracingShaderGroupCreateInfoKHR,
+    DeferredOperationKHR, KhrPortabilitySubsetFn, PhysicalDeviceFeatures2KHR,
+    RayTracingPipelineCreateInfoKHR, RayTracingShaderGroupCreateInfoKHR,
     RayTracingShaderGroupTypeKHR, StridedDeviceAddressRegionKHR,
     WriteDescriptorSetAccelerationStructureKHR, SHADER_UNUSED_KHR,
 };
@@ -66,7 +67,7 @@ pub struct Renderer {
 unsafe impl Send for Renderer {}
 
 impl Renderer {
-    pub fn create_suitable_device(gpu: &Gpu) -> DeviceContext {
+    pub fn create_suitable_device_windows(gpu: &Gpu) -> DeviceContext {
         let extensions = [
             ash::extensions::khr::RayTracingPipeline::name(),
             ash::extensions::khr::AccelerationStructure::name(),
@@ -95,9 +96,29 @@ impl Renderer {
         })
     }
 
+    pub fn create_suitable_device_mac(gpu: &Gpu) -> DeviceContext {
+        let extensions = [KhrPortabilitySubsetFn::name()];
+
+        let mut address_features =
+            ash::vk::PhysicalDeviceVulkan12Features::builder().buffer_device_address(true);
+        let mut features2 = PhysicalDeviceFeatures2KHR::default();
+        unsafe {
+            gpu.vulkan()
+                .vk_instance()
+                .get_physical_device_features2(*gpu.vk_physical_device(), &mut features2);
+        }
+
+        gpu.device_context(&extensions, |builder| {
+            builder
+                .push_next(&mut address_features)
+                .enabled_features(&features2.features)
+        })
+    }
+
     pub fn download_image(&self) -> BufferResource {
         self.device.wait();
-        let buffer = self.device.buffer(
+        let buffer = BufferResource::new(
+            self.device.clone(),
             (self.output_width * self.output_height * 4) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::TRANSFER_DST,
@@ -254,7 +275,8 @@ impl Renderer {
             }
         }
 
-        let mut material_buffer = self.device.buffer(
+        let mut material_buffer = BufferResource::new(
+            self.device.clone(),
             (materials.len() * std::mem::size_of::<GpuMaterial>()) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::STORAGE_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
@@ -262,7 +284,8 @@ impl Renderer {
 
         material_buffer.copy_to(&materials);
 
-        let mut mesh_address_buffer = self.device.buffer(
+        let mut mesh_address_buffer = BufferResource::new(
+            self.device.clone(),
             (mesh_addresses.len() * std::mem::size_of::<MeshAddress>()) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::STORAGE_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
@@ -270,7 +293,8 @@ impl Renderer {
 
         mesh_address_buffer.copy_to(&mesh_addresses);
 
-        let mut material_address_buffer = self.device.buffer(
+        let mut material_address_buffer = BufferResource::new(
+            self.device.clone(),
             (std::mem::size_of::<u64>()) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::UNIFORM_BUFFER,
@@ -279,7 +303,7 @@ impl Renderer {
         material_address_buffer.copy_to(&[material_buffer.device_address()]);
 
         let acceleration_structure =
-            TopLevelAccelerationStructure::new(&self.device, &self.rtx, &instances);
+            TopLevelAccelerationStructure::new(self.device.clone(), &self.rtx, &instances);
 
         let descriptor_sets = self.descriptor_sets.descriptor_sets(&self.device);
         if image_writes.len() > 0 {
@@ -299,7 +323,7 @@ impl Renderer {
             &descriptor_sets,
         );
 
-        let camera_buffer = self.build_camera_buffer(&self.device);
+        let camera_buffer = self.build_camera_buffer(self.device.clone());
         Self::update_material_descriptor(&self.device, &descriptor_sets, &material_address_buffer);
         Self::update_mesh_address_descriptor(&self.device, &descriptor_sets, &mesh_address_buffer);
         Self::update_camera_descriptors(&self.device, &camera_buffer, &descriptor_sets);
@@ -362,15 +386,15 @@ impl Renderer {
             current_batch: 0,
         };
 
-        result.load_shaders_and_pipeline(&d);
-        result.create_shader_binding_table(&d);
-        result.create_images_and_views(&d, width, height);
+        result.load_shaders_and_pipeline(d.clone());
+        result.create_shader_binding_table(d.clone());
+        result.create_images_and_views(d.clone(), width, height);
         result.output_width = width;
         result.output_height = height;
         result
     }
 
-    fn build_camera_buffer(&self, device: &DeviceContext) -> BufferResource {
+    fn build_camera_buffer(&self, device: Rc<DeviceContext>) -> BufferResource {
         let view_matrix = glm::look_at_rh(
             &self.camera_position,
             &self.camera_target,
@@ -390,7 +414,8 @@ impl Renderer {
             view_inverse,
             projection_inverse,
         };
-        let mut camera_buffer = device.buffer(
+        let mut camera_buffer = BufferResource::new(
+            device,
             (std::mem::size_of::<CameraData>()) as u64,
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::UNIFORM_BUFFER,
@@ -403,7 +428,7 @@ impl Renderer {
         &self.camera_position
     }
 
-    fn load_shaders_and_pipeline(&mut self, device: &DeviceContext) {
+    fn load_shaders_and_pipeline(&mut self, device: Rc<DeviceContext>) {
         let dir = std::env::current_exe()
             .expect("current dir check failed")
             .parent()
@@ -492,7 +517,7 @@ impl Renderer {
         }
     }
 
-    fn create_shader_binding_table(&mut self, device: &DeviceContext) {
+    fn create_shader_binding_table(&mut self, device: Rc<DeviceContext>) {
         unsafe {
             let group_count = 3;
             let properties = self.rtx.pipeline_properties();
@@ -505,7 +530,8 @@ impl Renderer {
                 .get_ray_tracing_shader_group_handles(self.pipeline, 0, group_count, table_size)
                 .expect("Get raytracing shader group handles failed");
 
-            self.shader_binding_table = Some(device.buffer(
+            self.shader_binding_table = Some(BufferResource::new(
+                device,
                 table_size as u64,
                 MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
                 BufferUsageFlags::TRANSFER_SRC
@@ -559,24 +585,26 @@ impl Renderer {
         self.current_batch = 0;
     }
 
-    fn create_images_and_views(&mut self, device: &DeviceContext, width: u32, height: u32) {
+    fn create_images_and_views(&mut self, device: Rc<DeviceContext>, width: u32, height: u32) {
         self.output_width = width;
         self.output_height = height;
 
-        self.output_image = Some(device.image_2d(
+        self.output_image = Some(Image2DResource::new(
+            self.device.clone(),
             width,
             height,
             Format::R8G8B8A8_UNORM,
-            MemoryPropertyFlags::DEVICE_LOCAL,
             ImageUsageFlags::STORAGE | ImageUsageFlags::TRANSFER_SRC,
+            MemoryPropertyFlags::DEVICE_LOCAL,
         ));
 
-        self.accumulation_image = Some(device.image_2d(
+        self.accumulation_image = Some(Image2DResource::new(
+            self.device.clone(),
             width,
             height,
             Format::R32G32B32A32_SFLOAT,
-            MemoryPropertyFlags::DEVICE_LOCAL,
             ImageUsageFlags::STORAGE,
+            MemoryPropertyFlags::DEVICE_LOCAL,
         ));
 
         let view_info = ImageViewCreateInfo::builder()
