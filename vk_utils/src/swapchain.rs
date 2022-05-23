@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use crate::device_context::DeviceContext;
 use crate::gpu::Gpu;
+use crate::queue::CommandQueue;
 use crate::vulkan::Vulkan;
 use ash::vk::SurfaceKHR;
 
@@ -33,7 +34,7 @@ fn create_swapchain(
     surface: ash::vk::SurfaceKHR,
     swapchain_loader: &ash::extensions::khr::Swapchain,
     old_swapchain: Option<&ash::vk::SwapchainKHR>,
-    queue_index: u32,
+    queue: Rc<CommandQueue>,
     width: u32,
     height: u32,
 ) -> (
@@ -46,7 +47,7 @@ fn create_swapchain(
 ) {
     let _ = unsafe {
         surface_loader
-            .get_physical_device_surface_support(*gpu, queue_index, surface)
+            .get_physical_device_surface_support(*gpu, queue.family_type_index(), surface)
             .expect("Query physical device queue surface support failed")
     };
 
@@ -163,7 +164,7 @@ impl Swapchain {
         device: Rc<DeviceContext>,
         surface: ash::vk::SurfaceKHR,
         old_swapchain: Option<&ash::vk::SwapchainKHR>,
-        queue_index: u32,
+        queue: Rc<CommandQueue>,
         width: u32,
         height: u32,
     ) -> Self {
@@ -171,17 +172,17 @@ impl Swapchain {
         let surface_loader =
             ash::extensions::khr::Surface::new(vulkan.library(), vulkan.vk_instance());
         let swapchain_loader =
-            ash::extensions::khr::Swapchain::new(vulkan.vk_instance(), device.vk_device());
+            ash::extensions::khr::Swapchain::new(vulkan.vk_instance(), device.handle());
         let (swapchain, images, image_views, format, physical_width, physical_height) =
             create_swapchain(
                 vulkan.vk_instance(),
                 device.gpu().vk_physical_device(),
-                device.vk_device(),
+                device.handle(),
                 &surface_loader,
                 surface.clone(),
                 &swapchain_loader,
                 old_swapchain,
-                queue_index,
+                queue.clone(),
                 width,
                 height,
             );
@@ -221,7 +222,7 @@ impl Swapchain {
 
         let renderpass = unsafe {
             device
-                .vk_device()
+                .handle()
                 .create_render_pass(&renderpass_create_info, None)
                 .expect("Renderpass creation failed for swapchain")
         };
@@ -238,7 +239,7 @@ impl Swapchain {
                     .layers(1);
                 unsafe {
                     device
-                        .vk_device()
+                        .handle()
                         .create_framebuffer(&create_info, None)
                         .expect("Framebuffer creation failed for swapchain images")
                 }
@@ -251,7 +252,7 @@ impl Swapchain {
         for _ in 0..images.len() {
             present_semaphores.push(unsafe {
                 device
-                    .vk_device()
+                    .handle()
                     .create_semaphore(&semaphore_create_info, None)
                     .unwrap()
             });
@@ -349,7 +350,12 @@ impl Swapchain {
         &self.handle
     }
 
-    pub fn swap(&self, queue: &ash::vk::Queue, semaphore: &ash::vk::Semaphore, index: u32) -> bool {
+    pub fn swap(
+        &self,
+        queue: Rc<CommandQueue>,
+        semaphore: &ash::vk::Semaphore,
+        index: u32,
+    ) -> bool {
         let s = &[*semaphore];
         let sc = &[self.handle];
         let i = &[index];
@@ -359,7 +365,9 @@ impl Swapchain {
             .image_indices(i);
 
         unsafe {
-            let r = self.swapchain_loader.queue_present(*queue, &present_info);
+            let r = self
+                .swapchain_loader
+                .queue_present(queue.handle(), &present_info);
 
             if r.is_err() {
                 true
@@ -374,21 +382,19 @@ impl Drop for Swapchain {
     fn drop(&mut self) {
         unsafe {
             for view in &self._image_views {
-                self.device.vk_device().destroy_image_view(*view, None);
+                self.device.handle().destroy_image_view(*view, None);
             }
 
             for semaphore in &self.present_semaphores {
-                self.device.vk_device().destroy_semaphore(*semaphore, None);
+                self.device.handle().destroy_semaphore(*semaphore, None);
             }
 
             for framebuffer in &self.framebuffers {
-                self.device
-                    .vk_device()
-                    .destroy_framebuffer(*framebuffer, None);
+                self.device.handle().destroy_framebuffer(*framebuffer, None);
             }
 
             self.device
-                .vk_device()
+                .handle()
                 .destroy_render_pass(self.renderpass, None);
         }
     }

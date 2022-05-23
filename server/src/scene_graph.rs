@@ -1,4 +1,4 @@
-use std::{sync::Arc, rc::Rc};
+use std::{rc::Rc, sync::Arc};
 
 use crate::{
     material_resource::Material,
@@ -10,7 +10,7 @@ use crate::{
 use super::instancer::Instancer;
 use nalgebra_glm::{vec3, Mat4x4};
 use renderer::{context::RtxContext, gpu_scene::Scene, shape::Shape};
-use vk_utils::device_context::DeviceContext;
+use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
 pub struct DefaultInstancer {}
 
@@ -196,6 +196,7 @@ impl SceneGraph {
         parent_transform: Mat4x4,
         device: Rc<DeviceContext>,
         rtx: &RtxContext,
+        queue: Rc<CommandQueue>,
     ) -> Scene {
         let mut scene = Scene::default();
         if self.nodes.len() == 0 {
@@ -205,11 +206,16 @@ impl SceneGraph {
         for node in &self.nodes {
             if let Some(mesh) = &node.mesh {
                 let gpu_mat = if let Some(material) = &node.material {
-                    gpu_cache.add_material(device.clone(), rtx, &material)
+                    gpu_cache.add_material(device.clone(), rtx, queue.clone(), &material)
                 } else {
-                    gpu_cache.add_material(device.clone(), rtx, &cpu_cache.default_material())
+                    gpu_cache.add_material(
+                        device.clone(),
+                        rtx,
+                        queue.clone(),
+                        &cpu_cache.default_material(),
+                    )
                 };
-                let gpu_mesh = gpu_cache.add_mesh(device.clone(), rtx, mesh);
+                let gpu_mesh = gpu_cache.add_mesh(device.clone(), rtx, queue.clone(), mesh);
                 let mut shape = Shape::new(gpu_mesh);
                 shape.create_instance(gpu_mat, &node.global_transform);
 

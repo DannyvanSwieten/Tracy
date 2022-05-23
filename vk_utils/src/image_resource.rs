@@ -45,7 +45,7 @@ impl Image2DResource {
                 .mip_levels(1)
                 .usage(usage);
 
-            let device = context.vk_device();
+            let device = context.handle();
 
             let image = device
                 .create_image(&image_info, None)

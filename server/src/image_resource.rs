@@ -1,7 +1,10 @@
 use std::rc::Rc;
 
 use renderer::{context::RtxContext, gpu_scene::GpuTexture};
-use vk_utils::{device_context::DeviceContext, buffer_resource::BufferResource, image_resource::Image2DResource};
+use vk_utils::{
+    buffer_resource::BufferResource, command_buffer::CommandBuffer, device_context::DeviceContext,
+    image_resource::Image2DResource, queue::CommandQueue,
+};
 
 use crate::{resource::GpuResource, resources::GpuResourceCache};
 
@@ -55,6 +58,7 @@ impl GpuResource for TextureImageData {
         &self,
         device: Rc<DeviceContext>,
         _: &RtxContext,
+        queue: Rc<CommandQueue>,
         _: &GpuResourceCache,
     ) -> Self::Item {
         let mut image = Image2DResource::new(
@@ -75,37 +79,21 @@ impl GpuResource for TextureImageData {
 
         buffer.copy_to(&self.pixels);
 
-        device
-            .graphics_queue()
-            .unwrap()
-            .begin(|command_buffer_handle| {
-                command_buffer_handle.color_image_resource_transition(
-                    &mut image,
-                    ash::vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                );
+        let mut command_buffer = CommandBuffer::new(device.clone(), queue.clone());
+        command_buffer.begin();
+        command_buffer.color_image_resource_transition(
+            &mut image,
+            ash::vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+        );
 
-                command_buffer_handle
-            });
+        command_buffer.copy_buffer_to_image_2d(&buffer, &image);
 
-        device
-            .graphics_queue()
-            .unwrap()
-            .begin(|command_buffer_handle| {
-                command_buffer_handle.copy_buffer_to_image_2d(&buffer, &image);
-                command_buffer_handle
-            });
+        command_buffer.color_image_resource_transition(
+            &mut image,
+            ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+        );
 
-        device
-            .graphics_queue()
-            .unwrap()
-            .begin(|command_buffer_handle| {
-                command_buffer_handle.color_image_resource_transition(
-                    &mut image,
-                    ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-                );
-
-                command_buffer_handle
-            });
+        command_buffer.submit();
 
         let view_info = *ash::vk::ImageViewCreateInfo::builder()
             .format(self.format)
@@ -120,7 +108,7 @@ impl GpuResource for TextureImageData {
 
         let image_view = unsafe {
             device
-                .vk_device()
+                .handle()
                 .create_image_view(&view_info, None)
                 .expect("Image view creation failed")
         };

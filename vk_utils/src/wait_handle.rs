@@ -1,8 +1,11 @@
+use std::rc::Rc;
+
 use ash::vk::{CommandBuffer, CommandPool, Fence};
-use ash::Device;
+
+use crate::device_context::DeviceContext;
 
 pub struct WaitHandle {
-    device: Device,
+    device: Rc<DeviceContext>,
     command_pool: CommandPool,
     command_buffer: CommandBuffer,
     fence: Fence,
@@ -10,7 +13,7 @@ pub struct WaitHandle {
 
 impl WaitHandle {
     pub(crate) fn new(
-        device: &Device,
+        device: Rc<DeviceContext>,
         command_pool: &CommandPool,
         command_buffer: CommandBuffer,
         fence: Fence,
@@ -25,7 +28,7 @@ impl WaitHandle {
 
     pub fn has_completed(&self) -> bool {
         unsafe {
-            match self.device.wait_for_fences(&[self.fence], true, 0) {
+            match self.device.handle().wait_for_fences(&[self.fence], true, 0) {
                 Err(_) => false,
                 Ok(()) => true,
             }
@@ -35,6 +38,7 @@ impl WaitHandle {
     pub fn wait(&self) {
         unsafe {
             self.device
+                .handle()
                 .wait_for_fences(&[self.fence], true, std::u64::MAX)
                 .expect("Wait failed");
         }
@@ -42,7 +46,11 @@ impl WaitHandle {
 
     pub fn wait_for(&self, timeout: u64) -> bool {
         unsafe {
-            match self.device.wait_for_fences(&[self.fence], true, timeout) {
+            match self
+                .device
+                .handle()
+                .wait_for_fences(&[self.fence], true, timeout)
+            {
                 Err(_) => false,
                 Ok(()) => true,
             }
@@ -55,6 +63,7 @@ impl Drop for WaitHandle {
         unsafe {
             self.wait();
             self.device
+                .handle()
                 .free_command_buffers(self.command_pool, &[self.command_buffer])
         }
     }

@@ -112,7 +112,7 @@ impl GraphicsPipeline {
 
         unsafe {
             self.pipeline = device
-                .vk_device()
+                .handle()
                 .create_graphics_pipelines(PipelineCache::null(), &[create_info], None)
                 .expect("Pipeline creation failed")[0];
         }

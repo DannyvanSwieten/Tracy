@@ -14,7 +14,9 @@ use ash::vk::{
 use ash::Device;
 use glm::Mat4x3;
 use vk_utils::buffer_resource::BufferResource;
+use vk_utils::command_buffer::CommandBuffer;
 use vk_utils::device_context::DeviceContext;
+use vk_utils::queue::CommandQueue;
 
 pub type Position = glm::Vec3;
 pub type Normal = glm::Vec3;
@@ -71,6 +73,7 @@ impl BottomLevelAccelerationStructure {
     pub fn new(
         device: Rc<DeviceContext>,
         rtx: &RtxContext,
+        queue: Rc<CommandQueue>,
         vertex_buffer: &BufferResource,
         _vertex_count: u32,
         vertex_offset: u32,
@@ -156,17 +159,14 @@ impl BottomLevelAccelerationStructure {
                 .first_vertex(vertex_offset)];
             let ranges = vec![&range[0..1]];
 
-            if let Some(queue) = device.graphics_queue() {
-                queue.begin(|command_buffer| {
-                    rtx.acceleration_structure_ext()
-                        .cmd_build_acceleration_structures(
-                            *command_buffer.native_handle(),
-                            &infos,
-                            &ranges,
-                        );
-                    command_buffer
-                });
-            }
+            let mut command_buffer = CommandBuffer::new(device.clone(), queue.clone());
+            command_buffer.begin();
+            command_buffer.record_handle(|handle| {
+                rtx.acceleration_structure_ext()
+                    .cmd_build_acceleration_structures(handle, &infos, &ranges);
+                handle
+            });
+            command_buffer.submit();
 
             let address_info = AccelerationStructureDeviceAddressInfoKHR::builder()
                 .acceleration_structure(acceleration_structure)
@@ -216,7 +216,12 @@ impl Drop for TopLevelAccelerationStructure {
 }
 
 impl TopLevelAccelerationStructure {
-    pub fn new(device: Rc<DeviceContext>, rtx: &RtxContext, instances: &[GeometryInstance]) -> Self {
+    pub fn new(
+        device: Rc<DeviceContext>,
+        rtx: &RtxContext,
+        queue: Rc<CommandQueue>,
+        instances: &[GeometryInstance],
+    ) -> Self {
         let mut _instance_buffer = BufferResource::new(
             device.clone(),
             instances.len() as u64 * 64,
@@ -301,20 +306,17 @@ impl TopLevelAccelerationStructure {
                 .primitive_count(instances.len() as u32)
                 .build()];
             let ranges = vec![&range[0..1]];
-            if let Some(queue) = device.graphics_queue() {
-                queue.begin(|command_buffer| {
-                    rtx.acceleration_structure_ext()
-                        .cmd_build_acceleration_structures(
-                            *command_buffer.native_handle(),
-                            &infos,
-                            &ranges,
-                        );
-                    command_buffer
-                });
-            }
+            let mut command_buffer = CommandBuffer::new(device.clone(), queue.clone());
+            command_buffer.begin();
+            command_buffer.record_handle(|handle| {
+                rtx.acceleration_structure_ext()
+                    .cmd_build_acceleration_structures(handle, &infos, &ranges);
+                handle
+            });
+            command_buffer.submit();
 
             Self {
-                _device: device.vk_device().clone(),
+                _device: device.handle().clone(),
                 rtx: rtx.clone(),
                 acceleration_structure,
                 _instance_buffer,

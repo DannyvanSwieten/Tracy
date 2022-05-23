@@ -15,15 +15,17 @@ use ash::extensions::khr::{
 use nalgebra_glm::{vec3, Vec3};
 
 use vk_utils::buffer_resource::BufferResource;
+use vk_utils::command_buffer::CommandBuffer;
 use vk_utils::device_context::DeviceContext;
 use vk_utils::gpu::Gpu;
 use vk_utils::image_resource::Image2DResource;
+use vk_utils::queue::CommandQueue;
 use vk_utils::shader_library::load_spirv;
 use vk_utils::wait_handle::WaitHandle;
 
 // Extension Objects
 use ash::vk::{
-    DeferredOperationKHR, KhrPortabilitySubsetFn, PhysicalDeviceFeatures2KHR,
+    DeferredOperationKHR, KhrPortabilitySubsetFn, PhysicalDeviceFeatures2KHR, QueueFlags,
     RayTracingPipelineCreateInfoKHR, RayTracingShaderGroupCreateInfoKHR,
     RayTracingShaderGroupTypeKHR, StridedDeviceAddressRegionKHR,
     WriteDescriptorSetAccelerationStructureKHR, SHADER_UNUSED_KHR,
@@ -46,6 +48,7 @@ pub struct Renderer {
     pub device: Rc<DeviceContext>,
     pub rtx: RtxContext,
     pipeline: Pipeline,
+    queue: Rc<CommandQueue>,
     accumulation_image: Option<Image2DResource>,
     accumulation_image_view: ImageView,
     output_image: Option<Image2DResource>,
@@ -128,80 +131,85 @@ impl Renderer {
             BufferUsageFlags::TRANSFER_DST,
         );
 
-        if let Some(queue) = &self.device.graphics_queue() {
-            queue.begin(|command_buffer| {
-                command_buffer
-                    .copy_image_2d_to_buffer(&self.output_image.as_ref().unwrap(), &buffer);
-                command_buffer
-            });
-        }
+        let mut command_buffer = CommandBuffer::new(self.device.clone(), self.queue.clone());
+        command_buffer.begin();
+        command_buffer.copy_image_2d_to_buffer(&self.output_image.as_ref().unwrap(), &buffer);
+
         buffer
     }
     pub fn render_frame(&mut self, frame: &Frame, spp: u32) -> (Image, ImageView) {
-        unsafe {
-            if let Some(queue) = self.device.graphics_queue() {
-                self.wait_handles[self.current_frame_index] = Some(queue.begin(|command_buffer| {
-                    if let Some(image) = self.output_image.as_mut() {
-                        command_buffer.color_image_resource_transition(image, ImageLayout::GENERAL);
-                        self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
-                    } else {
-                        panic!()
-                    }
-
-                    if let Some(image) = self.accumulation_image.as_mut() {
-                        command_buffer.color_image_resource_transition(image, ImageLayout::GENERAL);
-                        self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
-                    } else {
-                        panic!()
-                    }
-                    command_buffer.bind_descriptor_sets(
-                        &self.descriptor_sets.pipeline_layout,
-                        PipelineBindPoint::RAY_TRACING_KHR,
-                        &frame.descriptor_sets,
-                    );
-                    self.device.vk_device().cmd_bind_pipeline(
-                        *command_buffer.native_handle(),
-                        PipelineBindPoint::RAY_TRACING_KHR,
-                        self.pipeline,
-                    );
-                    let constants: Vec<u8> = [spp, self.current_batch]
-                        .iter()
-                        .flat_map(|val| {
-                            let i: u32 = *val;
-                            let bytes = i.to_le_bytes();
-                            bytes
-                        })
-                        .collect();
-                    self.device.vk_device().cmd_push_constants(
-                        *command_buffer.native_handle(),
-                        self.descriptor_sets.pipeline_layout,
-                        ShaderStageFlags::RAYGEN_KHR,
-                        0,
-                        &constants,
-                    );
-                    self.rtx.pipeline_ext().cmd_trace_rays(
-                        *command_buffer.native_handle(),
-                        &self.stride_addresses[0],
-                        &self.stride_addresses[1],
-                        &self.stride_addresses[2],
-                        &self.stride_addresses[3],
-                        self.output_width,
-                        self.output_height,
-                        1,
-                    );
-                    command_buffer
-                }));
-
-                self.current_frame_index += 1;
-                self.current_frame_index %= 3;
-                self.current_batch += 1;
-            }
-
-            (
-                *self.output_image.as_mut().unwrap().vk_image(),
-                self.output_image_view,
-            )
+        let mut command_buffer = CommandBuffer::new(self.device.clone(), self.queue.clone());
+        command_buffer.begin();
+        if let Some(image) = self.output_image.as_mut() {
+            command_buffer.color_image_resource_transition(image, ImageLayout::GENERAL);
+            self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
+        } else {
+            panic!()
         }
+
+        if let Some(image) = self.accumulation_image.as_mut() {
+            command_buffer.color_image_resource_transition(image, ImageLayout::GENERAL);
+            self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
+        } else {
+            panic!()
+        }
+
+        command_buffer.bind_descriptor_sets(
+            &self.descriptor_sets.pipeline_layout,
+            PipelineBindPoint::RAY_TRACING_KHR,
+            &frame.descriptor_sets,
+        );
+
+        unsafe {
+            command_buffer.record_handle(|handle| {
+                self.device.handle().cmd_bind_pipeline(
+                    handle,
+                    PipelineBindPoint::RAY_TRACING_KHR,
+                    self.pipeline,
+                );
+                let constants: Vec<u8> = [spp, self.current_batch]
+                    .iter()
+                    .flat_map(|val| {
+                        let i: u32 = *val;
+                        let bytes = i.to_le_bytes();
+                        bytes
+                    })
+                    .collect();
+                self.device.handle().cmd_push_constants(
+                    handle,
+                    self.descriptor_sets.pipeline_layout,
+                    ShaderStageFlags::RAYGEN_KHR,
+                    0,
+                    &constants,
+                );
+                self.rtx.pipeline_ext().cmd_trace_rays(
+                    handle,
+                    &self.stride_addresses[0],
+                    &self.stride_addresses[1],
+                    &self.stride_addresses[2],
+                    &self.stride_addresses[3],
+                    self.output_width,
+                    self.output_height,
+                    1,
+                );
+                handle
+            });
+
+            self.wait_handles[self.current_frame_index] = Some(command_buffer.submit());
+
+            self.current_frame_index += 1;
+            self.current_frame_index %= 3;
+            self.current_batch += 1;
+        }
+
+        (
+            *self.output_image.as_mut().unwrap().vk_image(),
+            self.output_image_view,
+        )
+    }
+
+    pub fn queue(&self) -> Rc<CommandQueue> {
+        self.queue.clone()
     }
 
     pub fn build_frame(&self, scene: &Scene) -> Frame {
@@ -306,8 +314,12 @@ impl Renderer {
 
         material_address_buffer.copy_to(&[material_buffer.device_address()]);
 
-        let acceleration_structure =
-            TopLevelAccelerationStructure::new(self.device.clone(), &self.rtx, &instances);
+        let acceleration_structure = TopLevelAccelerationStructure::new(
+            self.device.clone(),
+            &self.rtx,
+            self.queue.clone(),
+            &instances,
+        );
 
         let descriptor_sets = self.descriptor_sets.descriptor_sets(&self.device);
         if image_writes.len() > 0 {
@@ -317,7 +329,7 @@ impl Renderer {
                 .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
                 .image_info(&image_writes)];
             unsafe {
-                self.device.vk_device().update_descriptor_sets(&writes, &[]);
+                self.device.handle().update_descriptor_sets(&writes, &[]);
             }
         }
 
@@ -347,11 +359,11 @@ impl Renderer {
 impl Renderer {
     pub fn new(device: Rc<DeviceContext>, width: u32, height: u32) -> Self {
         let rtx = RtxContext::new(&device);
-
+        let queue = Rc::new(CommandQueue::new(device.clone(), QueueFlags::GRAPHICS));
         let descriptor_sets = RTXDescriptorSets::new(&device);
         let sampler = unsafe {
             device
-                .vk_device()
+                .handle()
                 .create_sampler(
                     &ash::vk::SamplerCreateInfo::builder()
                         .min_filter(ash::vk::Filter::LINEAR)
@@ -368,6 +380,7 @@ impl Renderer {
         let mut result = Self {
             device,
             rtx,
+            queue,
             pipeline: Pipeline::null(),
             accumulation_image: None,
             accumulation_image_view: ImageView::null(),
@@ -447,19 +460,19 @@ impl Renderer {
             let code = load_spirv(dir.join("ray_gen.rgen.spv").to_str().unwrap());
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let gen = device
-                .vk_device()
+                .handle()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray generation shader compilation failed");
             let code = load_spirv(dir.join("closest_hit.rchit.spv").to_str().unwrap());
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let chit = device
-                .vk_device()
+                .handle()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray closest hit shader compilation failed");
             let code = load_spirv(dir.join("ray_miss.rmiss.spv").to_str().unwrap());
             let shader_module_info = ShaderModuleCreateInfo::builder().code(&code);
             let miss = device
-                .vk_device()
+                .handle()
                 .create_shader_module(&shader_module_info, None)
                 .expect("Ray miss shader compilation failed");
 
@@ -625,7 +638,7 @@ impl Renderer {
 
         unsafe {
             self.output_image_view = device
-                .vk_device()
+                .handle()
                 .create_image_view(&view_info, None)
                 .expect("Image View creation failed");
         }
@@ -644,7 +657,7 @@ impl Renderer {
 
         unsafe {
             self.accumulation_image_view = device
-                .vk_device()
+                .handle()
                 .create_image_view(&accumulation_view_info, None)
                 .expect("Image View creation failed");
         }
@@ -676,7 +689,7 @@ impl Renderer {
         ];
 
         unsafe {
-            device.vk_device().update_descriptor_sets(&writes, &[]);
+            device.handle().update_descriptor_sets(&writes, &[]);
         }
     }
 
@@ -700,7 +713,7 @@ impl Renderer {
         writes[0].descriptor_count = 1;
 
         unsafe {
-            device.vk_device().update_descriptor_sets(&writes, &[]);
+            device.handle().update_descriptor_sets(&writes, &[]);
         }
     }
 
@@ -720,7 +733,7 @@ impl Renderer {
             .descriptor_type(DescriptorType::UNIFORM_BUFFER)];
 
         unsafe {
-            device.vk_device().update_descriptor_sets(&writes, &[]);
+            device.handle().update_descriptor_sets(&writes, &[]);
         }
     }
 
@@ -740,7 +753,7 @@ impl Renderer {
             .descriptor_type(DescriptorType::STORAGE_BUFFER)];
 
         unsafe {
-            device.vk_device().update_descriptor_sets(&writes, &[]);
+            device.handle().update_descriptor_sets(&writes, &[]);
         }
     }
 
@@ -760,7 +773,7 @@ impl Renderer {
             .descriptor_type(DescriptorType::UNIFORM_BUFFER)];
 
         unsafe {
-            device.vk_device().update_descriptor_sets(&writes, &[]);
+            device.handle().update_descriptor_sets(&writes, &[]);
         }
     }
 

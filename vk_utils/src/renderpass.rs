@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{ptr::null, rc::Rc};
 
 use ash::vk::{
     AttachmentDescription, AttachmentLoadOp, AttachmentReference, Device, Format, ImageLayout,
@@ -13,6 +13,7 @@ pub struct RenderPass {
     attachment_descriptions: Vec<AttachmentDescription>,
     subpass_dependencies: Vec<SubpassDependency>,
     subpass_descriptions: Vec<SubpassDescription>,
+    handle: ash::vk::RenderPass,
 }
 impl RenderPass {
     pub fn from_swapchain(device: Rc<DeviceContext>, swapchain: &Swapchain) -> Self {
@@ -49,9 +50,9 @@ impl RenderPass {
             .subpasses(&subpass_descriptions)
             .dependencies(&subpass_dependencies);
 
-        let renderpass = unsafe {
+        let handle = unsafe {
             device
-                .vk_device()
+                .handle()
                 .create_render_pass(&renderpass_create_info, None)
                 .expect("Renderpass creation failed for swapchain")
         };
@@ -62,6 +63,7 @@ impl RenderPass {
             attachment_refs,
             subpass_dependencies,
             subpass_descriptions,
+            handle,
         }
     }
 
@@ -72,6 +74,7 @@ impl RenderPass {
             attachment_descriptions: Vec::new(),
             subpass_dependencies: Vec::new(),
             subpass_descriptions: Vec::new(),
+            handle: ash::vk::RenderPass::null(),
         }
     }
 
@@ -117,9 +120,13 @@ impl RenderPass {
         self
     }
 
-    pub fn build(&mut self, device: &Device) {
+    pub fn build(&mut self) {
         let info = RenderPassCreateInfo::builder()
             .attachments(&self.attachment_descriptions)
             .build();
+    }
+
+    pub fn handle(&self) -> &ash::vk::RenderPass {
+        &self.handle
     }
 }

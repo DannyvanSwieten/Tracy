@@ -5,7 +5,7 @@ use renderer::{
     geometry::{Normal, Position, Tangent, Texcoord},
     gpu_scene::Mesh,
 };
-use vk_utils::device_context::DeviceContext;
+use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
 use crate::{resource::GpuResource, resources::GpuResourceCache};
 
@@ -42,12 +42,14 @@ impl GpuResource for MeshResource {
         &self,
         device: Rc<DeviceContext>,
         rtx: &RtxContext,
+        queue: Rc<CommandQueue>,
         _: &GpuResourceCache,
     ) -> Self::Item {
         // Turn Cpu mesh into Gpu mesh
         Mesh::new(
             device.clone(),
             rtx,
+            queue.clone(),
             &self.indices,
             &self.positions,
             &self.normals,

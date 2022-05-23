@@ -13,6 +13,7 @@ use vk_utils::device_context::DeviceContext;
 use vk_utils::image_resource::Image2DResource;
 
 use ash::vk::{BufferUsageFlags, DescriptorSet, MemoryPropertyFlags};
+use vk_utils::queue::CommandQueue;
 
 pub struct GpuTexture {
     pub image: Image2DResource,
@@ -32,6 +33,7 @@ impl Mesh {
     pub fn new(
         device: Rc<DeviceContext>,
         rtx: &RtxContext,
+        queue: Rc<CommandQueue>,
         indices: &[u32],
         positions: &[Position],
         normals: &[Normal],
@@ -96,6 +98,7 @@ impl Mesh {
         let blas = BottomLevelAccelerationStructure::new(
             device.clone(),
             rtx,
+            queue.clone(),
             &vertex_buffer,
             positions.len() as u32,
             0,

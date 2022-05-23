@@ -13,7 +13,6 @@ pub mod schema;
 pub mod server;
 pub mod simple_shapes;
 
-use ash_window::enumerate_required_extensions;
 use load_scene::load_scene_gltf;
 use nalgebra_glm::{vec3, Mat4};
 use winit::{
@@ -24,10 +23,13 @@ use winit::{
 
 use ash::{
     extensions::{ext::DebugUtils, khr::Surface},
-    vk::SurfaceKHR,
+    vk::QueueFlags,
 };
 use renderer::gpu_path_tracer::Renderer;
-use vk_utils::{swapchain::Swapchain, vulkan::Vulkan};
+use vk_utils::{
+    command_buffer::CommandBuffer, queue::CommandQueue, renderpass::RenderPass,
+    swapchain::Swapchain, vulkan::Vulkan,
+};
 
 use futures::lock::Mutex;
 use std::{rc::Rc, sync::Arc};
@@ -80,6 +82,7 @@ fn main() {
             Mat4::new_nonuniform_scaling(&vec3(1.0, 1.0, 1.0)),
             renderer.device.clone(),
             &renderer.rtx,
+            renderer.queue(),
         );
         let frame = renderer.build_frame(&gpu_scene);
 
@@ -97,12 +100,12 @@ fn main() {
         .expect("Image Write failed");
     } else if mode == "--server".to_string() {
         // set up server
-        // let server = application::ServerApplication::new(
-        //     context.clone(),
-        //     &args[2],
-        //     image_width,
-        //     image_height,
-        // );
+        let server = application::ServerApplication::new(
+            context.clone(),
+            &args[2],
+            image_width,
+            image_height,
+        );
 
         let event_loop = EventLoop::new();
 
@@ -118,12 +121,14 @@ fn main() {
             ash_window::create_surface(&vulkan.library(), &vulkan.vk_instance(), &window, None)
         };
 
+        let command_queue = Rc::new(CommandQueue::new(context.clone(), QueueFlags::GRAPHICS));
+
         let mut swapchain = match surface {
             Ok(s) => Some(Swapchain::new(
                 context.clone(),
                 s,
                 None,
-                0,
+                command_queue.clone(),
                 image_width,
                 image_height,
             )),
@@ -131,6 +136,16 @@ fn main() {
                 println!("{}", error);
                 None
             }
+        };
+
+        if swapchain.is_none() {
+            println!("{}", "No swapchain could be created")
+        }
+
+        let renderpass = if let Some(swapchain) = swapchain.as_ref() {
+            Some(RenderPass::from_swapchain(context.clone(), &swapchain))
+        } else {
+            None
         };
 
         event_loop.run(move |event, _, control_flow| match event {
@@ -141,36 +156,34 @@ fn main() {
             Event::RedrawRequested(window_id) => {
                 if window_id == window.id() {
                     let (width, height): (u32, u32) = window.inner_size().into();
-                    match swapchain.as_mut().unwrap().next_frame_buffer() {
-                        Ok((success, frame_index, framebuffer, semaphore)) => (),
-                        Err(err) => println!("{}", err),
+                    if let Some(swapchain) = swapchain.as_mut() {
+                        match swapchain.next_frame_buffer() {
+                            Ok((sub_optimal_swapchain, frame_index, framebuffer, semaphore)) => {
+                                let mut command_buffer =
+                                    CommandBuffer::new(context.clone(), command_queue.clone());
+                                command_buffer.begin();
+                                command_buffer.begin_render_pass(
+                                    renderpass.as_ref().unwrap(),
+                                    &framebuffer,
+                                    width,
+                                    height,
+                                );
+                                command_buffer.end_render_pass();
+                                command_buffer.submit();
+
+                                swapchain.swap(command_queue.clone(), &semaphore, frame_index);
+                            }
+                            Err(err) => println!("{}", err),
+                        }
                     }
-
-                    // if let Some(mut model) = server.model.try_lock() {
-                    //     let data = model.download_image();
-
-                    //     let mut pixel_buffer =
-                    //         PixelBufferTyped::<NativeFormat>::new_supported(width, height, &window);
-
-                    //     for (i, row) in pixel_buffer.rows_mut().enumerate() {
-                    //         let w = row.len();
-                    //         for (j, pixel) in row.into_iter().enumerate() {
-                    //             let index = (i * w + j) * 4;
-                    //             let value = &data[index..index + 3];
-                    //             *pixel = NativeFormat::from_rgb(value[0], value[1], value[2]);
-                    //         }
-                    //     }
-
-                    //     pixel_buffer.blit(&window).unwrap();
-                    // }
                 }
             }
             _ => {
-                // if let Some(model) = server.model.try_lock() {
-                //     if model.has_new_frame {
-                //         window.request_redraw();
-                //     }
-                // }
+                if let Some(model) = server.model.try_lock() {
+                    if model.has_new_frame {
+                        window.request_redraw();
+                    }
+                }
                 *control_flow = ControlFlow::WaitUntil(
                     std::time::Instant::now() + std::time::Duration::from_millis(100),
                 )

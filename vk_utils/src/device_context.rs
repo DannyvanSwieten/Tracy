@@ -1,12 +1,11 @@
 use crate::gpu::Gpu;
-use crate::queue::QueueHandle;
+use crate::queue::CommandQueue;
 use ash::vk::{DeviceCreateInfoBuilder, DeviceQueueCreateInfo, QueueFlags};
 use ash::Device;
 use std::ffi::CStr;
 pub struct DeviceContext {
     gpu: Gpu,
-    device: Device,
-    graphics_queue: Option<QueueHandle>,
+    handle: Device,
 }
 
 unsafe impl Send for DeviceContext {}
@@ -41,12 +40,7 @@ impl DeviceContext {
                     .unwrap();
                 Self {
                     gpu: gpu.clone(),
-                    device: device_context.clone(),
-                    graphics_queue: Some(QueueHandle::new(
-                        &device_context,
-                        &device_context.get_device_queue(index, 0),
-                        index,
-                    )),
+                    handle: device_context.clone(),
                 }
             }
         } else {
@@ -54,17 +48,22 @@ impl DeviceContext {
         }
     }
 
+    pub fn queue_family_index(&self, flags: QueueFlags) -> Option<u32> {
+        self.gpu.family_type_index(QueueFlags::GRAPHICS)
+    }
+
+    pub fn queue(&self, queue_family_index: u32) -> ash::vk::Queue {
+        unsafe { self.handle.get_device_queue(queue_family_index, 0) }
+    }
+
     pub fn wait(&self) {
         unsafe {
-            self.device.device_wait_idle().expect("Wait failed");
+            self.handle.device_wait_idle().expect("Wait failed");
         }
     }
 
-    pub fn graphics_queue(&self) -> Option<&QueueHandle> {
-        self.graphics_queue.as_ref()
-    }
-    pub fn vk_device(&self) -> &Device {
-        &self.device
+    pub fn handle(&self) -> &Device {
+        &self.handle
     }
 
     pub fn gpu(&self) -> &Gpu {

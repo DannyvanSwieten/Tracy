@@ -1,82 +1,121 @@
+use std::rc::Rc;
+
 use ash::vk::{
-    Buffer, BufferImageCopy, ClearColorValue, CommandBuffer, CommandBufferBeginInfo, CommandPool,
-    DependencyFlags, DescriptorSet, Extent2D, Extent3D, FenceCreateInfo, Framebuffer,
-    ImageAspectFlags, ImageLayout, ImageMemoryBarrier, ImageSubresourceLayers,
-    ImageSubresourceRange, PipelineBindPoint, PipelineLayout, PipelineStageFlags, Queue, Rect2D,
-    RenderPass, RenderPassBeginInfo, SubmitInfo, SubpassContents,
+    Buffer, BufferImageCopy, ClearColorValue, ClearValue, CommandBufferAllocateInfo,
+    CommandBufferBeginInfo, CommandPool, DependencyFlags, DescriptorSet, Extent2D, Extent3D,
+    FenceCreateInfo, Framebuffer, ImageAspectFlags, ImageLayout, ImageMemoryBarrier,
+    ImageSubresourceLayers, ImageSubresourceRange, PipelineBindPoint, PipelineLayout,
+    PipelineStageFlags, Rect2D, RenderPass, RenderPassBeginInfo, SubmitInfo, SubpassContents,
 };
-use ash::Device;
 
 use crate::buffer_resource::BufferResource;
-use crate::graphics_pipeline::GraphicsPipeline;
+use crate::device_context::DeviceContext;
 use crate::image_resource::Image2DResource;
+use crate::queue::CommandQueue;
 use crate::wait_handle::WaitHandle;
 
-pub struct CommandBufferHandle {
-    device: Device,
-    queue: Queue,
-    command_buffer: [CommandBuffer; 1],
+pub struct CommandBuffer {
+    device: Rc<DeviceContext>,
+    queue: Rc<CommandQueue>,
+    handle: Vec<ash::vk::CommandBuffer>,
     submit_info: [SubmitInfo; 1],
     begin_info: CommandBufferBeginInfo,
 }
 
-impl CommandBufferHandle {
-    pub(crate) fn new(device: &Device, queue: &Queue, command_buffer: &CommandBuffer) -> Self {
+impl CommandBuffer {
+    pub fn new(device: Rc<DeviceContext>, queue: Rc<CommandQueue>) -> Self {
+        let info = *CommandBufferAllocateInfo::builder()
+            .command_buffer_count(1)
+            .command_pool(queue.pool());
+        let handle = unsafe { device.handle().allocate_command_buffers(&info) };
         let mut me = Self {
             device: device.clone(),
             queue: queue.clone(),
-            command_buffer: [command_buffer.clone()],
+            handle: handle.expect("Command buffer allocation failed"),
             submit_info: [SubmitInfo::default()],
             begin_info: CommandBufferBeginInfo::default(),
         };
 
-        me.submit_info[0] = *SubmitInfo::builder().command_buffers(&me.command_buffer);
+        me.submit_info[0] = *SubmitInfo::builder().command_buffers(&me.handle);
         me
     }
 
-    pub(crate) fn begin(&self) {
+    pub fn begin(&mut self) {
         unsafe {
-            self.device
-                .begin_command_buffer(self.command_buffer[0], &self.begin_info)
-                .expect("Command buffer begin failed");
+            let success = self
+                .device
+                .handle()
+                .begin_command_buffer(self.handle(), &self.begin_info);
+
+            match success {
+                Ok(_) => (),
+                Err(error) => assert!(false),
+            }
         }
     }
 
-    pub(crate) fn submit(&self, command_pool: &CommandPool) -> WaitHandle {
+    pub fn record_handle<F>(&mut self, f: F)
+    where
+        F: FnOnce(ash::vk::CommandBuffer) -> ash::vk::CommandBuffer,
+    {
+        self.handle[0] = f(self.handle());
+    }
+
+    pub fn end(&mut self) {
+        unsafe {
+            let success = self.device.handle().end_command_buffer(self.handle());
+
+            match success {
+                Ok(_) => (),
+                Err(error) => assert!(false),
+            }
+        }
+    }
+
+    pub fn submit(&self) -> WaitHandle {
         unsafe {
             let info = FenceCreateInfo::builder().build();
             let fence = self
                 .device
+                .handle()
                 .create_fence(&info, None)
                 .expect("Fence creation failed");
 
             self.device
-                .end_command_buffer(self.command_buffer[0])
+                .handle()
+                .end_command_buffer(self.handle())
                 .expect("Command Buffer end failed");
             self.device
-                .queue_submit(*self.queue(), self.submit_info(), fence)
+                .handle()
+                .queue_submit(self.queue.handle(), &self.submit_info, fence)
                 .expect("Queue submit failed");
 
-            WaitHandle::new(&self.device, command_pool, *self.command_buffer(), fence)
+            WaitHandle::new(
+                self.device.clone(),
+                &self.queue.pool(),
+                self.handle(),
+                fence,
+            )
         }
     }
 
-    pub fn bind_pipeline(&self, bind_point: PipelineBindPoint, pipeline: &ash::vk::Pipeline) {
+    pub fn bind_pipeline(&mut self, bind_point: PipelineBindPoint, pipeline: &ash::vk::Pipeline) {
         unsafe {
             self.device
-                .cmd_bind_pipeline(*self.command_buffer(), bind_point, *pipeline);
+                .handle()
+                .cmd_bind_pipeline(self.handle(), bind_point, *pipeline);
         }
     }
 
     pub fn bind_descriptor_sets(
-        &self,
+        &mut self,
         layout: &PipelineLayout,
         bind_point: PipelineBindPoint,
         sets: &[DescriptorSet],
     ) {
         unsafe {
-            self.device.cmd_bind_descriptor_sets(
-                *self.command_buffer(),
+            self.device.handle().cmd_bind_descriptor_sets(
+                self.handle(),
                 bind_point,
                 *layout,
                 0,
@@ -86,23 +125,24 @@ impl CommandBufferHandle {
         }
     }
 
-    pub fn bind_vertex_buffer(&self, first_binding: u32, buffers: &[Buffer]) {
+    pub fn bind_vertex_buffer(&mut self, first_binding: u32, buffers: &[Buffer]) {
         unsafe {
             self.device
-                .cmd_bind_vertex_buffers(*self.command_buffer(), first_binding, buffers, &[])
+                .handle()
+                .cmd_bind_vertex_buffers(self.handle(), first_binding, buffers, &[])
         }
     }
 
     pub fn draw_vertices(
-        &self,
+        &mut self,
         vertex_count: u32,
         first_vertex: u32,
         instance_count: u32,
         first_instance: u32,
     ) {
         unsafe {
-            self.device.cmd_draw(
-                *self.command_buffer(),
+            self.device.handle().cmd_draw(
+                self.handle(),
                 vertex_count,
                 instance_count,
                 first_vertex,
@@ -111,28 +151,12 @@ impl CommandBufferHandle {
         }
     }
 
-    pub(crate) fn device(&self) -> &Device {
-        &self.device
-    }
-
-    pub(crate) fn queue(&self) -> &Queue {
-        &self.queue
-    }
-
-    pub(crate) fn command_buffer(&self) -> &CommandBuffer {
-        &self.command_buffer[0]
-    }
-
-    pub fn native_handle(&self) -> &CommandBuffer {
-        &self.command_buffer[0]
-    }
-
-    pub(crate) fn submit_info(&self) -> &[SubmitInfo] {
-        &self.submit_info
+    pub(crate) fn handle(&self) -> ash::vk::CommandBuffer {
+        self.handle[0]
     }
 
     pub fn color_image_resource_transition(
-        &self,
+        &mut self,
         image: &mut Image2DResource,
         layout: ImageLayout,
     ) {
@@ -152,8 +176,8 @@ impl CommandBufferHandle {
             .build();
 
         unsafe {
-            self.device.cmd_pipeline_barrier(
-                self.command_buffer[0],
+            self.device.handle().cmd_pipeline_barrier(
+                self.handle(),
                 PipelineStageFlags::ALL_COMMANDS,
                 PipelineStageFlags::ALL_COMMANDS,
                 DependencyFlags::BY_REGION,
@@ -167,7 +191,7 @@ impl CommandBufferHandle {
     }
 
     pub fn color_image_transition(
-        &self,
+        &mut self,
         image: &ash::vk::Image,
         old_layout: ImageLayout,
         new_layout: ImageLayout,
@@ -188,8 +212,8 @@ impl CommandBufferHandle {
             .build();
 
         unsafe {
-            self.device.cmd_pipeline_barrier(
-                self.command_buffer[0],
+            self.device.handle().cmd_pipeline_barrier(
+                self.handle(),
                 PipelineStageFlags::ALL_COMMANDS,
                 PipelineStageFlags::ALL_COMMANDS,
                 DependencyFlags::BY_REGION,
@@ -200,7 +224,7 @@ impl CommandBufferHandle {
         }
     }
 
-    pub fn clear_image_2d(&self, image: &Image2DResource, r: f32, g: f32, b: f32, a: f32) {
+    pub fn clear_image_2d(&mut self, image: &Image2DResource, r: f32, g: f32, b: f32, a: f32) {
         unsafe {
             let value = ClearColorValue {
                 float32: [r, g, b, a],
@@ -209,8 +233,8 @@ impl CommandBufferHandle {
                 .layer_count(1)
                 .level_count(1)
                 .aspect_mask(ImageAspectFlags::COLOR)];
-            self.device.cmd_clear_color_image(
-                *self.command_buffer(),
+            self.device.handle().cmd_clear_color_image(
+                self.handle(),
                 *image.vk_image(),
                 ImageLayout::GENERAL,
                 &value,
@@ -219,7 +243,7 @@ impl CommandBufferHandle {
         }
     }
 
-    pub fn copy_image_2d_to_buffer(&self, image: &Image2DResource, buffer: &BufferResource) {
+    pub fn copy_image_2d_to_buffer(&mut self, image: &Image2DResource, buffer: &BufferResource) {
         let layer_info = ImageSubresourceLayers::builder()
             .layer_count(1)
             .aspect_mask(ImageAspectFlags::COLOR);
@@ -233,8 +257,8 @@ impl CommandBufferHandle {
             .image_subresource(*layer_info)];
 
         unsafe {
-            self.device.cmd_copy_image_to_buffer(
-                self.command_buffer[0],
+            self.device.handle().cmd_copy_image_to_buffer(
+                self.handle(),
                 *image.vk_image(),
                 image.layout(),
                 buffer.buffer,
@@ -243,7 +267,7 @@ impl CommandBufferHandle {
         }
     }
 
-    pub fn copy_buffer_to_image_2d(&self, buffer: &BufferResource, image: &Image2DResource) {
+    pub fn copy_buffer_to_image_2d(&mut self, buffer: &BufferResource, image: &Image2DResource) {
         let layer_info = ImageSubresourceLayers::builder()
             .layer_count(1)
             .aspect_mask(ImageAspectFlags::COLOR);
@@ -257,8 +281,8 @@ impl CommandBufferHandle {
             .image_subresource(*layer_info)];
 
         unsafe {
-            self.device.cmd_copy_buffer_to_image(
-                self.command_buffer[0],
+            self.device.handle().cmd_copy_buffer_to_image(
+                self.handle(),
                 buffer.buffer,
                 *image.vk_image(),
                 image.layout(),
@@ -267,15 +291,20 @@ impl CommandBufferHandle {
         }
     }
 
-    pub(crate) fn begin_render_pass(
-        &self,
-        render_pass: &RenderPass,
+    pub fn begin_render_pass(
+        &mut self,
+        render_pass: &crate::renderpass::RenderPass,
         framebuffer: &Framebuffer,
         width: u32,
         height: u32,
     ) {
         let info = RenderPassBeginInfo::builder()
-            .render_pass(*render_pass)
+            .render_pass(*render_pass.handle())
+            .clear_values(&[ClearValue {
+                color: ClearColorValue {
+                    float32: [0.0, 1.0, 0.0, 1.0],
+                },
+            }])
             .render_area(
                 Rect2D::builder()
                     .extent(Extent2D::builder().width(width).height(height).build())
@@ -285,15 +314,15 @@ impl CommandBufferHandle {
             .build();
 
         unsafe {
-            self.device.cmd_begin_render_pass(
-                *self.command_buffer(),
+            self.device.handle().cmd_begin_render_pass(
+                self.handle(),
                 &info,
                 SubpassContents::INLINE,
             )
         }
     }
 
-    pub(crate) fn end_render_pass(&self) {
-        unsafe { self.device.cmd_end_render_pass(*self.command_buffer()) }
+    pub fn end_render_pass(&mut self) {
+        unsafe { self.device.handle().cmd_end_render_pass(self.handle()) }
     }
 }

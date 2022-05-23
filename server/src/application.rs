@@ -4,8 +4,8 @@ use crate::resources::{GpuResourceCache, Resources};
 use super::schema;
 use super::server::Server;
 use futures::lock::Mutex;
-use renderer::gpu_scene::{Frame, Scene};
 use renderer::gpu_path_tracer::Renderer;
+use renderer::gpu_scene::{Frame, Scene};
 use std::rc::Rc;
 use std::sync::Arc;
 use vk_utils::device_context::DeviceContext;
@@ -64,6 +64,7 @@ impl Model {
             nalgebra_glm::Mat4x4::identity(),
             self.renderer.device.clone(),
             &self.renderer.rtx,
+            self.renderer.queue(),
         );
         let frame = self.renderer.build_frame(&scene);
         if self.cached_frames.len() == 0 {

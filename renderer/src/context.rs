@@ -80,9 +80,9 @@ impl RtxContext {
         }
 
         let acceleration_structure_ext =
-            AccelerationStructure::new(device.gpu().vulkan().vk_instance(), device.vk_device());
+            AccelerationStructure::new(device.gpu().vulkan().vk_instance(), device.handle());
         let ray_tracing_pipeline_ext =
-            RayTracingPipeline::new(device.gpu().vulkan().vk_instance(), device.vk_device());
+            RayTracingPipeline::new(device.gpu().vulkan().vk_instance(), device.handle());
 
         let mut pipeline_properties = PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
         let _properties = device

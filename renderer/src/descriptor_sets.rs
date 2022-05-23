@@ -29,7 +29,7 @@ impl RTXDescriptorSets {
             .descriptor_pool(self.descriptor_pool);
         unsafe {
             device
-                .vk_device()
+                .handle()
                 .allocate_descriptor_sets(&descriptor_set_create_info)
                 .expect("Descriptor set allocation failed")
         }
@@ -87,11 +87,11 @@ impl RTXDescriptorSets {
 
             let descriptor_set_layouts = vec![
                 device
-                    .vk_device()
+                    .handle()
                     .create_descriptor_set_layout(&set_0, None)
                     .expect("Descriptor set layout creation failed"),
                 device
-                    .vk_device()
+                    .handle()
                     .create_descriptor_set_layout(&set_1, None)
                     .expect("Descriptor set layout creation failed"),
             ];
@@ -101,7 +101,7 @@ impl RTXDescriptorSets {
                 .stage_flags(ShaderStageFlags::RAYGEN_KHR)];
 
             let pipeline_layout = device
-                .vk_device()
+                .handle()
                 .create_pipeline_layout(
                     &PipelineLayoutCreateInfo::builder()
                         .set_layouts(&descriptor_set_layouts)
@@ -139,7 +139,7 @@ impl RTXDescriptorSets {
                 .max_sets(32)
                 .pool_sizes(&sizes);
             let descriptor_pool = device
-                .vk_device()
+                .handle()
                 .create_descriptor_pool(&descriptor_pool_create_info, None)
                 .expect("Descriptor pool creation failed");
 

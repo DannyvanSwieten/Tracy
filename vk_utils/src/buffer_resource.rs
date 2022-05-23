@@ -22,7 +22,7 @@ impl BufferResource {
         unsafe {
             let ptr = self
                 .device
-                .vk_device()
+                .handle()
                 .map_memory(self.memory, 0, self.size, MemoryMapFlags::default())
                 .expect("Memory map failed on buffer");
 
@@ -35,10 +35,10 @@ impl BufferResource {
                 .size(self.size)];
 
             self.device
-            .vk_device()
+                .handle()
                 .flush_mapped_memory_ranges(&ranges)
                 .expect("Memory flush failed");
-            self.device.vk_device().unmap_memory(self.memory);
+            self.device.handle().unmap_memory(self.memory);
         }
     }
 
@@ -54,7 +54,7 @@ impl BufferResource {
             for i in (0..self.content_size).step_by(stride) {
                 let ptr = self
                     .device
-                    .vk_device()
+                    .handle()
                     .map_memory(self.memory, i, stride as u64, MemoryMapFlags::default())
                     .expect("Memory map failed on buffer");
 
@@ -71,10 +71,10 @@ impl BufferResource {
                     .size(ash::vk::WHOLE_SIZE)];
 
                 self.device
-                    .vk_device()
+                    .handle()
                     .flush_mapped_memory_ranges(&ranges)
                     .expect("Memory flush failed");
-                self.device.vk_device().unmap_memory(self.memory);
+                self.device.handle().unmap_memory(self.memory);
             }
         }
     }
@@ -83,7 +83,7 @@ impl BufferResource {
         unsafe {
             let ptr = self
                 .device
-                .vk_device()
+                .handle()
                 .map_memory(self.memory, 0, self.size, MemoryMapFlags::default())
                 .expect("Memory map failed on buffer") as *mut T;
 
@@ -106,7 +106,7 @@ impl BufferResource {
         usage: BufferUsageFlags,
     ) -> Self {
         unsafe {
-            let device = device_context.vk_device();
+            let device = device_context.handle();
             let buffer_info = BufferCreateInfo::builder()
                 .size(size)
                 .sharing_mode(SharingMode::EXCLUSIVE)
@@ -161,13 +161,17 @@ impl BufferResource {
 
     pub fn device_address(&self) -> DeviceAddress {
         let v_address_info = BufferDeviceAddressInfo::builder().buffer(self.buffer);
-        unsafe { self.device.vk_device().get_buffer_device_address(&v_address_info) }
+        unsafe {
+            self.device
+                .handle()
+                .get_buffer_device_address(&v_address_info)
+        }
     }
 }
 
 impl Drop for BufferResource {
     fn drop(&mut self) {
-        unsafe { self.device.vk_device().free_memory(self.memory, None) }
-        unsafe { self.device.vk_device().destroy_buffer(self.buffer, None) }
+        unsafe { self.device.handle().free_memory(self.memory, None) }
+        unsafe { self.device.handle().destroy_buffer(self.buffer, None) }
     }
 }

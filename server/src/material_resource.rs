@@ -1,8 +1,8 @@
-use std::{sync::Arc, rc::Rc};
+use std::{rc::Rc, sync::Arc};
 
 use nalgebra_glm::{vec4, Vec4};
 use renderer::context::RtxContext;
-use vk_utils::device_context::DeviceContext;
+use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
 use crate::{
     image_resource::TextureImageData,
@@ -63,6 +63,7 @@ impl GpuResource for Material {
         &self,
         _: Rc<DeviceContext>,
         _: &RtxContext,
+        _: Rc<CommandQueue>,
         cache: &GpuResourceCache,
     ) -> Self::Item {
         let mut mat = renderer::material::Material::new(

@@ -1,7 +1,7 @@
-use std::{any::TypeId, ops::Deref, sync::Arc, rc::Rc};
+use std::{any::TypeId, ops::Deref, rc::Rc, sync::Arc};
 
 use renderer::context::RtxContext;
-use vk_utils::device_context::DeviceContext;
+use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
 use crate::resources::GpuResourceCache;
 
@@ -12,6 +12,7 @@ pub trait GpuResource {
         &self,
         device: Rc<DeviceContext>,
         rtx: &RtxContext,
+        queue: Rc<CommandQueue>,
         cache: &GpuResourceCache,
     ) -> Self::Item;
 }
@@ -70,11 +71,12 @@ impl<T: GpuResource + 'static> Resource<T> {
         &self,
         device: Rc<DeviceContext>,
         rtx: &RtxContext,
+        queue: Rc<CommandQueue>,
         cache: &GpuResourceCache,
     ) -> Arc<renderer::resource::Resource<T::Item>> {
         Arc::new(renderer::resource::Resource::new(
             self.uid,
-            self.item.prepare(device, rtx, cache),
+            self.item.prepare(device, rtx, queue, cache),
         ))
     }
 }

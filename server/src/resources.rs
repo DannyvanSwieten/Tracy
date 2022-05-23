@@ -6,11 +6,12 @@ use std::sync::Arc;
 use renderer::context::RtxContext;
 use renderer::gpu_scene::{GpuTexture, Mesh};
 use vk_utils::device_context::DeviceContext;
+use vk_utils::queue::CommandQueue;
 
 use crate::image_resource::TextureImageData;
-use crate::material_resource::{Material};
+use crate::material_resource::Material;
 use crate::mesh_resource::{self, MeshResource};
-use crate::resource::{Resource};
+use crate::resource::Resource;
 
 static GLOBAL_CPU_RESOURCE_ID: AtomicUsize = AtomicUsize::new(0);
 
@@ -103,12 +104,13 @@ impl GpuResourceCache {
         &mut self,
         device: Rc<DeviceContext>,
         rtx: &RtxContext,
+        queue: Rc<CommandQueue>,
         mesh: &Arc<Resource<mesh_resource::MeshResource>>,
     ) -> Arc<renderer::resource::Resource<Mesh>> {
         let prepared = self.meshes.get(&mesh.uid());
         if prepared.is_none() {
             self.meshes
-                .insert(mesh.uid(), mesh.prepare(device, rtx, self));
+                .insert(mesh.uid(), mesh.prepare(device, rtx, queue, self));
         }
         self.meshes.get(&mesh.uid()).unwrap().clone()
     }
@@ -117,28 +119,29 @@ impl GpuResourceCache {
         &mut self,
         device: Rc<DeviceContext>,
         rtx: &RtxContext,
+        queue: Rc<CommandQueue>,
         material: &Arc<Resource<Material>>,
     ) -> Arc<renderer::resource::Resource<renderer::material::Material>> {
         let prepared = self.materials.get(&material.uid());
         if prepared.is_none() {
             if let Some(base_color) = &material.albedo_map {
-                self.add_texture(device.clone(), rtx, &base_color);
+                self.add_texture(device.clone(), rtx, queue.clone(), &base_color);
             }
 
             if let Some(metallic_roughness) = &material.metallic_roughness_map {
-                self.add_texture(device.clone(), rtx, &metallic_roughness);
+                self.add_texture(device.clone(), rtx, queue.clone(), &metallic_roughness);
             }
 
             if let Some(normal) = &material.normal_map {
-                self.add_texture(device.clone(), rtx, &normal);
+                self.add_texture(device.clone(), rtx, queue.clone(), &normal);
             }
 
             if let Some(emission) = &material.emission_map {
-                self.add_texture(device.clone(), rtx, &emission);
+                self.add_texture(device.clone(), rtx, queue.clone(), &emission);
             }
 
             self.materials
-                .insert(material.uid(), material.prepare(device, rtx, self));
+                .insert(material.uid(), material.prepare(device, rtx, queue, self));
         }
 
         self.materials.get(&material.uid()).unwrap().clone()
@@ -148,12 +151,13 @@ impl GpuResourceCache {
         &mut self,
         device: Rc<DeviceContext>,
         rtx: &RtxContext,
+        queue: Rc<CommandQueue>,
         texture: &Arc<Resource<TextureImageData>>,
     ) -> Arc<renderer::resource::Resource<GpuTexture>> {
         let prepared = self.textures.get(&texture.uid());
         if prepared.is_none() {
             self.textures
-                .insert(texture.uid(), texture.prepare(device, rtx, self));
+                .insert(texture.uid(), texture.prepare(device, rtx, queue, self));
         }
 
         self.textures.get(&texture.uid()).unwrap().clone()
