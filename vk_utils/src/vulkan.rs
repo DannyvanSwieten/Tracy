@@ -1,3 +1,4 @@
+use ash::extensions::ext::MetalSurface;
 use ash::vk::{
     make_api_version, ApplicationInfo, Bool32, DebugUtilsMessageSeverityFlagsEXT,
     DebugUtilsMessageTypeFlagsEXT, DebugUtilsMessengerCallbackDataEXT,
@@ -47,7 +48,7 @@ unsafe extern "system" fn vulkan_debug_callback(
 
 pub fn surface_extension_name() -> &'static CStr {
     if cfg!(unix) {
-        ash::vk::MvkMacosSurfaceFn::name()
+        MetalSurface::name()
     } else {
         Win32Surface::name()
     }

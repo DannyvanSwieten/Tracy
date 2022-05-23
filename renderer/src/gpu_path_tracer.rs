@@ -9,6 +9,9 @@ use crate::descriptor_sets::{
 use crate::geometry::TopLevelAccelerationStructure;
 use crate::gpu_scene::{Frame, MeshAddress, Scene};
 use crate::material::GpuMaterial;
+use ash::extensions::khr::{
+    AccelerationStructure, DeferredHostOperations, RayTracingPipeline, Swapchain,
+};
 use nalgebra_glm::{vec3, Vec3};
 
 use vk_utils::buffer_resource::BufferResource;
@@ -69,9 +72,10 @@ unsafe impl Send for Renderer {}
 impl Renderer {
     pub fn create_suitable_device_windows(gpu: &Gpu) -> DeviceContext {
         let extensions = [
-            ash::extensions::khr::RayTracingPipeline::name(),
-            ash::extensions::khr::AccelerationStructure::name(),
-            ash::extensions::khr::DeferredHostOperations::name(),
+            RayTracingPipeline::name(),
+            AccelerationStructure::name(),
+            DeferredHostOperations::name(),
+            Swapchain::name(),
         ];
 
         let mut rt_features = ash::vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::builder()
@@ -97,7 +101,7 @@ impl Renderer {
     }
 
     pub fn create_suitable_device_mac(gpu: &Gpu) -> DeviceContext {
-        let extensions = [KhrPortabilitySubsetFn::name()];
+        let extensions = [KhrPortabilitySubsetFn::name(), Swapchain::name()];
 
         let mut address_features =
             ash::vk::PhysicalDeviceVulkan12Features::builder().buffer_device_address(true);

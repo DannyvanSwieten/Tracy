@@ -10,8 +10,8 @@
             "name": "Launch Debug MacOS",
             "program": "${workspaceFolder}/target/debug/tracey",
             "args": [
-                "--file",
-                "${workspaceFolder}/assets/Duck/glTF/Duck.gltf",
+                "--server",
+                "localhost:7000",
                 "1280",
                 "720"
             ],
@@ -28,10 +28,12 @@
             //     "1280",
             //     "720"
             // ],
-            "args": ["--server",
-                    "localhost:7000",
-                    "1280", "720"
-                ],
+            "args": [
+                "--server",
+                "localhost:7000",
+                "1280",
+                "720"
+            ],
             "stopOnEntry": false,
             "cwd": "${workspaceFolder}",
             "console": "externalTerminal"
@@ -61,6 +63,6 @@
             "name": "Launch Chrome against localhost",
             "url": "http://localhost:3000",
             "webRoot": "${workspaceFolder}"
-          }
+        }
     ]
 }

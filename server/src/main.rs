@@ -13,6 +13,7 @@ pub mod schema;
 pub mod server;
 pub mod simple_shapes;
 
+use ash_window::enumerate_required_extensions;
 use load_scene::load_scene_gltf;
 use nalgebra_glm::{vec3, Mat4};
 use winit::{
@@ -21,12 +22,12 @@ use winit::{
     window::WindowBuilder,
 };
 
-use ash::extensions::{
-    ext::DebugUtils,
-    khr::{Surface, Swapchain},
+use ash::{
+    extensions::{ext::DebugUtils, khr::Surface},
+    vk::SurfaceKHR,
 };
 use renderer::gpu_path_tracer::Renderer;
-use vk_utils::vulkan::Vulkan;
+use vk_utils::{swapchain::Swapchain, vulkan::Vulkan};
 
 use futures::lock::Mutex;
 use std::{rc::Rc, sync::Arc};
@@ -96,8 +97,12 @@ fn main() {
         .expect("Image Write failed");
     } else if mode == "--server".to_string() {
         // set up server
-        let server =
-            application::ServerApplication::new(context, &args[2], image_width, image_height);
+        // let server = application::ServerApplication::new(
+        //     context.clone(),
+        //     &args[2],
+        //     image_width,
+        //     image_height,
+        // );
 
         let event_loop = EventLoop::new();
 
@@ -109,6 +114,25 @@ fn main() {
             .build(&event_loop)
             .unwrap();
 
+        let surface = unsafe {
+            ash_window::create_surface(&vulkan.library(), &vulkan.vk_instance(), &window, None)
+        };
+
+        let mut swapchain = match surface {
+            Ok(s) => Some(Swapchain::new(
+                context.clone(),
+                s,
+                None,
+                0,
+                image_width,
+                image_height,
+            )),
+            Err(error) => {
+                println!("{}", error);
+                None
+            }
+        };
+
         event_loop.run(move |event, _, control_flow| match event {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
@@ -117,6 +141,10 @@ fn main() {
             Event::RedrawRequested(window_id) => {
                 if window_id == window.id() {
                     let (width, height): (u32, u32) = window.inner_size().into();
+                    match swapchain.as_mut().unwrap().next_frame_buffer() {
+                        Ok((success, frame_index, framebuffer, semaphore)) => (),
+                        Err(err) => println!("{}", err),
+                    }
 
                     // if let Some(mut model) = server.model.try_lock() {
                     //     let data = model.download_image();
@@ -138,11 +166,11 @@ fn main() {
                 }
             }
             _ => {
-                if let Some(model) = server.model.try_lock() {
-                    if model.has_new_frame {
-                        window.request_redraw();
-                    }
-                }
+                // if let Some(model) = server.model.try_lock() {
+                //     if model.has_new_frame {
+                //         window.request_redraw();
+                //     }
+                // }
                 *control_flow = ControlFlow::WaitUntil(
                     std::time::Instant::now() + std::time::Duration::from_millis(100),
                 )

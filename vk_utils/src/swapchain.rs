@@ -160,8 +160,6 @@ fn create_swapchain(
 
 impl Swapchain {
     pub fn new(
-        vulkan: &Vulkan,
-        gpu: &Gpu,
         device: Rc<DeviceContext>,
         surface: ash::vk::SurfaceKHR,
         old_swapchain: Option<&ash::vk::SwapchainKHR>,
@@ -169,6 +167,7 @@ impl Swapchain {
         width: u32,
         height: u32,
     ) -> Self {
+        let vulkan = device.gpu().vulkan();
         let surface_loader =
             ash::extensions::khr::Surface::new(vulkan.library(), vulkan.vk_instance());
         let swapchain_loader =
@@ -176,7 +175,7 @@ impl Swapchain {
         let (swapchain, images, image_views, format, physical_width, physical_height) =
             create_swapchain(
                 vulkan.vk_instance(),
-                gpu.vk_physical_device(),
+                device.gpu().vk_physical_device(),
                 device.vk_device(),
                 &surface_loader,
                 surface.clone(),
