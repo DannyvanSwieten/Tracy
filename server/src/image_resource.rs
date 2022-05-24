@@ -3,7 +3,7 @@ use std::rc::Rc;
 use renderer::{context::RtxContext, gpu_scene::GpuTexture};
 use vk_utils::{
     buffer_resource::BufferResource, command_buffer::CommandBuffer, device_context::DeviceContext,
-    image_resource::Image2DResource, queue::CommandQueue,
+    image2d_resource::Image2DResource, image_resource::ImageResource, queue::CommandQueue,
 };
 
 use crate::{resource::GpuResource, resources::GpuResourceCache};
@@ -81,24 +81,20 @@ impl GpuResource for TextureImageData {
 
         let mut command_buffer = CommandBuffer::new(device.clone(), queue.clone());
         command_buffer.begin();
-        command_buffer.color_image_resource_transition(
-            &mut image,
-            ash::vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-        );
+        command_buffer
+            .image_resource_transition(&mut image, ash::vk::ImageLayout::TRANSFER_DST_OPTIMAL);
 
-        command_buffer.copy_buffer_to_image_2d(&buffer, &image);
+        command_buffer.copy_buffer_to_image(&buffer, &mut image);
 
-        command_buffer.color_image_resource_transition(
-            &mut image,
-            ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-        );
+        command_buffer
+            .image_resource_transition(&mut image, ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
 
         command_buffer.submit();
 
         let view_info = *ash::vk::ImageViewCreateInfo::builder()
             .format(self.format)
             .view_type(ash::vk::ImageViewType::TYPE_2D)
-            .image(*image.vk_image())
+            .image(image.handle())
             .subresource_range(
                 *ash::vk::ImageSubresourceRange::builder()
                     .layer_count(1)

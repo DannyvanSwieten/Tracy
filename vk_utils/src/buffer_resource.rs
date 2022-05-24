@@ -6,8 +6,7 @@ use crate::memory::memory_type_index;
 use ash::vk::{
     Buffer, BufferCreateInfo, BufferDeviceAddressInfo, BufferUsageFlags, DeviceAddress,
     DeviceMemory, MappedMemoryRange, MemoryAllocateFlags, MemoryAllocateFlagsInfo,
-    MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags, PhysicalDeviceMemoryProperties,
-    SharingMode,
+    MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags, SharingMode,
 };
 pub struct BufferResource {
     device: Rc<DeviceContext>,

@@ -2,15 +2,16 @@ use std::rc::Rc;
 
 use ash::vk::{
     Buffer, BufferImageCopy, ClearColorValue, ClearValue, CommandBufferAllocateInfo,
-    CommandBufferBeginInfo, CommandPool, DependencyFlags, DescriptorSet, Extent2D, Extent3D,
-    FenceCreateInfo, Framebuffer, ImageAspectFlags, ImageLayout, ImageMemoryBarrier,
+    CommandBufferBeginInfo, DependencyFlags, DescriptorSet, Extent2D, Extent3D, FenceCreateInfo,
+    Filter, Framebuffer, ImageAspectFlags, ImageBlit, ImageLayout, ImageMemoryBarrier,
     ImageSubresourceLayers, ImageSubresourceRange, PipelineBindPoint, PipelineLayout,
-    PipelineStageFlags, Rect2D, RenderPass, RenderPassBeginInfo, SubmitInfo, SubpassContents,
+    PipelineStageFlags, Rect2D, RenderPassBeginInfo, SubmitInfo, SubpassContents,
 };
 
 use crate::buffer_resource::BufferResource;
 use crate::device_context::DeviceContext;
-use crate::image_resource::Image2DResource;
+use crate::image2d_resource::Image2DResource;
+use crate::image_resource::ImageResource;
 use crate::queue::CommandQueue;
 use crate::wait_handle::WaitHandle;
 
@@ -155,15 +156,15 @@ impl CommandBuffer {
         self.handle[0]
     }
 
-    pub fn color_image_resource_transition(
+    pub fn image_resource_transition(
         &mut self,
-        image: &mut Image2DResource,
+        image: &mut impl ImageResource,
         layout: ImageLayout,
     ) {
         let barrier = ImageMemoryBarrier::builder()
             .old_layout(image.layout())
             .new_layout(layout)
-            .image(*image.vk_image())
+            .image(image.handle())
             .src_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
             .dst_queue_family_index(ash::vk::QUEUE_FAMILY_IGNORED)
             .subresource_range(
@@ -186,8 +187,31 @@ impl CommandBuffer {
                 &[barrier],
             );
         }
+    }
 
-        image.layout = layout;
+    pub fn blit(&mut self, src: &impl ImageResource, dst: &mut impl ImageResource) {
+        let regions = [*ImageBlit::builder()
+            .dst_subresource(
+                *ImageSubresourceLayers::builder()
+                    .aspect_mask(ImageAspectFlags::COLOR)
+                    .layer_count(1),
+            )
+            .src_subresource(
+                *ImageSubresourceLayers::builder()
+                    .aspect_mask(ImageAspectFlags::COLOR)
+                    .layer_count(1),
+            )];
+        unsafe {
+            self.device.handle().cmd_blit_image(
+                self.handle(),
+                src.handle(),
+                src.layout(),
+                dst.handle(),
+                dst.layout(),
+                &regions,
+                Filter::LINEAR,
+            )
+        }
     }
 
     pub fn color_image_transition(
@@ -224,7 +248,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn clear_image_2d(&mut self, image: &Image2DResource, r: f32, g: f32, b: f32, a: f32) {
+    pub fn clear_image(&mut self, image: &mut impl ImageResource, r: f32, g: f32, b: f32, a: f32) {
         unsafe {
             let value = ClearColorValue {
                 float32: [r, g, b, a],
@@ -235,7 +259,7 @@ impl CommandBuffer {
                 .aspect_mask(ImageAspectFlags::COLOR)];
             self.device.handle().cmd_clear_color_image(
                 self.handle(),
-                *image.vk_image(),
+                image.handle(),
                 ImageLayout::GENERAL,
                 &value,
                 &range,
@@ -243,7 +267,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn copy_image_2d_to_buffer(&mut self, image: &Image2DResource, buffer: &BufferResource) {
+    pub fn copy_image_to_buffer(&mut self, image: &impl ImageResource, buffer: &BufferResource) {
         let layer_info = ImageSubresourceLayers::builder()
             .layer_count(1)
             .aspect_mask(ImageAspectFlags::COLOR);
@@ -252,14 +276,14 @@ impl CommandBuffer {
                 *Extent3D::builder()
                     .width(image.width())
                     .height(image.height())
-                    .depth(1),
+                    .depth(image.depth()),
             )
             .image_subresource(*layer_info)];
 
         unsafe {
             self.device.handle().cmd_copy_image_to_buffer(
                 self.handle(),
-                *image.vk_image(),
+                image.handle(),
                 image.layout(),
                 buffer.buffer,
                 &copy,
@@ -267,7 +291,11 @@ impl CommandBuffer {
         }
     }
 
-    pub fn copy_buffer_to_image_2d(&mut self, buffer: &BufferResource, image: &Image2DResource) {
+    pub fn copy_buffer_to_image(
+        &mut self,
+        buffer: &BufferResource,
+        image: &mut impl ImageResource,
+    ) {
         let layer_info = ImageSubresourceLayers::builder()
             .layer_count(1)
             .aspect_mask(ImageAspectFlags::COLOR);
@@ -276,7 +304,7 @@ impl CommandBuffer {
                 *Extent3D::builder()
                     .width(image.width())
                     .height(image.height())
-                    .depth(1),
+                    .depth(image.depth()),
             )
             .image_subresource(*layer_info)];
 
@@ -284,7 +312,7 @@ impl CommandBuffer {
             self.device.handle().cmd_copy_buffer_to_image(
                 self.handle(),
                 buffer.buffer,
-                *image.vk_image(),
+                image.handle(),
                 image.layout(),
                 &copy,
             )

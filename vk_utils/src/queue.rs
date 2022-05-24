@@ -44,33 +44,4 @@ impl CommandQueue {
     pub(crate) fn pool(&self) -> CommandPool {
         self.command_pool
     }
-
-    // pub fn begin_render_pass<F>(
-    //     &self,
-    //     render_pass: &RenderPass,
-    //     framebuffer: &Framebuffer,
-    //     width: u32,
-    //     height: u32,
-    //     f: F,
-    // ) -> WaitHandle
-    // where
-    //     F: FnOnce(CommandBuffer) -> CommandBuffer,
-    // {
-    //     let command_buffer = self.command_buffer();
-    //     command_buffer.begin();
-    //     command_buffer.begin_render_pass(render_pass.handle(), framebuffer, width, height);
-    //     let command_buffer = f(command_buffer);
-    //     command_buffer.end_render_pass();
-    //     command_buffer.submit(&self.command_pool)
-    // }
-
-    // pub fn begin<F>(&self, f: F) -> WaitHandle
-    // where
-    //     F: FnOnce(CommandBuffer) -> CommandBuffer,
-    // {
-    //     let command_buffer = self.command_buffer();
-    //     command_buffer.begin();
-    //     let command_buffer = f(command_buffer);
-    //     command_buffer.submit(&self.command_pool)
-    // }
 }

@@ -9,7 +9,7 @@ pub use ash::{Entry, Instance};
 use std::borrow::Cow;
 use std::ffi::{CStr, CString};
 
-use ash::extensions::{ext::DebugUtils, khr::Win32Surface, mvk::MacOSSurface};
+use ash::extensions::{ext::DebugUtils, khr::Win32Surface};
 
 use crate::gpu::Gpu;
 

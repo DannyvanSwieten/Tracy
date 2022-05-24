@@ -18,7 +18,8 @@ use vk_utils::buffer_resource::BufferResource;
 use vk_utils::command_buffer::CommandBuffer;
 use vk_utils::device_context::DeviceContext;
 use vk_utils::gpu::Gpu;
-use vk_utils::image_resource::Image2DResource;
+use vk_utils::image2d_resource::Image2DResource;
+use vk_utils::image_resource::ImageResource;
 use vk_utils::queue::CommandQueue;
 use vk_utils::shader_library::load_spirv;
 use vk_utils::wait_handle::WaitHandle;
@@ -133,7 +134,7 @@ impl Renderer {
 
         let mut command_buffer = CommandBuffer::new(self.device.clone(), self.queue.clone());
         command_buffer.begin();
-        command_buffer.copy_image_2d_to_buffer(&self.output_image.as_ref().unwrap(), &buffer);
+        command_buffer.copy_image_to_buffer(self.output_image.as_ref().unwrap(), &buffer);
 
         buffer
     }
@@ -141,14 +142,14 @@ impl Renderer {
         let mut command_buffer = CommandBuffer::new(self.device.clone(), self.queue.clone());
         command_buffer.begin();
         if let Some(image) = self.output_image.as_mut() {
-            command_buffer.color_image_resource_transition(image, ImageLayout::GENERAL);
+            command_buffer.image_resource_transition(image, ImageLayout::GENERAL);
             self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
         } else {
             panic!()
         }
 
         if let Some(image) = self.accumulation_image.as_mut() {
-            command_buffer.color_image_resource_transition(image, ImageLayout::GENERAL);
+            command_buffer.image_resource_transition(image, ImageLayout::GENERAL);
             self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
         } else {
             panic!()
@@ -203,7 +204,7 @@ impl Renderer {
         }
 
         (
-            *self.output_image.as_mut().unwrap().vk_image(),
+            self.output_image.as_mut().unwrap().handle(),
             self.output_image_view,
         )
     }
@@ -634,7 +635,7 @@ impl Renderer {
                     .build(),
             )
             .view_type(ImageViewType::TYPE_2D)
-            .image(*self.output_image.as_ref().unwrap().vk_image());
+            .image(self.output_image.as_ref().unwrap().handle());
 
         unsafe {
             self.output_image_view = device
@@ -653,7 +654,7 @@ impl Renderer {
                     .build(),
             )
             .view_type(ImageViewType::TYPE_2D)
-            .image(*self.accumulation_image.as_ref().unwrap().vk_image());
+            .image(self.accumulation_image.as_ref().unwrap().handle());
 
         unsafe {
             self.accumulation_image_view = device

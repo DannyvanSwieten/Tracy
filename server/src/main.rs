@@ -168,10 +168,11 @@ fn main() {
                                     width,
                                     height,
                                 );
+
                                 command_buffer.end_render_pass();
                                 command_buffer.submit();
 
-                                swapchain.swap(command_queue.clone(), &semaphore, frame_index);
+                                swapchain.swap(&semaphore, frame_index);
                             }
                             Err(err) => println!("{}", err),
                         }
@@ -180,9 +181,9 @@ fn main() {
             }
             _ => {
                 if let Some(model) = server.model.try_lock() {
-                    if model.has_new_frame {
-                        window.request_redraw();
-                    }
+                    //if model.has_new_frame {
+                    window.request_redraw();
+                    //}
                 }
                 *control_flow = ControlFlow::WaitUntil(
                     std::time::Instant::now() + std::time::Duration::from_millis(100),
