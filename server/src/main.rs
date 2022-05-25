@@ -1,4 +1,5 @@
 pub mod application;
+pub mod image_renderer;
 pub mod image_resource;
 pub mod instancer;
 pub mod load_scene;
@@ -27,12 +28,12 @@ use ash::{
 };
 use renderer::gpu_path_tracer::Renderer;
 use vk_utils::{
-    command_buffer::CommandBuffer, queue::CommandQueue, renderpass::RenderPass,
-    swapchain::Swapchain, vulkan::Vulkan,
+    command_buffer::CommandBuffer, graphics_pipeline::GraphicsPipelineState, queue::CommandQueue,
+    renderpass::RenderPass, shader_library::ShaderLibrary, swapchain::Swapchain, vulkan::Vulkan,
 };
 
 use futures::lock::Mutex;
-use std::{rc::Rc, sync::Arc};
+use std::{path::Path, rc::Rc, sync::Arc};
 
 use crate::resources::{GpuResourceCache, Resources};
 
@@ -122,6 +123,33 @@ fn main() {
         };
 
         let command_queue = Rc::new(CommandQueue::new(context.clone(), QueueFlags::GRAPHICS));
+        let path = std::env::current_exe()
+            .expect("current dir check failed")
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("shaders");
+        let mut shader_library = ShaderLibrary::new(context.clone(), &path);
+        shader_library.add_spirv_from_file(
+            ash::vk::ShaderStageFlags::VERTEX,
+            "v_sampled_image",
+            "main",
+            Path::new("sampled_image.vert.spv"),
+        );
+
+        shader_library.add_spirv_from_file(
+            ash::vk::ShaderStageFlags::FRAGMENT,
+            "f_sampled_image",
+            "main",
+            Path::new("sampled_image.frag.spv"),
+        );
+
+        GraphicsPipelineState::new()
+            .with_vertex_shader(shader_library.get_unchecked("v_sampled_image").module())
+            .with_fragment_shader(shader_library.get_unchecked("f_sampled_image").module());
 
         let mut swapchain = match surface {
             Ok(s) => Some(Swapchain::new(
@@ -138,13 +166,10 @@ fn main() {
             }
         };
 
-        if swapchain.is_none() {
-            println!("{}", "No swapchain could be created")
-        }
-
         let renderpass = if let Some(swapchain) = swapchain.as_ref() {
             Some(RenderPass::from_swapchain(context.clone(), &swapchain))
         } else {
+            println!("{}", "No swapchain could be created");
             None
         };
 
@@ -170,6 +195,11 @@ fn main() {
                                 );
 
                                 command_buffer.end_render_pass();
+                                if let Some(model) = server.model.try_lock() {
+                                    let image = model.renderer.output_image();
+                                    let swapchain_image = swapchain.image_mut(frame_index);
+                                    command_buffer.blit(image.as_ref(), swapchain_image);
+                                }
                                 command_buffer.submit();
 
                                 swapchain.swap(&semaphore, frame_index);
@@ -181,9 +211,9 @@ fn main() {
             }
             _ => {
                 if let Some(model) = server.model.try_lock() {
-                    //if model.has_new_frame {
-                    window.request_redraw();
-                    //}
+                    if model.has_new_frame {
+                        window.request_redraw();
+                    }
                 }
                 *control_flow = ControlFlow::WaitUntil(
                     std::time::Instant::now() + std::time::Duration::from_millis(100),

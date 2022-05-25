@@ -4,7 +4,7 @@ use ash::vk::{
     Buffer, BufferImageCopy, ClearColorValue, ClearValue, CommandBufferAllocateInfo,
     CommandBufferBeginInfo, DependencyFlags, DescriptorSet, Extent2D, Extent3D, FenceCreateInfo,
     Filter, Framebuffer, ImageAspectFlags, ImageBlit, ImageLayout, ImageMemoryBarrier,
-    ImageSubresourceLayers, ImageSubresourceRange, PipelineBindPoint, PipelineLayout,
+    ImageSubresourceLayers, ImageSubresourceRange, Offset3D, PipelineBindPoint, PipelineLayout,
     PipelineStageFlags, Rect2D, RenderPassBeginInfo, SubmitInfo, SubpassContents,
 };
 
@@ -41,6 +41,10 @@ impl CommandBuffer {
         me
     }
 
+    pub(crate) fn queue(&self) -> Rc<CommandQueue> {
+        self.queue.clone()
+    }
+
     pub fn begin(&mut self) {
         unsafe {
             let success = self
@@ -73,7 +77,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn submit(&self) -> WaitHandle {
+    pub fn submit(self) -> WaitHandle {
         unsafe {
             let info = FenceCreateInfo::builder().build();
             let fence = self
@@ -91,12 +95,7 @@ impl CommandBuffer {
                 .queue_submit(self.queue.handle(), &self.submit_info, fence)
                 .expect("Queue submit failed");
 
-            WaitHandle::new(
-                self.device.clone(),
-                &self.queue.pool(),
-                self.handle(),
-                fence,
-            )
+            WaitHandle::new(self, fence)
         }
     }
 
@@ -156,6 +155,10 @@ impl CommandBuffer {
         self.handle[0]
     }
 
+    pub(crate) fn device(&self) -> Rc<DeviceContext> {
+        self.device.clone()
+    }
+
     pub fn image_resource_transition(
         &mut self,
         image: &mut impl ImageResource,
@@ -196,6 +199,8 @@ impl CommandBuffer {
                     .aspect_mask(ImageAspectFlags::COLOR)
                     .layer_count(1),
             )
+            .dst_offsets([*Offset3D::builder(), *Offset3D::builder().z(1)])
+            .src_offsets([*Offset3D::builder(), *Offset3D::builder().z(1)])
             .src_subresource(
                 *ImageSubresourceLayers::builder()
                     .aspect_mask(ImageAspectFlags::COLOR)

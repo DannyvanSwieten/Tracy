@@ -1,9 +1,13 @@
 use ash::vk::{ShaderModule, ShaderModuleCreateInfo, ShaderStageFlags};
 use ash::Device;
 use std::collections::HashMap;
+use std::path::Path;
+use std::rc::Rc;
 
 use byteorder::ReadBytesExt;
 use std::fs::File;
+
+use crate::device_context::DeviceContext;
 
 pub fn load_spirv(path: &str) -> Vec<u32> {
     let file = File::open(path).expect(&(String::from("File not found at: ") + &path.to_string()));
@@ -23,28 +27,44 @@ pub struct ShaderLibraryEntry {
     stage: ShaderStageFlags,
     entry_point: String,
 }
+
+impl ShaderLibraryEntry {
+    pub fn module(&self) -> &ShaderModule {
+        &self.module
+    }
+}
 pub struct ShaderLibrary {
+    device: Rc<DeviceContext>,
     entries: HashMap<String, ShaderLibraryEntry>,
+    root: String,
 }
 
 impl ShaderLibrary {
+    pub fn new(device: Rc<DeviceContext>, root: &Path) -> Self {
+        Self {
+            device,
+            entries: HashMap::new(),
+            root: root.to_str().unwrap().to_string(),
+        }
+    }
+
     pub fn add_spirv(
         &mut self,
-        device: &Device,
         stage: ShaderStageFlags,
-        name: &str,
+        id: &str,
         entry_point: &str,
         code: &[u32],
     ) {
         let info = ShaderModuleCreateInfo::builder().code(code).build();
         let module = unsafe {
-            device
+            self.device
+                .handle()
                 .create_shader_module(&info, None)
                 .expect("Shader Module creation failed")
         };
 
         self.entries.insert(
-            String::from(name),
+            String::from(id),
             ShaderLibraryEntry {
                 module,
                 entry_point: String::from(entry_point),
@@ -52,18 +72,23 @@ impl ShaderLibrary {
             },
         );
     }
-    pub fn add_file(
+    pub fn add_spirv_from_file(
         &mut self,
-        device: &Device,
         stage: ShaderStageFlags,
-        name: &str,
+        id: &str,
         entry_point: &str,
-        path: &str,
+        path: &Path,
     ) {
-        let spirv = load_spirv(path);
-        self.add_spirv(device, stage, name, entry_point, &spirv);
+        if let Some(p) = Path::new(&self.root).join(path).to_str() {
+            let spirv = load_spirv(p);
+            self.add_spirv(stage, id, entry_point, &spirv);
+        }
     }
-    pub fn get(&self, name: &str) -> Option<&ShaderLibraryEntry> {
-        self.entries.get(&String::from(name))
+    pub fn get(&self, id: &str) -> Option<&ShaderLibraryEntry> {
+        self.entries.get(&String::from(id))
+    }
+
+    pub fn get_unchecked(&self, id: &str) -> &ShaderLibraryEntry {
+        &self.entries.get(&String::from(id)).unwrap()
     }
 }

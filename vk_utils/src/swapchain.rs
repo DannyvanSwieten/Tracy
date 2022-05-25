@@ -1,5 +1,6 @@
 use crate::device_context::DeviceContext;
 use crate::queue::CommandQueue;
+use crate::swapchain_image::SwapchainImage;
 use crate::swapchain_util::create_swapchain;
 use ash::vk::SurfaceKHR;
 use std::rc::Rc;
@@ -10,7 +11,7 @@ pub struct Swapchain {
     swapchain_loader: ash::extensions::khr::Swapchain,
     surface: ash::vk::SurfaceKHR,
     handle: ash::vk::SwapchainKHR,
-    images: Vec<ash::vk::Image>,
+    images: Vec<SwapchainImage>,
     _image_views: Vec<ash::vk::ImageView>,
     present_semaphores: Vec<ash::vk::Semaphore>,
     renderpass: ash::vk::RenderPass,
@@ -124,13 +125,26 @@ impl Swapchain {
             });
         }
 
+        let swapchain_images = images
+            .iter()
+            .map(|image| {
+                SwapchainImage::new(
+                    *image,
+                    ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                    format.format,
+                    width,
+                    height,
+                )
+            })
+            .collect();
+
         Self {
             device: device.clone(),
             queue: queue.clone(),
             surface,
             handle: swapchain,
             swapchain_loader,
-            images,
+            images: swapchain_images,
             _image_views: image_views,
             present_semaphores,
             renderpass,
@@ -205,8 +219,16 @@ impl Swapchain {
         self.images.len()
     }
 
-    pub fn images(&self) -> &Vec<ash::vk::Image> {
+    pub fn images(&self) -> &Vec<SwapchainImage> {
         &self.images
+    }
+
+    pub fn image(&self, index: u32) -> &SwapchainImage {
+        &self.images[index as usize]
+    }
+
+    pub fn image_mut(&mut self, index: u32) -> &mut SwapchainImage {
+        &mut self.images[index as usize]
     }
 
     pub fn format(&self) -> &ash::vk::Format {

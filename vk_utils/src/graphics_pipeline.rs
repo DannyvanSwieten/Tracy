@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use ash::vk::{
     GraphicsPipelineCreateInfo, Pipeline, PipelineCache, PipelineColorBlendStateCreateInfo,
     PipelineDepthStencilStateCreateInfo, PipelineDynamicStateCreateInfo, PipelineLayout,
@@ -8,117 +10,123 @@ use ash::vk::{
 
 use crate::device_context::DeviceContext;
 
-pub struct GraphicsPipeline {
-    blend_state: PipelineColorBlendStateCreateInfo,
-    depth_stencil_state: PipelineDepthStencilStateCreateInfo,
-    dynamic_state: PipelineDynamicStateCreateInfo,
-    multisample_state: PipelineMultisampleStateCreateInfo,
-    rasterization_state: PipelineRasterizationStateCreateInfo,
+#[derive(Default, Clone)]
+pub struct GraphicsPipelineState {
+    blend_state: Option<PipelineColorBlendStateCreateInfo>,
+    depth_stencil_state: Option<PipelineDepthStencilStateCreateInfo>,
+    dynamic_state: Option<PipelineDynamicStateCreateInfo>,
+    multisample_state: Option<PipelineMultisampleStateCreateInfo>,
+    rasterization_state: Option<PipelineRasterizationStateCreateInfo>,
     shader_stage_state: Vec<PipelineShaderStageCreateInfo>,
-    tesselation_state: PipelineTessellationStateCreateInfo,
-    viewport_state: PipelineViewportStateCreateInfo,
-    pipeline_layout: PipelineLayout,
-    render_pass: RenderPass,
-    pipeline: Pipeline,
+    tesselation_state: Option<PipelineTessellationStateCreateInfo>,
+    viewport_state: Option<PipelineViewportStateCreateInfo>,
 }
 
-impl GraphicsPipeline {
+impl GraphicsPipelineState {
     pub fn new() -> Self {
-        Self {
-            blend_state: PipelineColorBlendStateCreateInfo::default(),
-            depth_stencil_state: PipelineDepthStencilStateCreateInfo::default(),
-            dynamic_state: PipelineDynamicStateCreateInfo::default(),
-            multisample_state: PipelineMultisampleStateCreateInfo::default(),
-            rasterization_state: PipelineRasterizationStateCreateInfo::default(),
-            shader_stage_state: Vec::new(),
-            tesselation_state: PipelineTessellationStateCreateInfo::default(),
-            viewport_state: PipelineViewportStateCreateInfo::default(),
-            pipeline_layout: PipelineLayout::null(),
-            render_pass: RenderPass::null(),
-            pipeline: Pipeline::null(),
+        Self::default()
+    }
+
+    pub fn with_polygon_mode(mut self, mode: PolygonMode) -> Self {
+        if self.rasterization_state.is_none() {
+            self.rasterization_state = Some(PipelineRasterizationStateCreateInfo::default())
         }
+
+        self.rasterization_state.unwrap().polygon_mode = mode;
+        self
     }
 
-    pub fn with_polygon_mode(&mut self, mode: PolygonMode) {
-        self.rasterization_state.polygon_mode = mode
+    pub fn with_depth_testing(mut self) -> Self {
+        if self.depth_stencil_state.is_none() {
+            self.depth_stencil_state = Some(PipelineDepthStencilStateCreateInfo::default())
+        }
+
+        self.depth_stencil_state.unwrap().depth_test_enable = 1;
+        self
     }
 
-    pub fn enable_depth_testing(&mut self) {
-        self.depth_stencil_state.depth_test_enable = 1;
+    pub fn with_depth_writing(mut self) -> Self {
+        if self.depth_stencil_state.is_none() {
+            self.depth_stencil_state = Some(PipelineDepthStencilStateCreateInfo::default())
+        }
+        self.depth_stencil_state.unwrap().depth_write_enable = 1;
+        self
     }
 
-    pub fn enable_depth_writing(&mut self) {
-        self.depth_stencil_state.depth_write_enable = 1;
-    }
-
-    pub fn set_vertex_shader(&mut self, module: &ShaderModule) {
+    pub fn with_vertex_shader(mut self, module: &ShaderModule) -> Self {
         self.shader_stage_state.push(
             PipelineShaderStageCreateInfo::builder()
                 .module(*module)
                 .stage(ShaderStageFlags::VERTEX)
                 .build(),
-        )
+        );
+
+        self
     }
 
-    pub fn set_fragment_shader(&mut self, module: &ShaderModule) {
+    pub fn with_fragment_shader(mut self, module: &ShaderModule) -> Self {
         self.shader_stage_state.push(
             PipelineShaderStageCreateInfo::builder()
                 .module(*module)
                 .stage(ShaderStageFlags::FRAGMENT)
                 .build(),
-        )
+        );
+
+        self
     }
 
-    pub fn set_geometry_shader(&mut self, module: &ShaderModule) {
+    pub fn with_geometry_shader(mut self, module: &ShaderModule) -> Self {
         self.shader_stage_state.push(
             PipelineShaderStageCreateInfo::builder()
                 .module(*module)
                 .stage(ShaderStageFlags::GEOMETRY)
                 .build(),
-        )
+        );
+
+        self
     }
 
-    pub fn set_tesselation_control_shader(&mut self, module: &ShaderModule) {
+    pub fn with_tesselation_control_shader(mut self, module: &ShaderModule) -> Self {
         self.shader_stage_state.push(
             PipelineShaderStageCreateInfo::builder()
                 .module(*module)
                 .stage(ShaderStageFlags::TESSELLATION_CONTROL)
                 .build(),
-        )
+        );
+
+        self
     }
 
-    pub fn set_tesselation_evaluation_shader(&mut self, module: &ShaderModule) {
+    pub fn with_tesselation_evaluation_shader(mut self, module: &ShaderModule) -> Self {
         self.shader_stage_state.push(
             PipelineShaderStageCreateInfo::builder()
                 .module(*module)
                 .stage(ShaderStageFlags::TESSELLATION_EVALUATION)
                 .build(),
-        )
+        );
+
+        self
     }
+}
 
-    pub fn build(&mut self, device: &DeviceContext) {
-        let create_info = GraphicsPipelineCreateInfo::builder()
-            .layout(self.pipeline_layout)
-            .render_pass(self.render_pass)
-            .stages(&self.shader_stage_state)
-            .tessellation_state(&self.tesselation_state)
-            .multisample_state(&self.multisample_state)
-            .viewport_state(&self.viewport_state)
-            .dynamic_state(&self.dynamic_state)
-            .depth_stencil_state(&self.depth_stencil_state)
-            .color_blend_state(&self.blend_state)
-            .rasterization_state(&self.rasterization_state)
-            .build();
+pub struct GraphicsPipeline {
+    device: Rc<DeviceContext>,
+    state: GraphicsPipelineState,
+    pipeline_layout: PipelineLayout,
+    pipeline: Pipeline,
+}
 
-        unsafe {
-            self.pipeline = device
-                .handle()
-                .create_graphics_pipelines(PipelineCache::null(), &[create_info], None)
-                .expect("Pipeline creation failed")[0];
+impl GraphicsPipeline {
+    pub fn new(device: Rc<DeviceContext>, state: GraphicsPipelineState) -> Self {
+        Self {
+            device,
+            state,
+            pipeline_layout: PipelineLayout::null(),
+            pipeline: Pipeline::null(),
         }
     }
 
-    pub fn vk_pipeline(&self) -> &Pipeline {
+    pub fn handle(&self) -> &Pipeline {
         &self.pipeline
     }
 

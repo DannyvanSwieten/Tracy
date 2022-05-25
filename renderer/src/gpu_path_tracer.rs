@@ -50,9 +50,9 @@ pub struct Renderer {
     pub rtx: RtxContext,
     pipeline: Pipeline,
     queue: Rc<CommandQueue>,
-    accumulation_image: Option<Image2DResource>,
+    accumulation_image: Rc<Image2DResource>,
     accumulation_image_view: ImageView,
-    output_image: Option<Image2DResource>,
+    output_image: Rc<Image2DResource>,
     output_image_view: ImageView,
     shader_binding_table: Option<BufferResource>,
     stride_addresses: Vec<StridedDeviceAddressRegionKHR>,
@@ -134,26 +134,22 @@ impl Renderer {
 
         let mut command_buffer = CommandBuffer::new(self.device.clone(), self.queue.clone());
         command_buffer.begin();
-        command_buffer.copy_image_to_buffer(self.output_image.as_ref().unwrap(), &buffer);
+        command_buffer.copy_image_to_buffer(self.output_image.as_ref(), &buffer);
 
         buffer
     }
-    pub fn render_frame(&mut self, frame: &Frame, spp: u32) -> (Image, ImageView) {
+    pub fn render_frame(&mut self, frame: &Frame, spp: u32) -> (Rc<Image2DResource>, ImageView) {
         let mut command_buffer = CommandBuffer::new(self.device.clone(), self.queue.clone());
         command_buffer.begin();
-        if let Some(image) = self.output_image.as_mut() {
-            command_buffer.image_resource_transition(image, ImageLayout::GENERAL);
-            self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
-        } else {
-            panic!()
-        }
+        command_buffer.image_resource_transition(
+            Rc::get_mut(&mut self.output_image).unwrap(),
+            ImageLayout::GENERAL,
+        );
 
-        if let Some(image) = self.accumulation_image.as_mut() {
-            command_buffer.image_resource_transition(image, ImageLayout::GENERAL);
-            self.output_image.as_mut().unwrap().layout = ImageLayout::GENERAL;
-        } else {
-            panic!()
-        }
+        command_buffer.image_resource_transition(
+            Rc::get_mut(&mut self.output_image).unwrap(),
+            ImageLayout::GENERAL,
+        );
 
         command_buffer.bind_descriptor_sets(
             &self.descriptor_sets.pipeline_layout,
@@ -203,14 +199,15 @@ impl Renderer {
             self.current_batch += 1;
         }
 
-        (
-            self.output_image.as_mut().unwrap().handle(),
-            self.output_image_view,
-        )
+        (self.output_image.clone(), self.output_image_view)
     }
 
     pub fn queue(&self) -> Rc<CommandQueue> {
         self.queue.clone()
+    }
+
+    pub fn output_image(&self) -> Rc<Image2DResource> {
+        self.output_image.clone()
     }
 
     pub fn build_frame(&self, scene: &Scene) -> Frame {
@@ -378,14 +375,32 @@ impl Renderer {
 
         let d = device.clone();
 
+        let accumulation_image = Image2DResource::new(
+            device.clone(),
+            width,
+            height,
+            Format::R32G32B32A32_SFLOAT,
+            ImageUsageFlags::STORAGE,
+            MemoryPropertyFlags::DEVICE_LOCAL,
+        );
+
+        let output_image = Image2DResource::new(
+            device.clone(),
+            width,
+            height,
+            Format::R8G8B8A8_UNORM,
+            ImageUsageFlags::TRANSFER_SRC | ImageUsageFlags::STORAGE,
+            MemoryPropertyFlags::DEVICE_LOCAL,
+        );
+
         let mut result = Self {
             device,
             rtx,
             queue,
             pipeline: Pipeline::null(),
-            accumulation_image: None,
+            accumulation_image: Rc::new(accumulation_image),
             accumulation_image_view: ImageView::null(),
-            output_image: None,
+            output_image: Rc::new(output_image),
             output_image_view: ImageView::null(),
             shader_binding_table: None,
             stride_addresses: Vec::new(),
@@ -607,7 +622,7 @@ impl Renderer {
         self.output_width = width;
         self.output_height = height;
 
-        self.output_image = Some(Image2DResource::new(
+        self.output_image = Rc::new(Image2DResource::new(
             self.device.clone(),
             width,
             height,
@@ -616,7 +631,7 @@ impl Renderer {
             MemoryPropertyFlags::DEVICE_LOCAL,
         ));
 
-        self.accumulation_image = Some(Image2DResource::new(
+        self.accumulation_image = Rc::new(Image2DResource::new(
             self.device.clone(),
             width,
             height,
@@ -635,7 +650,7 @@ impl Renderer {
                     .build(),
             )
             .view_type(ImageViewType::TYPE_2D)
-            .image(self.output_image.as_ref().unwrap().handle());
+            .image(self.output_image.handle());
 
         unsafe {
             self.output_image_view = device
@@ -654,7 +669,7 @@ impl Renderer {
                     .build(),
             )
             .view_type(ImageViewType::TYPE_2D)
-            .image(self.accumulation_image.as_ref().unwrap().handle());
+            .image(self.accumulation_image.handle());
 
         unsafe {
             self.accumulation_image_view = device

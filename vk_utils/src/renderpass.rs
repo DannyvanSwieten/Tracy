@@ -78,55 +78,69 @@ impl RenderPass {
         }
     }
 
-    pub fn with_color_attachment(mut self, format: Format, final_layout: ImageLayout) -> Self {
-        let attachment_description = AttachmentDescription::builder()
-            .final_layout(final_layout)
-            .load_op(AttachmentLoadOp::LOAD)
-            .samples(SampleCountFlags::TYPE_1)
-            .format(format)
-            .build();
+    pub fn new_with_single_output(
+        device: Rc<DeviceContext>,
+        format: Format,
+        initial_layout: ImageLayout,
+        final_layout: ImageLayout,
+    ) -> Self {
+        let attachment_descriptions = vec![ash::vk::AttachmentDescription {
+            format: format,
+            samples: ash::vk::SampleCountFlags::TYPE_1,
+            load_op: ash::vk::AttachmentLoadOp::LOAD,
+            store_op: ash::vk::AttachmentStoreOp::STORE,
+            final_layout,
+            ..Default::default()
+        }];
 
-        let attachment_ref = AttachmentReference::builder()
-            .layout(ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-            .attachment(self.attachment_descriptions.len() as u32)
-            .build();
+        let attachment_refs = vec![ash::vk::AttachmentReference {
+            attachment: 0,
+            layout: initial_layout,
+        }];
 
-        self.attachment_descriptions.push(attachment_description);
-        self.attachment_refs.push(attachment_ref);
+        let subpass_dependencies = vec![ash::vk::SubpassDependency {
+            src_subpass: ash::vk::SUBPASS_EXTERNAL,
+            src_stage_mask: ash::vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            dst_access_mask: ash::vk::AccessFlags::COLOR_ATTACHMENT_READ
+                | ash::vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+            dst_stage_mask: ash::vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            ..Default::default()
+        }];
 
-        self
-    }
+        let subpass_descriptions = vec![ash::vk::SubpassDescription::builder()
+            .color_attachments(&attachment_refs)
+            .pipeline_bind_point(ash::vk::PipelineBindPoint::GRAPHICS)
+            .build()];
 
-    pub fn with_depth_attachment(mut self, format: Format) -> Self {
-        let attachment_description = AttachmentDescription::builder()
-            .load_op(AttachmentLoadOp::DONT_CARE)
-            .samples(SampleCountFlags::TYPE_1)
-            .format(format)
-            .build();
+        let renderpass_create_info = ash::vk::RenderPassCreateInfo::builder()
+            .attachments(&attachment_descriptions)
+            .subpasses(&subpass_descriptions)
+            .dependencies(&subpass_dependencies);
 
-        let attachment_ref = AttachmentReference::builder()
-            .layout(ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-            .attachment(self.attachment_descriptions.len() as u32)
-            .build();
+        let handle = unsafe {
+            device
+                .handle()
+                .create_render_pass(&renderpass_create_info, None)
+                .expect("Renderpass creation failed for swapchain")
+        };
 
-        self.attachment_descriptions.push(attachment_description);
-        self.attachment_refs.push(attachment_ref);
-
-        self
-    }
-
-    pub fn with_sub_pass_dependency(mut self, dependency: SubpassDependency) -> Self {
-        self.subpass_dependencies.push(dependency);
-        self
-    }
-
-    pub fn build(&mut self) {
-        let info = RenderPassCreateInfo::builder()
-            .attachments(&self.attachment_descriptions)
-            .build();
+        Self {
+            device: device.clone(),
+            attachment_descriptions,
+            attachment_refs,
+            subpass_dependencies,
+            subpass_descriptions,
+            handle,
+        }
     }
 
     pub fn handle(&self) -> &ash::vk::RenderPass {
         &self.handle
+    }
+}
+
+impl Drop for RenderPass {
+    fn drop(&mut self) {
+        unsafe { self.device.handle().destroy_render_pass(self.handle, None) }
     }
 }
