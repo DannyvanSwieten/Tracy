@@ -43,7 +43,7 @@ impl Node {
 
         Self {
             id,
-            name: "".to_string(),
+            name: actor.name().to_string(),
             children: actor.children().to_vec(),
             camera: None,
             mesh,
@@ -126,6 +126,16 @@ pub struct Scene {
 #[derive(Clone)]
 pub struct Project {
     pub name: String,
+    pub scene: Scene,
+}
+
+impl Project {
+    pub fn new(name: &str, scene: Scene) -> Self {
+        Self {
+            name: name.to_string(),
+            scene,
+        }
+    }
 }
 
 #[Object]
@@ -208,7 +218,7 @@ pub struct Query;
 
 #[Object]
 impl Query {
-    async fn scenes(&self, context: &Context<'_>) -> Result<Scene> {
+    async fn scene(&self, context: &Context<'_>) -> Result<Scene> {
         let model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
         let scene = Scene::new(&model.project.scene_graph);
         Ok(scene)
@@ -216,9 +226,7 @@ impl Query {
 
     async fn project(&self, context: &Context<'_>) -> Result<Project> {
         let model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
-        let project = Project {
-            name: model.project.name.clone(),
-        };
+        let project = Project::new(&model.project.name, Scene::new(&model.project.scene_graph));
         Ok(project)
     }
 
@@ -253,7 +261,12 @@ pub struct Mutation {}
 
 #[Object]
 impl Mutation {
-    async fn create_basic_shape(&self, context: &Context<'_>, shape: String) -> Result<bool> {
+    async fn create_basic_shape(
+        &self,
+        context: &Context<'_>,
+        shape: String,
+        parent: usize,
+    ) -> Result<bool> {
         let mut model = context.data::<Arc<Mutex<Model>>>()?.lock().await;
         let mesh_resource = if shape == "Triangle" {
             Some(
@@ -280,14 +293,15 @@ impl Mutation {
             ))
         };
         if let Some(mesh) = mesh_resource {
-            let node_id = model.project.scene_graph.create_node();
+            let node_id = model.project.scene_graph.create_node_with_parent(parent);
             let material = model.cpu_resource_cache.default_material();
             model
                 .project
                 .scene_graph
                 .node_mut(node_id)
                 .with_mesh(mesh)
-                .with_material(material);
+                .with_material(material)
+                .with_name(&shape);
 
             match model.broadcasters.node_added.send(Node::new(
                 node_id,

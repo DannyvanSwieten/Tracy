@@ -21,6 +21,7 @@ impl Instancer for DefaultInstancer {
 }
 
 pub struct Entity {
+    name: String,
     local_transform: Mat4x4,
     global_transform: Mat4x4,
     mesh: Option<Arc<Resource<MeshResource>>>,
@@ -36,6 +37,7 @@ impl Entity {
             mesh: None,
             material: None,
             children: Vec::new(),
+            name: "Untitled".to_string(),
         }
     }
 
@@ -89,6 +91,15 @@ impl Entity {
         self
     }
 
+    pub fn with_name(&mut self, name: &str) -> &mut Self {
+        self.name = name.to_string();
+        self
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     pub fn mesh(&self) -> &Option<Arc<Resource<MeshResource>>> {
         &self.mesh
     }
@@ -106,10 +117,12 @@ pub struct SceneGraph {
 
 impl SceneGraph {
     pub fn new(name: &str) -> Self {
+        let mut root = Entity::new();
+        root.with_name("Root");
         Self {
             name: name.to_string(),
             root: 0,
-            nodes: Vec::new(),
+            nodes: vec![root],
         }
     }
 
@@ -146,11 +159,18 @@ impl SceneGraph {
     pub fn expand_node(&mut self, resources: &Resources, node_id: usize, primitives: &Vec<usize>) {
         self.nodes[node_id].mesh = None;
         for primitive in primitives {
-            let child_id = self.create_node();
+            let child_id = self.create_node_with_parent(node_id);
             self.nodes[node_id]
                 .with_child(child_id)
                 .with_mesh(resources.get_mesh_unchecked(*primitive));
         }
+    }
+
+    pub fn create_node_with_parent(&mut self, parent: usize) -> usize {
+        self.nodes.push(Entity::new());
+        let id = self.nodes.len() - 1;
+        self.node_mut(parent).children.push(id);
+        id
     }
 
     pub fn create_node(&mut self) -> usize {

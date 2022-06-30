@@ -19,7 +19,6 @@ use nalgebra_glm::{vec3, Mat4};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
 };
 
 use ash::{
@@ -27,13 +26,10 @@ use ash::{
     vk::QueueFlags,
 };
 use renderer::gpu_path_tracer::Renderer;
-use vk_utils::{
-    command_buffer::CommandBuffer, graphics_pipeline::GraphicsPipelineState, queue::CommandQueue,
-    renderpass::RenderPass, shader_library::ShaderLibrary, swapchain::Swapchain, vulkan::Vulkan,
-};
+use vk_utils::{queue::CommandQueue, vulkan::Vulkan};
 
 use futures::lock::Mutex;
-use std::{path::Path, rc::Rc, sync::Arc};
+use std::{io::Write, rc::Rc, sync::Arc, thread};
 
 use crate::resources::{GpuResourceCache, Resources};
 
@@ -100,6 +96,14 @@ fn main() {
         )
         .expect("Image Write failed");
     } else if mode == "--server".to_string() {
+        let (mut sender, receiver) = std::sync::mpsc::channel();
+        let image_join_handle = thread::spawn(move || {
+            let listener = std::net::TcpListener::bind("localhost:8000").unwrap();
+            for stream in listener.incoming() {
+                sender.send(stream.expect("Connection failed"));
+            }
+        });
+
         // set up server
         let server = application::ServerApplication::new(
             context.clone(),
@@ -110,114 +114,32 @@ fn main() {
 
         let event_loop = EventLoop::new();
 
-        let window = WindowBuilder::new()
-            .with_title("Renderer Output")
-            .with_inner_size(winit::dpi::PhysicalSize::new(image_width, image_height))
-            .with_min_inner_size(winit::dpi::PhysicalSize::new(image_width, image_height))
-            .with_resizable(false)
-            .build(&event_loop)
-            .unwrap();
-
-        let surface = unsafe {
-            ash_window::create_surface(&vulkan.library(), &vulkan.vk_instance(), &window, None)
-        };
-
-        let command_queue = Rc::new(CommandQueue::new(context.clone(), QueueFlags::GRAPHICS));
-        let path = std::env::current_exe()
-            .expect("current dir check failed")
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("shaders");
-        let mut shader_library = ShaderLibrary::new(context.clone(), &path);
-        shader_library.add_spirv_from_file(
-            ash::vk::ShaderStageFlags::VERTEX,
-            "v_sampled_image",
-            "main",
-            Path::new("sampled_image.vert.spv"),
-        );
-
-        shader_library.add_spirv_from_file(
-            ash::vk::ShaderStageFlags::FRAGMENT,
-            "f_sampled_image",
-            "main",
-            Path::new("sampled_image.frag.spv"),
-        );
-
-        GraphicsPipelineState::new()
-            .with_vertex_shader(shader_library.get_unchecked("v_sampled_image").module())
-            .with_fragment_shader(shader_library.get_unchecked("f_sampled_image").module());
-
-        let mut swapchain = match surface {
-            Ok(s) => Some(Swapchain::new(
-                context.clone(),
-                s,
-                None,
-                command_queue.clone(),
-                image_width,
-                image_height,
-            )),
-            Err(error) => {
-                println!("{}", error);
-                None
-            }
-        };
-
-        let renderpass = if let Some(swapchain) = swapchain.as_ref() {
-            Some(RenderPass::from_swapchain(context.clone(), &swapchain))
-        } else {
-            println!("{}", "No swapchain could be created");
-            None
-        };
+        let mut streams = Vec::new();
 
         event_loop.run(move |event, _, control_flow| match event {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
-                window_id,
-            } if window_id == window.id() => *control_flow = ControlFlow::Exit,
-            Event::RedrawRequested(window_id) => {
-                if window_id == window.id() {
-                    let (width, height): (u32, u32) = window.inner_size().into();
-                    if let Some(swapchain) = swapchain.as_mut() {
-                        match swapchain.next_frame_buffer() {
-                            Ok((sub_optimal_swapchain, frame_index, framebuffer, semaphore)) => {
-                                let mut command_buffer =
-                                    CommandBuffer::new(context.clone(), command_queue.clone());
-                                command_buffer.begin();
-                                command_buffer.begin_render_pass(
-                                    renderpass.as_ref().unwrap(),
-                                    &framebuffer,
-                                    width,
-                                    height,
-                                );
+                window_id: _,
+            } => *control_flow = ControlFlow::Exit,
+            _ => {
+                match receiver.try_recv() {
+                    Ok(stream) => streams.push(stream),
+                    Err(_error) => (),
+                }
 
-                                command_buffer.end_render_pass();
-                                if let Some(model) = server.model.try_lock() {
-                                    let image = model.renderer.output_image();
-                                    let swapchain_image = swapchain.image_mut(frame_index);
-                                    command_buffer.blit(image.as_ref(), swapchain_image);
-                                }
-                                command_buffer.submit();
-
-                                swapchain.swap(&semaphore, frame_index);
+                if let Some(mut model) = server.model.try_lock() {
+                    if model.has_new_frame {
+                        let buf = &model.download_image::<u8>();
+                        for stream in &mut streams {
+                            match stream.write_all(buf) {
+                                Ok(_) => (),
+                                Err(err) => println!("{}", err.to_string()),
                             }
-                            Err(err) => println!("{}", err),
                         }
                     }
                 }
-            }
-            _ => {
-                if let Some(model) = server.model.try_lock() {
-                    if model.has_new_frame {
-                        window.request_redraw();
-                    }
-                }
-                *control_flow = ControlFlow::WaitUntil(
-                    std::time::Instant::now() + std::time::Duration::from_millis(100),
-                )
+
+                *control_flow = ControlFlow::Poll;
             }
         });
     }

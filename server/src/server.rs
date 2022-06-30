@@ -5,7 +5,11 @@ use async_graphql_poem::{GraphQL, GraphQLSubscription};
 use futures::channel::oneshot;
 use futures::lock::Mutex;
 use poem::{
-    handler, listener::TcpListener, middleware, post, web::Html, EndpointExt, IntoResponse, Route,
+    handler,
+    listener::{Listener, TcpListener},
+    middleware, post,
+    web::Html,
+    EndpointExt, IntoResponse, Route,
 };
 use std::{sync::Arc, thread, time::Duration};
 use tokio::runtime;
@@ -44,7 +48,9 @@ impl Server {
                         .at("/ws", GraphQLSubscription::new(schema.clone()))
                         .with(middleware::Cors::new());
 
-                    poem::Server::new(TcpListener::bind(addr))
+                    let listener = TcpListener::bind(addr);
+
+                    poem::Server::new(listener)
                         .run_with_graceful_shutdown(
                             app,
                             async move {

@@ -123,7 +123,7 @@ impl Renderer {
         })
     }
 
-    pub fn download_image(&self) -> BufferResource {
+    pub fn download_image(&mut self) -> BufferResource {
         self.device.wait();
         let buffer = BufferResource::new(
             self.device.clone(),
@@ -134,13 +134,22 @@ impl Renderer {
 
         let mut command_buffer = CommandBuffer::new(self.device.clone(), self.queue.clone());
         command_buffer.begin();
+        command_buffer.image_resource_transition(
+            Rc::get_mut(&mut self.output_image).unwrap(),
+            ImageLayout::TRANSFER_SRC_OPTIMAL,
+        );
         command_buffer.copy_image_to_buffer(self.output_image.as_ref(), &buffer);
+        command_buffer.submit();
 
         buffer
     }
     pub fn render_frame(&mut self, frame: &Frame, spp: u32) -> (Rc<Image2DResource>, ImageView) {
         let mut command_buffer = CommandBuffer::new(self.device.clone(), self.queue.clone());
         command_buffer.begin();
+        command_buffer.image_resource_transition(
+            Rc::get_mut(&mut self.accumulation_image).unwrap(),
+            ImageLayout::GENERAL,
+        );
         command_buffer.image_resource_transition(
             Rc::get_mut(&mut self.output_image).unwrap(),
             ImageLayout::GENERAL,

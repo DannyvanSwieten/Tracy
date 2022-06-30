@@ -50,8 +50,8 @@
             "args": [
                 "--server",
                 "localhost:7000",
-                "1920",
-                "1080"
+                "1280",
+                "720"
             ],
             "stopOnEntry": false,
             "cwd": "${workspaceFolder}",
