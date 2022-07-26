@@ -2,7 +2,7 @@ use crate::device_context::DeviceContext;
 use crate::queue::CommandQueue;
 use crate::swapchain_image::SwapchainImage;
 use crate::swapchain_util::create_swapchain;
-use ash::vk::SurfaceKHR;
+use ash::vk::{SurfaceKHR, SwapchainKHR};
 use std::rc::Rc;
 
 pub struct Swapchain {
@@ -10,7 +10,7 @@ pub struct Swapchain {
     queue: Rc<CommandQueue>,
     swapchain_loader: ash::extensions::khr::Swapchain,
     surface: ash::vk::SurfaceKHR,
-    handle: ash::vk::SwapchainKHR,
+    handle: SwapchainKHR,
     images: Vec<SwapchainImage>,
     _image_views: Vec<ash::vk::ImageView>,
     present_semaphores: Vec<ash::vk::Semaphore>,
@@ -30,7 +30,7 @@ impl Swapchain {
     pub fn new(
         device: Rc<DeviceContext>,
         surface: ash::vk::SurfaceKHR,
-        old_swapchain: Option<&ash::vk::SwapchainKHR>,
+        old_swapchain: Option<&Swapchain>,
         queue: Rc<CommandQueue>,
         width: u32,
         height: u32,
@@ -40,6 +40,11 @@ impl Swapchain {
             ash::extensions::khr::Surface::new(vulkan.library(), vulkan.vk_instance());
         let swapchain_loader =
             ash::extensions::khr::Swapchain::new(vulkan.vk_instance(), device.handle());
+        let old_swapchain_handle = if let Some(old_sc) = old_swapchain {
+            old_sc.handle()
+        } else {
+            SwapchainKHR::null()
+        };
         let (swapchain, images, image_views, format, physical_width, physical_height) =
             create_swapchain(
                 vulkan.vk_instance(),
@@ -48,7 +53,7 @@ impl Swapchain {
                 &surface_loader,
                 surface.clone(),
                 &swapchain_loader,
-                old_swapchain,
+                old_swapchain_handle,
                 queue.clone(),
                 width,
                 height,
@@ -162,6 +167,10 @@ impl Swapchain {
         &self.surface
     }
 
+    pub fn handle(&self) -> SwapchainKHR {
+        self.handle
+    }
+
     pub fn next_frame_buffer(
         &mut self,
     ) -> Result<(bool, u32, ash::vk::Framebuffer, ash::vk::Semaphore), ash::vk::Result> {
@@ -233,10 +242,6 @@ impl Swapchain {
 
     pub fn format(&self) -> &ash::vk::Format {
         &self.format
-    }
-
-    pub fn handle(&self) -> &ash::vk::SwapchainKHR {
-        &self.handle
     }
 
     pub fn swap(&self, semaphore: &ash::vk::Semaphore, index: u32) -> bool {

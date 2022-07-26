@@ -9,7 +9,7 @@ pub(crate) fn create_swapchain(
     surface_loader: &ash::extensions::khr::Surface,
     surface: ash::vk::SurfaceKHR,
     swapchain_loader: &ash::extensions::khr::Swapchain,
-    old_swapchain: Option<&ash::vk::SwapchainKHR>,
+    old_swapchain: ash::vk::SwapchainKHR,
     queue: Rc<CommandQueue>,
     width: u32,
     height: u32,
@@ -67,10 +67,7 @@ pub(crate) fn create_swapchain(
         .find(|&mode| mode == ash::vk::PresentModeKHR::MAILBOX)
         .unwrap_or(ash::vk::PresentModeKHR::FIFO);
     let swapchain_loader = ash::extensions::khr::Swapchain::new(instance, ctx);
-    let mut old = ash::vk::SwapchainKHR::null();
-    if old_swapchain.is_some() {
-        old = *old_swapchain.unwrap();
-    }
+
     let swapchain_create_info = ash::vk::SwapchainCreateInfoKHR::builder()
         .surface(surface)
         .min_image_count(desired_image_count)
@@ -84,7 +81,7 @@ pub(crate) fn create_swapchain(
         .present_mode(present_mode)
         .clipped(true)
         .image_array_layers(1)
-        .old_swapchain(old);
+        .old_swapchain(old_swapchain);
 
     let swapchain = unsafe {
         swapchain_loader

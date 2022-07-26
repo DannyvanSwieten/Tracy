@@ -1,2 +1,2 @@
 [workspace]
-members = ["vk_utils", "renderer", "server"]
+members = ["vk_utils", "renderer", "ui", "server"]

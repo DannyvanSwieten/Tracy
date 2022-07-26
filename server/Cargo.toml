@@ -8,7 +8,6 @@ edition = "2021"
 renderer = {path = "../renderer"}
 vk_utils = {path = "../vk_utils"}
 ash = "*"
-ash-window = "*"
 image = "*"
 nalgebra-glm = "*"
 gltf = "*"
