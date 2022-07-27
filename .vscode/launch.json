@@ -10,7 +10,7 @@
             "name": "Launch Debug MacOS",
             "program": "${workspaceFolder}/target/debug/tracey",
             "args": [
-                "--server",
+                "--ui_application",
                 "localhost:7000",
                 "1280",
                 "720"

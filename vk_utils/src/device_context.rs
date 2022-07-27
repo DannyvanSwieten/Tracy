@@ -1,5 +1,4 @@
 use crate::gpu::Gpu;
-use crate::queue::CommandQueue;
 use ash::vk::{DeviceCreateInfoBuilder, DeviceQueueCreateInfo, QueueFlags};
 use ash::Device;
 use std::ffi::CStr;
@@ -49,7 +48,7 @@ impl DeviceContext {
     }
 
     pub fn queue_family_index(&self, flags: QueueFlags) -> Option<u32> {
-        self.gpu.family_type_index(QueueFlags::GRAPHICS)
+        self.gpu.family_type_index(flags)
     }
 
     pub fn queue(&self, queue_family_index: u32) -> ash::vk::Queue {
