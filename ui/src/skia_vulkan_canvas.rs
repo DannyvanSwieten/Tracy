@@ -47,6 +47,65 @@ impl SkiaCanvasImage {
     }
 }
 
+fn get_layout(layout: ash::vk::ImageLayout) -> skia_safe::gpu::vk::ImageLayout {
+    match layout {
+        ash::vk::ImageLayout::UNDEFINED => skia_safe::gpu::vk::ImageLayout::UNDEFINED,
+        ash::vk::ImageLayout::GENERAL => skia_safe::gpu::vk::ImageLayout::GENERAL,
+        ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL => {
+            return skia_safe::gpu::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
+        }
+        ash::vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL => {
+            return skia_safe::gpu::vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        }
+        ash::vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL => {
+            return skia_safe::gpu::vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        }
+        ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL => {
+            return skia_safe::gpu::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+        }
+        ash::vk::ImageLayout::TRANSFER_SRC_OPTIMAL => {
+            return skia_safe::gpu::vk::ImageLayout::TRANSFER_SRC_OPTIMAL;
+        }
+        ash::vk::ImageLayout::TRANSFER_DST_OPTIMAL => {
+            return skia_safe::gpu::vk::ImageLayout::TRANSFER_DST_OPTIMAL;
+        }
+        ash::vk::ImageLayout::PREINITIALIZED => skia_safe::gpu::vk::ImageLayout::PREINITIALIZED,
+        ash::vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL => {
+            return skia_safe::gpu::vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL;
+        }
+        ash::vk::ImageLayout::DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL => {
+            return skia_safe::gpu::vk::ImageLayout::DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
+        }
+        ash::vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL => {
+            return skia_safe::gpu::vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL;
+        }
+        ash::vk::ImageLayout::DEPTH_READ_ONLY_OPTIMAL => {
+            return skia_safe::gpu::vk::ImageLayout::DEPTH_READ_ONLY_OPTIMAL;
+        }
+        ash::vk::ImageLayout::STENCIL_ATTACHMENT_OPTIMAL => {
+            return skia_safe::gpu::vk::ImageLayout::STENCIL_ATTACHMENT_OPTIMAL;
+        }
+        ash::vk::ImageLayout::STENCIL_READ_ONLY_OPTIMAL => {
+            return skia_safe::gpu::vk::ImageLayout::STENCIL_READ_ONLY_OPTIMAL;
+        }
+        ash::vk::ImageLayout::PRESENT_SRC_KHR => vk::ImageLayout::PRESENT_SRC_KHR,
+        ash::vk::ImageLayout::SHARED_PRESENT_KHR => vk::ImageLayout::SHARED_PRESENT_KHR,
+        ash::vk::ImageLayout::SHADING_RATE_OPTIMAL_NV => {
+            return skia_safe::gpu::vk::ImageLayout::SHADING_RATE_OPTIMAL_NV;
+        }
+        ash::vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT => {
+            return skia_safe::gpu::vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT;
+        }
+        ash::vk::ImageLayout::READ_ONLY_OPTIMAL_KHR => {
+            return skia_safe::gpu::vk::ImageLayout::READ_ONLY_OPTIMAL_KHR;
+        }
+        ash::vk::ImageLayout::ATTACHMENT_OPTIMAL_KHR => {
+            return skia_safe::gpu::vk::ImageLayout::ATTACHMENT_OPTIMAL_KHR;
+        }
+        _ => skia_safe::gpu::vk::ImageLayout::UNDEFINED,
+    }
+}
+
 impl ImageResource for SkiaCanvasImage {
     fn width(&self) -> u32 {
         self.width
@@ -317,21 +376,86 @@ impl ImageResource for SkiaCanvasImage {
         }
     }
 
-    fn set_layout(&mut self, layout: ash::vk::ImageLayout) {}
+    fn set_layout(&mut self, layout: ash::vk::ImageLayout) {
+        self.skia_backend_texture
+            .set_vulkan_image_layout(get_layout(layout));
+    }
 
     fn layout(&self) -> ash::vk::ImageLayout {
-        todo!()
+        if let Some(info) = self.skia_backend_texture.vulkan_image_info() {
+            match info.layout {
+                vk::ImageLayout::UNDEFINED => ash::vk::ImageLayout::UNDEFINED,
+                vk::ImageLayout::GENERAL => ash::vk::ImageLayout::GENERAL,
+                vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL => {
+                    ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL
+                }
+                vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL => {
+                    ash::vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                }
+                vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL => {
+                    ash::vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                }
+                vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL => {
+                    ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
+                }
+                vk::ImageLayout::TRANSFER_SRC_OPTIMAL => ash::vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                vk::ImageLayout::TRANSFER_DST_OPTIMAL => ash::vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                vk::ImageLayout::PREINITIALIZED => ash::vk::ImageLayout::PREINITIALIZED,
+                vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL => {
+                    ash::vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL
+                }
+                vk::ImageLayout::DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL => {
+                    ash::vk::ImageLayout::DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL
+                }
+                vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL => {
+                    ash::vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL
+                }
+                vk::ImageLayout::DEPTH_READ_ONLY_OPTIMAL => {
+                    ash::vk::ImageLayout::DEPTH_READ_ONLY_OPTIMAL
+                }
+                vk::ImageLayout::STENCIL_ATTACHMENT_OPTIMAL => {
+                    ash::vk::ImageLayout::STENCIL_ATTACHMENT_OPTIMAL
+                }
+                vk::ImageLayout::STENCIL_READ_ONLY_OPTIMAL => {
+                    ash::vk::ImageLayout::STENCIL_READ_ONLY_OPTIMAL
+                }
+                vk::ImageLayout::PRESENT_SRC_KHR => ash::vk::ImageLayout::PRESENT_SRC_KHR,
+                vk::ImageLayout::SHARED_PRESENT_KHR => ash::vk::ImageLayout::SHARED_PRESENT_KHR,
+                vk::ImageLayout::SHADING_RATE_OPTIMAL_NV => {
+                    ash::vk::ImageLayout::SHADING_RATE_OPTIMAL_NV
+                }
+                vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT => {
+                    ash::vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT
+                }
+                vk::ImageLayout::READ_ONLY_OPTIMAL_KHR => {
+                    ash::vk::ImageLayout::READ_ONLY_OPTIMAL_KHR
+                }
+                vk::ImageLayout::ATTACHMENT_OPTIMAL_KHR => {
+                    ash::vk::ImageLayout::ATTACHMENT_OPTIMAL_KHR
+                }
+                vk::ImageLayout::MAX_ENUM => todo!(),
+            }
+        } else {
+            panic!()
+        }
     }
 
     fn handle(&self) -> ash::vk::Image {
-        todo!()
+        if let Some(info) = self.skia_backend_texture.vulkan_image_info() {
+            unsafe {
+                let handle: ash::vk::Image = std::mem::transmute(info.image);
+                handle
+            }
+        } else {
+            panic!()
+        }
     }
 }
 
 pub struct SkiaGpuCanvas2D {
     context: RecordingContext,
     surfaces: Vec<Surface>,
-    surface_images: Vec<Rc<RefCell<SkiaCanvasImage>>>,
+    surface_images: Vec<skia_safe::gpu::BackendTexture>,
     surface_image_views: Vec<ash::vk::ImageView>,
     current_image_index: usize,
 }
@@ -388,13 +512,13 @@ impl SkiaGpuCanvas2D {
             );
         }
 
-        let surface_images: Vec<Rc<RefCell<SkiaCanvasImage>>> = surfaces
+        let surface_images: Vec<skia_safe::gpu::BackendTexture> = surfaces
             .iter_mut()
             .map(|surface| {
                 if let Some(t) =
                     surface.get_backend_texture(skia_safe::surface::BackendHandleAccess::FlushRead)
                 {
-                    SkiaCanvasImage::new(t, width, height);
+                    return t;
                 }
 
                 panic!()
@@ -405,7 +529,7 @@ impl SkiaGpuCanvas2D {
             .iter()
             .map(|image| {
                 let create_info = ash::vk::ImageViewCreateInfo::builder()
-                    .image(image.borrow().handle())
+                    .image(unsafe { std::mem::transmute(image.vulkan_image_info().unwrap().image) })
                     .view_type(ash::vk::ImageViewType::TYPE_2D)
                     .format(ash::vk::Format::B8G8R8A8_UNORM)
                     .subresource_range(
@@ -560,16 +684,19 @@ impl Canvas2D for SkiaGpuCanvas2D {
         }
     }
 
-    fn flush(&mut self) -> (Rc<RefCell<SkiaCanvasImage>>, ash::vk::ImageView) {
+    fn flush(&mut self) -> (SkiaCanvasImage, ash::vk::ImageView) {
         if let Some(direct) = self.context.as_direct_context().as_mut() {
             direct.flush_submit_and_sync_cpu();
         }
 
         let view = self.surface_image_views[self.current_image_index];
-        let image = self.surface_images[self.current_image_index].clone();
+        let image = &self.surface_images[self.current_image_index].clone();
         self.current_image_index += 1;
         self.current_image_index %= self.surface_images.len();
 
-        (image, view)
+        (
+            SkiaCanvasImage::new(image.clone(), image.width() as _, image.height() as _),
+            view,
+        )
     }
 }

@@ -29,7 +29,7 @@
             //     "720"
             // ],
             "args": [
-                "--server",
+                "--ui_application",
                 "localhost:7000",
                 "1280",
                 "720"

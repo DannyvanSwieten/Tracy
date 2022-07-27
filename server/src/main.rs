@@ -142,5 +142,24 @@ fn main() {
                 *control_flow = ControlFlow::Poll;
             }
         });
+    } else if mode == "--ui_application".to_string() {
+        let application = ui::application::Application::<i32>::new("My App");
+        application.run(
+            ui::ui_application_delegate::UIApplicationDelegate::new().with_window(
+                "Window 1",
+                800,
+                600,
+                UIDelegate {},
+            ),
+            0,
+        )
+    }
+}
+
+pub struct UIDelegate {}
+
+impl ui::user_interface::UIDelegate<i32> for UIDelegate {
+    fn build(&self, section: &str, state: &i32) -> ui::node::Node<i32> {
+        ui::node::Node::new("main").widget(ui::widget::Container::new())
     }
 }

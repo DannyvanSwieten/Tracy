@@ -252,7 +252,7 @@ impl ImageRenderer {
 
     pub fn render(
         &self,
-        command_buffer: &CommandBuffer,
+        command_buffer: &mut CommandBuffer,
         image_view: &ash::vk::ImageView,
         slot: usize,
     ) {
@@ -267,18 +267,18 @@ impl ImageRenderer {
 
         unsafe { self.device.update_descriptor_sets(&[write], &[]) };
 
-        // command_buffer.bind_descriptor_sets(
-        //     &self.pipeline_layout,
-        //     ash::vk::PipelineBindPoint::GRAPHICS,
-        //     &[self.descriptor_sets[slot]],
-        // );
+        command_buffer.bind_descriptor_sets(
+            &self.pipeline_layout,
+            ash::vk::PipelineBindPoint::GRAPHICS,
+            &[self.descriptor_sets[slot]],
+        );
 
-        // command_buffer.bind_pipeline(
-        //     ash::vk::PipelineBindPoint::GRAPHICS,
-        //     &self.graphics_pipeline,
-        // );
+        command_buffer.bind_pipeline(
+            ash::vk::PipelineBindPoint::GRAPHICS,
+            &self.graphics_pipeline,
+        );
 
-        // command_buffer.draw_vertices(6, 0, 1, 0);
+        command_buffer.draw_vertices(6, 0, 1, 0);
     }
 }
 

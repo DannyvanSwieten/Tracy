@@ -135,6 +135,7 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
             width,
             height,
         );
+        self.renderpass = Some(RenderPass::from_swapchain(self.device.clone(), &swapchain));
         let mut user_interface = UserInterface::new(self.ui_delegate.build("root", state));
         let image_renderer = ImageRenderer::new(
             &self.device,
@@ -214,41 +215,41 @@ impl<'a, AppState: 'static> WindowDelegate<AppState> for UIGpuDrawingWindowDeleg
             }
         };
 
+        self.fences[index as usize].clear();
+
         let mut command_buffer = CommandBuffer::new(self.device.clone(), self.queue.clone());
-        {
-            let image_ref = Rc::get_mut(&mut image).unwrap().get_mut();
-            command_buffer.begin();
+        command_buffer.begin();
 
-            self.sub_optimal_swapchain = sub_optimal;
-            self.fences[index as usize].clear();
-            if let Some(ui) = self.ui.as_mut() {
-                command_buffer.image_resource_transition(
-                    image_ref,
-                    ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+        self.sub_optimal_swapchain = sub_optimal;
+        self.fences[index as usize].clear();
+        if let Some(ui) = self.ui.as_mut() {
+            command_buffer.image_resource_transition(
+                &mut image,
+                ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            );
+
+            if let Some(renderpass) = &self.renderpass {
+                command_buffer.begin_render_pass(
+                    renderpass,
+                    &framebuffer,
+                    ui.swapchain.physical_width(),
+                    ui.swapchain.physical_height(),
                 );
 
-                if let Some(renderpass) = &self.renderpass {
-                    command_buffer.begin_render_pass(
-                        renderpass,
-                        &framebuffer,
-                        ui.swapchain.physical_width(),
-                        ui.swapchain.physical_height(),
-                    );
+                ui.image_renderer
+                    .render(&mut command_buffer, &view, index as usize);
 
-                    ui.image_renderer
-                        .render(&command_buffer, &view, index as usize);
-                }
-
-                command_buffer.image_resource_transition(
-                    image_ref,
-                    ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                );
-
-                command_buffer.end();
-                self.fences[index as usize].push(Some(command_buffer.submit()));
-
-                ui.swapchain.swap(&semaphore, index);
+                command_buffer.end_render_pass();
             }
+
+            command_buffer.image_resource_transition(
+                &mut image,
+                ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            );
+
+            self.fences[index as usize].push(Some(command_buffer.submit()));
+
+            ui.swapchain.swap(&semaphore, index);
         }
     }
 }

@@ -246,7 +246,7 @@ impl<AppState> Widget<AppState> for Container {
     fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
         assert_ne!(rect.width(), 0f32);
         assert_ne!(rect.height(), 0f32);
-        let bg = style.get("bg-color").unwrap_or(&Color::CYAN);
+        let bg = style.get("bg-color").unwrap_or(&Color::RED);
         self.paint.set_color(*bg);
         canvas.draw_rounded_rect(rect, 5., 5., &self.paint);
     }

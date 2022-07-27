@@ -274,7 +274,10 @@ impl<AppState: 'static> Application<AppState> {
         &self.vulkan
     }
 
-    pub fn run(mut self, delegate: Box<dyn ApplicationDelegate<AppState>>, state: AppState) {
+    pub fn run<Delegate>(mut self, delegate: Delegate, state: AppState)
+    where
+        Delegate: ApplicationDelegate<AppState> + 'static,
+    {
         let mut s = state;
         let event_loop = EventLoop::new();
         let mut d = delegate;

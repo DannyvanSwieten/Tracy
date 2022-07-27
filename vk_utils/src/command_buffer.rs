@@ -190,6 +190,8 @@ impl CommandBuffer {
                 &[barrier],
             );
         }
+
+        image.set_layout(layout);
     }
 
     pub fn blit(&mut self, src: &impl ImageResource, dst: &mut impl ImageResource) {
