@@ -6,6 +6,7 @@ use crate::window_delegate::WindowDelegate;
 use std::collections::HashMap;
 use vk_utils::vulkan::Vulkan;
 
+use super::application_model::ApplicationModel;
 use std::ffi::{CStr, CString};
 use std::path::PathBuf;
 
@@ -36,27 +37,23 @@ pub fn surface_extension_name() -> &'static CStr {
     Win32Surface::name()
 }
 
-pub trait ApplicationDelegate<AppState> {
+pub trait ApplicationDelegate<Model: ApplicationModel> {
     fn application_will_start(
         &mut self,
-        _: &Application<AppState>,
-        _: &mut AppState,
-        _: &mut WindowRegistry<AppState>,
+        _: &Application<Model>,
+        _: &mut Model,
+        _: &mut WindowRegistry<Model>,
         _: &EventLoopWindowTarget<()>,
     ) {
     }
-    fn application_will_quit(
-        &mut self,
-        _: &mut Application<AppState>,
-        _: &EventLoopWindowTarget<()>,
-    ) {
+    fn application_will_quit(&mut self, _: &mut Application<Model>, _: &EventLoopWindowTarget<()>) {
     }
 
     fn application_will_update(
         &mut self,
-        _: &Application<AppState>,
-        _: &mut AppState,
-        _: &mut WindowRegistry<AppState>,
+        _: &Application<Model>,
+        _: &mut Model,
+        _: &mut WindowRegistry<Model>,
         _: &EventLoopWindowTarget<()>,
     ) {
     }
@@ -78,8 +75,8 @@ pub trait ApplicationDelegate<AppState> {
 
     fn window_requested_redraw(
         &mut self,
-        _: &Application<AppState>,
-        _: &AppState,
+        _: &Application<Model>,
+        _: &Model,
         _: &winit::window::WindowId,
     ) -> ControlFlow {
         ControlFlow::Wait
@@ -90,12 +87,12 @@ pub trait ApplicationDelegate<AppState> {
     }
 }
 
-pub struct WindowRegistry<AppState: 'static> {
+pub struct WindowRegistry<Model: 'static> {
     windows: HashMap<WindowId, Window>,
-    window_delegates: HashMap<WindowId, Box<dyn WindowDelegate<AppState>>>,
+    window_delegates: HashMap<WindowId, Box<dyn WindowDelegate<Model>>>,
 }
 
-impl<AppState> WindowRegistry<AppState> {
+impl<Model: ApplicationModel> WindowRegistry<Model> {
     pub fn create_window(
         &self,
         target: &EventLoopWindowTarget<()>,
@@ -114,7 +111,7 @@ impl<AppState> WindowRegistry<AppState> {
     pub fn register_with_delegate(
         &mut self,
         window: Window,
-        delegate: Box<dyn WindowDelegate<AppState>>,
+        delegate: Box<dyn WindowDelegate<Model>>,
     ) {
         self.window_delegates.insert(window.id(), delegate);
         self.windows.insert(window.id(), window);
@@ -128,7 +125,7 @@ impl<AppState> WindowRegistry<AppState> {
         self.windows.len()
     }
 
-    fn update(&mut self, state: &mut AppState) {
+    fn update(&mut self, state: &mut Model) {
         for (_, delegate) in self.window_delegates.iter_mut() {
             delegate.update(state)
         }
@@ -136,8 +133,8 @@ impl<AppState> WindowRegistry<AppState> {
 
     fn window_resized(
         &mut self,
-        app: &Application<AppState>,
-        state: &mut AppState,
+        app: &Application<Model>,
+        state: &mut Model,
         id: &winit::window::WindowId,
         size: &winit::dpi::PhysicalSize<u32>,
     ) {
@@ -152,7 +149,7 @@ impl<AppState> WindowRegistry<AppState> {
         }
     }
 
-    fn close_button_pressed(&mut self, id: &WindowId, state: &mut AppState) {
+    fn close_button_pressed(&mut self, id: &WindowId, state: &mut Model) {
         if let Some(delegate) = self.window_delegates.get_mut(id) {
             if delegate.close_button_pressed(state) {
                 self.windows.remove(id);
@@ -162,7 +159,7 @@ impl<AppState> WindowRegistry<AppState> {
 
     fn mouse_moved(
         &mut self,
-        state: &mut AppState,
+        state: &mut Model,
         id: &WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) {
@@ -173,7 +170,7 @@ impl<AppState> WindowRegistry<AppState> {
 
     fn mouse_dragged(
         &mut self,
-        state: &mut AppState,
+        state: &mut Model,
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
         delta: &winit::dpi::PhysicalPosition<f64>,
@@ -191,7 +188,7 @@ impl<AppState> WindowRegistry<AppState> {
 
     fn mouse_down(
         &mut self,
-        state: &mut AppState,
+        state: &mut Model,
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) {
@@ -202,7 +199,7 @@ impl<AppState> WindowRegistry<AppState> {
 
     fn mouse_up(
         &mut self,
-        state: &mut AppState,
+        state: &mut Model,
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) {
@@ -214,7 +211,7 @@ impl<AppState> WindowRegistry<AppState> {
     fn window_moved(&mut self, _: &winit::window::WindowId, _: &winit::dpi::PhysicalPosition<i32>) {
     }
 
-    fn draw(&mut self, app: &Application<AppState>, state: &mut AppState) {
+    fn draw(&mut self, app: &Application<Model>, state: &mut Model) {
         for (_, delegate) in self.window_delegates.iter_mut() {
             delegate.draw(app, state)
         }
@@ -227,7 +224,7 @@ impl<AppState> WindowRegistry<AppState> {
     fn file_dropped(
         &mut self,
         id: &WindowId,
-        state: &mut AppState,
+        state: &mut Model,
         file: &PathBuf,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) {
@@ -239,7 +236,7 @@ impl<AppState> WindowRegistry<AppState> {
     fn file_hovered(
         &mut self,
         id: &WindowId,
-        state: &mut AppState,
+        state: &mut Model,
         file: &PathBuf,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) {
@@ -249,12 +246,13 @@ impl<AppState> WindowRegistry<AppState> {
     }
 }
 
-pub struct Application<AppState> {
+pub struct Application<Model: ApplicationModel> {
     vulkan: Vulkan,
-    _state: std::marker::PhantomData<AppState>,
+    pending_messages: Vec<Model::MessageType>,
+    _state: std::marker::PhantomData<Model>,
 }
 
-impl<AppState: 'static> Application<AppState> {
+impl<Model: ApplicationModel + 'static> Application<Model> {
     pub fn new(name: &str) -> Self {
         let layers = [CString::new("VK_LAYER_KHRONOS_validation").expect("String Creation Failed")];
         let instance_extensions = [
@@ -266,7 +264,8 @@ impl<AppState: 'static> Application<AppState> {
 
         Self {
             vulkan,
-            _state: std::marker::PhantomData::<AppState>::default(),
+            pending_messages: Vec::new(),
+            _state: std::marker::PhantomData::<Model>::default(),
         }
     }
 
@@ -274,9 +273,11 @@ impl<AppState: 'static> Application<AppState> {
         &self.vulkan
     }
 
-    pub fn run<Delegate>(mut self, delegate: Delegate, state: AppState)
+    pub fn send_message(&mut self, msg: Model::MessageType) {}
+
+    pub fn run<Delegate>(mut self, delegate: Delegate, state: Model)
     where
-        Delegate: ApplicationDelegate<AppState> + 'static,
+        Delegate: ApplicationDelegate<Model> + 'static,
     {
         let mut s = state;
         let event_loop = EventLoop::new();
@@ -290,7 +291,6 @@ impl<AppState: 'static> Application<AppState> {
         d.application_will_start(&self, &mut s, &mut window_registry, &event_loop);
         let mut last_mouse_position = winit::dpi::PhysicalPosition::<f64>::new(0., 0.);
         let mut last_file_drop: Vec<std::path::PathBuf> = Vec::new();
-        let mut file_was_dropped = false;
         let mut mouse_is_down = false;
         event_loop.run(move |e, event_loop, control_flow| {
             *control_flow = winit::event_loop::ControlFlow::Poll;

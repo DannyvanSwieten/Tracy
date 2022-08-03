@@ -16,17 +16,15 @@ pub mod simple_shapes;
 
 use load_scene::load_scene_gltf;
 use nalgebra_glm::{vec3, Mat4};
+use ui::application_model::ApplicationModel;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
 };
 
-use ash::{
-    extensions::{ext::DebugUtils, khr::Surface},
-    vk::QueueFlags,
-};
+use ash::extensions::{ext::DebugUtils, khr::Surface};
 use renderer::gpu_path_tracer::Renderer;
-use vk_utils::{queue::CommandQueue, vulkan::Vulkan};
+use vk_utils::vulkan::Vulkan;
 
 use futures::lock::Mutex;
 use std::{io::Write, rc::Rc, sync::Arc, thread};
@@ -96,11 +94,13 @@ fn main() {
         )
         .expect("Image Write failed");
     } else if mode == "--server".to_string() {
-        let (mut sender, receiver) = std::sync::mpsc::channel();
-        let image_join_handle = thread::spawn(move || {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let _image_join_handle = thread::spawn(move || {
             let listener = std::net::TcpListener::bind("localhost:8000").unwrap();
             for stream in listener.incoming() {
-                sender.send(stream.expect("Connection failed"));
+                sender
+                    .send(stream.expect("Connection failed"))
+                    .expect("send failed");
             }
         });
 
@@ -143,23 +143,32 @@ fn main() {
             }
         });
     } else if mode == "--ui_application".to_string() {
-        let application = ui::application::Application::<i32>::new("My App");
+        let application = ui::application::Application::<State>::new("My App");
         application.run(
             ui::ui_application_delegate::UIApplicationDelegate::new().with_window(
                 "Window 1",
                 800,
                 600,
-                UIDelegate {},
+                UIBuilder {},
             ),
-            0,
+            State {},
         )
     }
 }
 
-pub struct UIDelegate {}
+pub struct State {}
+impl ApplicationModel for State {
+    type MessageType = i32;
 
-impl ui::user_interface::UIDelegate<i32> for UIDelegate {
-    fn build(&self, section: &str, state: &i32) -> ui::node::Node<i32> {
-        ui::node::Node::new("main").widget(ui::widget::Container::new())
+    fn handle_message(&mut self, msg: Self::MessageType) {
+        todo!()
+    }
+}
+
+pub struct UIBuilder {}
+
+impl ui::user_interface::UIBuilder<State> for UIBuilder {
+    fn build(&self, _section: &str, _state: &State) -> ui::node::Node<State> {
+        ui::node::Node::new("joe").widget(ui::widget::Container::new())
     }
 }

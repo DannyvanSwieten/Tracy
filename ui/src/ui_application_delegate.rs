@@ -1,30 +1,30 @@
 use crate::application::{Application, ApplicationDelegate, WindowRegistry};
+use crate::application_model::ApplicationModel;
 use crate::ui_gpu_drawing_window_delegate::UIGpuDrawingWindowDelegate;
-use crate::user_interface::UIDelegate;
+use crate::user_interface::UIBuilder;
 use crate::window_delegate::WindowDelegate;
 use std::rc::Rc;
 use vk_utils::device_context::DeviceContext;
 use winit::event_loop::EventLoopWindowTarget;
 
-struct WindowRequest<AppState> {
+struct WindowRequest<Model> {
     title: String,
     width: u32,
     height: u32,
-    ui_delegate: Box<dyn UIDelegate<AppState>>,
+    ui_delegate: Box<dyn UIBuilder<Model>>,
 }
 
-pub struct UIApplicationDelegate<AppState> {
-    on_start: Option<Box<dyn FnMut(&Application<AppState>, &mut AppState)>>,
-    on_update: Option<Box<dyn FnMut(&Application<AppState>, &mut AppState)>>,
-    on_device_created:
-        Option<Box<dyn FnMut(&vk_utils::gpu::Gpu, Rc<DeviceContext>, &mut AppState)>>,
+pub struct UIApplicationDelegate<Model: ApplicationModel> {
+    on_start: Option<Box<dyn FnMut(&Application<Model>, &mut Model)>>,
+    on_update: Option<Box<dyn FnMut(&Application<Model>, &mut Model)>>,
+    on_device_created: Option<Box<dyn FnMut(&vk_utils::gpu::Gpu, Rc<DeviceContext>, &mut Model)>>,
     device_builder:
         Option<Box<dyn FnMut(&vk_utils::gpu::Gpu, Vec<&'static std::ffi::CStr>) -> DeviceContext>>,
-    window_requests: Vec<WindowRequest<AppState>>,
-    _state: std::marker::PhantomData<AppState>,
+    window_requests: Vec<WindowRequest<Model>>,
+    _state: std::marker::PhantomData<Model>,
 }
 
-impl<AppState> UIApplicationDelegate<AppState> {
+impl<Model: ApplicationModel> UIApplicationDelegate<Model> {
     pub fn new() -> Self {
         Self {
             on_start: None,
@@ -38,7 +38,7 @@ impl<AppState> UIApplicationDelegate<AppState> {
 
     pub fn on_start<F>(mut self, f: F) -> Self
     where
-        F: FnMut(&Application<AppState>, &mut AppState) + 'static,
+        F: FnMut(&Application<Model>, &mut Model) + 'static,
     {
         self.on_start = Some(Box::new(f));
         self
@@ -46,7 +46,7 @@ impl<AppState> UIApplicationDelegate<AppState> {
 
     pub fn on_update<F>(mut self, f: F) -> Self
     where
-        F: FnMut(&Application<AppState>, &mut AppState) + 'static,
+        F: FnMut(&Application<Model>, &mut Model) + 'static,
     {
         self.on_update = Some(Box::new(f));
         self
@@ -54,7 +54,7 @@ impl<AppState> UIApplicationDelegate<AppState> {
 
     pub fn on_device_created<F>(mut self, f: F) -> Self
     where
-        F: FnMut(&vk_utils::gpu::Gpu, Rc<DeviceContext>, &mut AppState) + 'static,
+        F: FnMut(&vk_utils::gpu::Gpu, Rc<DeviceContext>, &mut Model) + 'static,
     {
         self.on_device_created = Some(Box::new(f));
         self
@@ -70,7 +70,7 @@ impl<AppState> UIApplicationDelegate<AppState> {
 
     pub fn with_window<D>(mut self, title: &str, width: u32, height: u32, ui_delegate: D) -> Self
     where
-        D: UIDelegate<AppState> + 'static,
+        D: UIBuilder<Model> + 'static,
     {
         self.window_requests.push(WindowRequest {
             title: title.to_string(),
@@ -82,12 +82,12 @@ impl<AppState> UIApplicationDelegate<AppState> {
     }
 }
 
-impl<AppState> ApplicationDelegate<AppState> for UIApplicationDelegate<AppState> {
+impl<Model: ApplicationModel> ApplicationDelegate<Model> for UIApplicationDelegate<Model> {
     fn application_will_start(
         &mut self,
-        app: &Application<AppState>,
-        state: &mut AppState,
-        window_registry: &mut WindowRegistry<AppState>,
+        app: &Application<Model>,
+        state: &mut Model,
+        window_registry: &mut WindowRegistry<Model>,
         target: &EventLoopWindowTarget<()>,
     ) {
         if let Some(cb) = self.on_start.as_mut() {
@@ -127,9 +127,9 @@ impl<AppState> ApplicationDelegate<AppState> for UIApplicationDelegate<AppState>
 
     fn application_will_update(
         &mut self,
-        app: &Application<AppState>,
-        state: &mut AppState,
-        _: &mut WindowRegistry<AppState>,
+        app: &Application<Model>,
+        state: &mut Model,
+        _: &mut WindowRegistry<Model>,
         _: &EventLoopWindowTarget<()>,
     ) {
         if let Some(cb) = self.on_update.as_mut() {

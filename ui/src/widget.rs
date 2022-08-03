@@ -1,3 +1,4 @@
+use crate::application_model::ApplicationModel;
 use crate::canvas_2d::Canvas2D;
 use crate::node::*;
 use crate::window_event::{MouseEvent, MouseEventType};
@@ -136,13 +137,13 @@ pub enum VerticalAlignment {
     Bottom,
 }
 
-pub enum Action<AppState> {
+pub enum Action<Model> {
     None,
     Layout {
         nodes: Vec<&'static str>,
     },
     PopupRequest {
-        request: PopupRequest<AppState>,
+        request: PopupRequest<Model>,
         position: Point,
     },
     TriggerPopupMenu {
@@ -151,30 +152,30 @@ pub enum Action<AppState> {
     },
 }
 
-pub trait AppAction<AppState> {
-    fn undo(&self, _state: &mut AppState);
-    fn redo(&self, _state: &mut AppState);
+pub trait AppAction<Model> {
+    fn undo(&self, _state: &mut Model);
+    fn redo(&self, _state: &mut Model);
 }
 
-pub trait Widget<AppState> {
+pub trait Widget<Model: ApplicationModel> {
     fn paint(
         &mut self,
-        _state: &AppState,
+        _state: &Model,
         _rect: &Rect,
         _canvas: &mut dyn Canvas2D,
         _style: &StyleSheet,
     ) {
     }
-    fn paint_3d(&mut self, _state: &AppState, _rect: &Rect) {}
+    fn paint_3d(&mut self, _state: &Model, _rect: &Rect) {}
 
-    fn resized(&mut self, _state: &mut AppState, _rect: &Rect) {}
+    fn resized(&mut self, _state: &mut Model, _rect: &Rect) {}
 
     fn calculate_size(
         &self,
         preferred_width: Option<f32>,
         preferred_height: Option<f32>,
         constraints: &Constraints,
-        _children: &[Node<AppState>],
+        _children: &[Node<Model>],
     ) -> (Size, Vec<Constraints>) {
         let w = if let Some(preferred_width) = preferred_width {
             let width = constraints.min_width;
@@ -197,34 +198,29 @@ pub trait Widget<AppState> {
 
     fn layout(
         &mut self,
-        _state: &AppState,
+        _state: &Model,
         _rect: &Rect,
         _spacing: f32,
         _padding: f32,
-        _children: &mut [Node<AppState>],
+        _children: &mut [Node<Model>],
     ) {
     }
-    fn mouse_down(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {}
-    fn mouse_up(
-        &mut self,
-        _state: &mut AppState,
-        _rect: &Rect,
-        _event: &MouseEvent,
-    ) -> Action<AppState> {
+    fn mouse_down(&mut self, _state: &mut Model, _rect: &Rect, _event: &MouseEvent) {}
+    fn mouse_up(&mut self, _state: &mut Model, _rect: &Rect, _event: &MouseEvent) -> Action<Model> {
         return Action::None;
     }
     fn double_click(
         &mut self,
-        _state: &mut AppState,
+        _state: &mut Model,
         _rect: &Rect,
         _event: &MouseEvent,
-    ) -> Action<AppState> {
+    ) -> Action<Model> {
         return Action::None;
     }
-    fn mouse_drag(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {}
-    fn mouse_moved(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {}
-    fn mouse_enter(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {}
-    fn mouse_leave(&mut self, _state: &mut AppState, _rect: &Rect, _event: &MouseEvent) {}
+    fn mouse_drag(&mut self, _state: &mut Model, _rect: &Rect, _event: &MouseEvent) {}
+    fn mouse_moved(&mut self, _state: &mut Model, _rect: &Rect, _event: &MouseEvent) {}
+    fn mouse_enter(&mut self, _state: &mut Model, _rect: &Rect, _event: &MouseEvent) {}
+    fn mouse_leave(&mut self, _state: &mut Model, _rect: &Rect, _event: &MouseEvent) {}
 }
 
 #[derive(Default)]
@@ -242,8 +238,8 @@ impl Container {
     }
 }
 
-impl<AppState> Widget<AppState> for Container {
-    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+impl<Model: ApplicationModel> Widget<Model> for Container {
+    fn paint(&mut self, _: &Model, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
         assert_ne!(rect.width(), 0f32);
         assert_ne!(rect.height(), 0f32);
         let bg = style.get("bg-color").unwrap_or(&Color::RED);
@@ -253,11 +249,11 @@ impl<AppState> Widget<AppState> for Container {
 
     fn layout(
         &mut self,
-        _state: &AppState,
+        _state: &Model,
         rect: &Rect,
         _spacing: f32,
         _padding: f32,
-        children: &mut [Node<AppState>],
+        children: &mut [Node<Model>],
     ) {
         assert_eq!(children.len() < 2, true);
         if children.len() != 0 {
@@ -272,7 +268,7 @@ impl<AppState> Widget<AppState> for Container {
         preferred_width: Option<f32>,
         preferred_height: Option<f32>,
         constraints: &Constraints,
-        children: &[Node<AppState>],
+        children: &[Node<Model>],
     ) -> (Size, Vec<Constraints>) {
         assert_eq!(children.len() < 2, true);
         let w = if let Some(preferred_width) = preferred_width {
@@ -295,14 +291,14 @@ impl<AppState> Widget<AppState> for Container {
     }
 }
 
-pub struct HStack<AppState> {
+pub struct HStack<Model> {
     vertical_alignment: VerticalAlignment,
     paint: Paint,
     border_paint: Paint,
-    phantom: std::marker::PhantomData<AppState>,
+    phantom: std::marker::PhantomData<Model>,
 }
 
-impl<AppState> HStack<AppState> {
+impl<Model: ApplicationModel> HStack<Model> {
     pub fn new() -> Self {
         HStack {
             vertical_alignment: VerticalAlignment::Center,
@@ -315,7 +311,7 @@ impl<AppState> HStack<AppState> {
     pub fn layout_horizontally(
         &self,
         rect: &Rect,
-        children: &mut [Node<AppState>],
+        children: &mut [Node<Model>],
         spacing: f32,
         padding: f32,
     ) {
@@ -352,14 +348,14 @@ impl<AppState> HStack<AppState> {
     }
 }
 
-pub struct VStack<AppState> {
+pub struct VStack<Model> {
     horizontal_alignment: HorizontalAlignment,
     paint: Paint,
     border_paint: Paint,
-    phantom: std::marker::PhantomData<AppState>,
+    phantom: std::marker::PhantomData<Model>,
 }
 
-impl<AppState> VStack<AppState> {
+impl<Model: ApplicationModel> VStack<Model> {
     pub fn new() -> Self {
         VStack {
             horizontal_alignment: HorizontalAlignment::Center,
@@ -372,7 +368,7 @@ impl<AppState> VStack<AppState> {
     pub fn layout_vertically(
         &self,
         rect: &Rect,
-        children: &mut [Node<AppState>],
+        children: &mut [Node<Model>],
         spacing: f32,
         padding: f32,
     ) {
@@ -409,8 +405,8 @@ impl<AppState> VStack<AppState> {
     }
 }
 
-impl<AppState> Widget<AppState> for HStack<AppState> {
-    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+impl<Model: ApplicationModel> Widget<Model> for HStack<Model> {
+    fn paint(&mut self, _: &Model, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
         assert_ne!(rect.width(), 0f32);
         assert_ne!(rect.height(), 0f32);
 
@@ -429,7 +425,7 @@ impl<AppState> Widget<AppState> for HStack<AppState> {
         preferred_width: Option<f32>,
         preferred_height: Option<f32>,
         constraints: &Constraints,
-        children: &[Node<AppState>],
+        children: &[Node<Model>],
     ) -> (Size, Vec<Constraints>) {
         let w = if let Some(preferred_width) = preferred_width {
             let width = constraints.min_width;
@@ -480,18 +476,18 @@ impl<AppState> Widget<AppState> for HStack<AppState> {
 
     fn layout(
         &mut self,
-        _: &AppState,
+        _: &Model,
         rect: &Rect,
         spacing: f32,
         padding: f32,
-        children: &mut [Node<AppState>],
+        children: &mut [Node<Model>],
     ) {
         self.layout_horizontally(rect, children, spacing, padding)
     }
 }
 
-impl<AppState> Widget<AppState> for VStack<AppState> {
-    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+impl<Model: ApplicationModel> Widget<Model> for VStack<Model> {
+    fn paint(&mut self, _: &Model, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
         assert_ne!(rect.width(), 0f32);
         assert_ne!(rect.height(), 0f32);
         self.paint.set_anti_alias(true);
@@ -509,7 +505,7 @@ impl<AppState> Widget<AppState> for VStack<AppState> {
         preferred_width: Option<f32>,
         preferred_height: Option<f32>,
         constraints: &Constraints,
-        children: &[Node<AppState>],
+        children: &[Node<Model>],
     ) -> (Size, Vec<Constraints>) {
         let w = if let Some(preferred_width) = preferred_width {
             let width = constraints.min_width;
@@ -560,11 +556,11 @@ impl<AppState> Widget<AppState> for VStack<AppState> {
 
     fn layout(
         &mut self,
-        _: &AppState,
+        _: &Model,
         rect: &Rect,
         spacing: f32,
         padding: f32,
-        children: &mut [Node<AppState>],
+        children: &mut [Node<Model>],
     ) {
         self.layout_vertically(rect, children, spacing, padding)
     }
@@ -586,8 +582,8 @@ impl Label {
     }
 }
 
-impl<AppState> Widget<AppState> for Label {
-    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+impl<Model: ApplicationModel> Widget<Model> for Label {
+    fn paint(&mut self, _: &Model, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
         assert_ne!(rect.width(), 0f32);
         assert_ne!(rect.height(), 0f32);
         self.paint.set_color(*style.get("bg-color").unwrap());
@@ -602,7 +598,7 @@ impl<AppState> Widget<AppState> for Label {
         preferred_width: Option<f32>,
         preferred_height: Option<f32>,
         constraints: &Constraints,
-        children: &[Node<AppState>],
+        children: &[Node<Model>],
     ) -> (Size, Vec<Constraints>) {
         let w = if let Some(preferred_width) = preferred_width {
             let width = constraints.min_width;
@@ -624,17 +620,17 @@ impl<AppState> Widget<AppState> for Label {
     }
 }
 
-pub struct Button<AppState> {
+pub struct Button<Model> {
     pressed: bool,
     hovered: bool,
     text: String,
     paint: Paint,
     font: Font,
-    on_click: Option<Box<dyn FnMut(&mut AppState) -> Action<AppState>>>,
-    phantom: std::marker::PhantomData<AppState>,
+    on_click: Option<Box<dyn FnMut(&mut Model) -> Action<Model>>>,
+    phantom: std::marker::PhantomData<Model>,
 }
 
-impl<AppState> Button<AppState> {
+impl<Model> Button<Model> {
     pub fn new(text: &str) -> Self {
         let b = Button {
             pressed: false,
@@ -653,13 +649,13 @@ impl<AppState> Button<AppState> {
     }
 }
 
-impl<AppState> Widget<AppState> for Button<AppState> {
+impl<Model: ApplicationModel> Widget<Model> for Button<Model> {
     fn calculate_size(
         &self,
         preferred_width: Option<f32>,
         preferred_height: Option<f32>,
         constraints: &Constraints,
-        _children: &[Node<AppState>],
+        _children: &[Node<Model>],
     ) -> (Size, Vec<Constraints>) {
         let w = if let Some(preferred_width) = preferred_width {
             let width = constraints.min_width;
@@ -680,11 +676,11 @@ impl<AppState> Widget<AppState> for Button<AppState> {
         (Size::new(w, h), vec![Constraints::new(0.0, w, 0.0, h)])
     }
 
-    fn mouse_down(&mut self, _: &mut AppState, _: &Rect, _: &MouseEvent) {
+    fn mouse_down(&mut self, _: &mut Model, _: &Rect, _: &MouseEvent) {
         self.pressed = true;
     }
 
-    fn mouse_up(&mut self, state: &mut AppState, _: &Rect, _: &MouseEvent) -> Action<AppState> {
+    fn mouse_up(&mut self, state: &mut Model, _: &Rect, _: &MouseEvent) -> Action<Model> {
         self.pressed = false;
         if let Some(handler) = self.on_click.as_mut() {
             return (*handler)(state);
@@ -693,15 +689,15 @@ impl<AppState> Widget<AppState> for Button<AppState> {
         }
     }
 
-    fn mouse_enter(&mut self, _: &mut AppState, _: &Rect, _: &MouseEvent) {
+    fn mouse_enter(&mut self, _: &mut Model, _: &Rect, _: &MouseEvent) {
         self.hovered = true;
     }
 
-    fn mouse_leave(&mut self, _: &mut AppState, _: &Rect, _: &MouseEvent) {
+    fn mouse_leave(&mut self, _: &mut Model, _: &Rect, _: &MouseEvent) {
         self.hovered = false;
     }
 
-    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+    fn paint(&mut self, _: &Model, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
         assert_ne!(rect.width(), 0f32);
         assert_ne!(rect.height(), 0f32);
         self.paint.set_anti_alias(true);
@@ -727,20 +723,20 @@ impl<AppState> Widget<AppState> for Button<AppState> {
     }
 }
 
-pub trait TableDelegate<AppState> {
-    fn row_selected(&mut self, id: usize, state: &mut AppState) -> Action<AppState>;
-    fn row_count(&self, state: &AppState) -> usize;
+pub trait TableDelegate<Model> {
+    fn row_selected(&mut self, id: usize, state: &mut Model) -> Action<Model>;
+    fn row_count(&self, state: &Model) -> usize;
 }
 
-pub struct Table<AppState> {
+pub struct Table<Model> {
     paint: Paint,
-    delegate: Box<dyn TableDelegate<AppState>>,
+    delegate: Box<dyn TableDelegate<Model>>,
 }
 
-impl<AppState> Table<AppState> {
+impl<Model> Table<Model> {
     pub fn new<D>(delegate: D) -> Self
     where
-        D: TableDelegate<AppState> + 'static,
+        D: TableDelegate<Model> + 'static,
     {
         Table {
             paint: Paint::default(),
@@ -749,14 +745,8 @@ impl<AppState> Table<AppState> {
     }
 }
 
-impl<AppState> Widget<AppState> for Table<AppState> {
-    fn paint(
-        &mut self,
-        state: &AppState,
-        rect: &Rect,
-        canvas: &mut dyn Canvas2D,
-        style: &StyleSheet,
-    ) {
+impl<Model: ApplicationModel> Widget<Model> for Table<Model> {
+    fn paint(&mut self, state: &Model, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
         assert_ne!(rect.width(), 0f32);
         assert_ne!(rect.height(), 0f32);
         let e_color = *style.get("even").unwrap_or(&Color::CYAN);
@@ -784,12 +774,7 @@ impl<AppState> Widget<AppState> for Table<AppState> {
         }
     }
 
-    fn mouse_up(
-        &mut self,
-        state: &mut AppState,
-        rect: &Rect,
-        event: &MouseEvent,
-    ) -> Action<AppState> {
+    fn mouse_up(&mut self, state: &mut Model, rect: &Rect, event: &MouseEvent) -> Action<Model> {
         let row_count = self.delegate.row_count(state);
         let y = event.global_position().y - rect.top();
         let row_size = rect.height() / row_count as f32;
@@ -800,11 +785,11 @@ impl<AppState> Widget<AppState> for Table<AppState> {
 
     fn layout(
         &mut self,
-        _state: &AppState,
+        _state: &Model,
         _rect: &Rect,
         _spacing: f32,
         _padding: f32,
-        _children: &mut [Node<AppState>],
+        _children: &mut [Node<Model>],
     ) {
     }
 
@@ -813,7 +798,7 @@ impl<AppState> Widget<AppState> for Table<AppState> {
         preferred_width: Option<f32>,
         preferred_height: Option<f32>,
         constraints: &Constraints,
-        _children: &[Node<AppState>],
+        _children: &[Node<Model>],
     ) -> (Size, Vec<Constraints>) {
         let w = if let Some(preferred_width) = preferred_width {
             let width = constraints.min_width;
@@ -835,7 +820,7 @@ impl<AppState> Widget<AppState> for Table<AppState> {
     }
 }
 
-pub struct Slider<AppState> {
+pub struct Slider<Model> {
     label: String,
     border_paint: Paint,
     bg_paint: Paint,
@@ -848,10 +833,10 @@ pub struct Slider<AppState> {
     current_normalized: f32,
     current_value: f32,
     last_position: f32,
-    value_changed: Option<Box<dyn FnMut(f32, &mut AppState)>>,
+    value_changed: Option<Box<dyn FnMut(f32, &mut Model)>>,
 }
 
-impl<AppState> Slider<AppState> {
+impl<Model> Slider<Model> {
     pub fn new(label: &str) -> Self {
         Slider::new_with_min_max_and_value(label, 0., 1., 0., false)
     }
@@ -882,7 +867,7 @@ impl<AppState> Slider<AppState> {
 
     pub fn with_handler<F>(mut self, handler: F) -> Self
     where
-        F: FnMut(f32, &mut AppState) + 'static,
+        F: FnMut(f32, &mut Model) + 'static,
     {
         self.value_changed = Some(Box::new(handler));
         self
@@ -894,8 +879,8 @@ impl<AppState> Slider<AppState> {
     }
 }
 
-impl<AppState> Widget<AppState> for Slider<AppState> {
-    fn paint(&mut self, _: &AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+impl<Model: ApplicationModel> Widget<Model> for Slider<Model> {
+    fn paint(&mut self, _: &Model, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
         assert_ne!(rect.width(), 0f32);
         assert_ne!(rect.height(), 0f32);
 
@@ -927,7 +912,7 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
         canvas.draw_string(&t, &rect.center(), &self.font, &self.text_paint);
     }
 
-    fn mouse_down(&mut self, state: &mut AppState, rect: &Rect, event: &MouseEvent) {
+    fn mouse_down(&mut self, state: &mut Model, rect: &Rect, event: &MouseEvent) {
         let x = event.global_position().x - rect.left();
         self.current_normalized = (1. / rect.width()) * x;
 
@@ -947,7 +932,7 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
         preferred_width: Option<f32>,
         preferred_height: Option<f32>,
         constraints: &Constraints,
-        _children: &[Node<AppState>],
+        _children: &[Node<Model>],
     ) -> (Size, Vec<Constraints>) {
         let w = if let Some(preferred_width) = preferred_width {
             let width = constraints.min_width;
@@ -968,7 +953,7 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
         (Size::new(w, h), vec![Constraints::new(0.0, w, 0.0, h)])
     }
 
-    // fn mouse_drag(&mut self, state: &mut AppState, rect: &Rect, event: &MouseEvent) {
+    // fn mouse_drag(&mut self, state: &mut Model, rect: &Rect, event: &MouseEvent) {
     //     self.last_position += event.delta_position.x;
     //     self.current_normalized =
     //         (1. / rect.width()) * self.last_position.min(rect.width()).max(0.);
@@ -984,7 +969,7 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
     // }
 }
 
-// pub struct Spinner<AppState> {
+// pub struct Spinner<Model> {
 //     label: String,
 //     border_paint: Paint,
 //     bg_paint: Paint,
@@ -996,10 +981,10 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
 //     step_size: f32,
 //     discrete: bool,
 //     current_value: f32,
-//     value_changed: Option<Box<dyn FnMut(f32, &mut AppState)>>,
+//     value_changed: Option<Box<dyn FnMut(f32, &mut Model)>>,
 // }
 
-// impl<AppState> Spinner<AppState> {
+// impl<Model> Spinner<Model> {
 //     pub fn new(
 //         label: &str,
 //         min: Option<f32>,
@@ -1031,15 +1016,15 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
 
 //     pub fn with_handler<F>(mut self, handler: F) -> Self
 //     where
-//         F: FnMut(f32, &mut AppState) + 'static,
+//         F: FnMut(f32, &mut Model) + 'static,
 //     {
 //         self.value_changed = Some(Box::new(handler));
 //         self
 //     }
 // }
 
-// impl<AppState> Widget<AppState> for Spinner<AppState> {
-//     fn paint(&mut self, _: &mut AppState, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+// impl<Model> Widget<Model> for Spinner<Model> {
+//     fn paint(&mut self, _: &mut Model, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
 //         let bg_color = style.get("bg-color");
 //         let fill_color = style.get("fill-color");
 //         let border_color = style.get("border-color");
@@ -1071,7 +1056,7 @@ impl<AppState> Widget<AppState> for Slider<AppState> {
 //         );
 //     }
 
-//     fn mouse_drag(&mut self, state: &mut AppState, _: &Rect, event: &MouseEvent) {
+//     fn mouse_drag(&mut self, state: &mut Model, _: &Rect, event: &MouseEvent) {
 //         self.current_value += -event.delta_position.y * self.step_size;
 
 //         if self.discrete {
@@ -1113,14 +1098,14 @@ impl ViewPort {
     }
 }
 
-// impl<AppState> Widget<AppState> for ViewPort {
+// impl<Model> Widget<Model> for ViewPort {
 //     fn layout(
 //         &mut self,
-//         _state: &AppState,
+//         _state: &Model,
 //         rect: &Rect,
 //         _spacing: f32,
 //         _padding: f32,
-//         children: &mut [Node<AppState>],
+//         children: &mut [Node<Model>],
 //     ) {
 //         assert_eq!(1, children.len());
 
@@ -1151,7 +1136,7 @@ impl ViewPort {
 
 //     fn paint(
 //         &mut self,
-//         _state: &AppState,
+//         _state: &Model,
 //         rect: &Rect,
 //         canvas: &mut dyn Canvas2D,
 //         _style: &StyleSheet,
@@ -1197,7 +1182,7 @@ impl PopupMenuWidget {
     }
 }
 
-impl<AppState> Widget<AppState> for PopupMenuWidget {}
+impl<Model: ApplicationModel> Widget<Model> for PopupMenuWidget {}
 
 impl PopupMenu {
     pub fn new(id: usize, name: &str) -> Self {
@@ -1223,15 +1208,15 @@ impl PopupMenu {
     }
 }
 
-pub struct PopupRequest<AppState> {
+pub struct PopupRequest<Model> {
     menu: PopupMenu,
-    pub handler: Box<dyn FnMut(usize, usize, &mut AppState) -> Action<AppState>>,
+    pub handler: Box<dyn FnMut(usize, usize, &mut Model) -> Action<Model>>,
 }
 
-impl<AppState: 'static> PopupRequest<AppState> {
+impl<Model: ApplicationModel + 'static> PopupRequest<Model> {
     pub fn new<F>(menu: PopupMenu, handler: F) -> Self
     where
-        F: FnMut(usize, usize, &mut AppState) -> Action<AppState> + 'static,
+        F: FnMut(usize, usize, &mut Model) -> Action<Model> + 'static,
     {
         PopupRequest {
             menu,
@@ -1239,7 +1224,7 @@ impl<AppState: 'static> PopupRequest<AppState> {
         }
     }
 
-    pub fn build(&self) -> Node<AppState> {
+    pub fn build(&self) -> Node<Model> {
         let mut b = Node::new("menu").widget(VStack::new()).spacing(1.);
 
         for item in self.menu.items.iter() {

@@ -1,5 +1,6 @@
 use skia_safe::{Point, Rect, Size};
 
+use crate::application_model::ApplicationModel;
 use crate::canvas_2d::Canvas2D;
 use crate::widget::*;
 use crate::window_event::{MouseEvent, MouseEventType};
@@ -15,7 +16,7 @@ fn next_node_id() -> u32 {
 }
 
 #[repr(C)]
-pub struct Node<AppState> {
+pub struct Node<Model: ApplicationModel> {
     uid: u32,
     material_tag: String,
     name: String,
@@ -23,21 +24,20 @@ pub struct Node<AppState> {
     padding: f32,
     spacing: f32,
     pub constraints: Constraints,
-    widget: Box<dyn Widget<AppState>>,
-    children: Vec<Node<AppState>>,
+    widget: Box<dyn Widget<Model>>,
+    children: Vec<Node<Model>>,
     style: Material,
     preferred_width: Option<f32>,
     preferred_height: Option<f32>,
     flex: Option<f32>,
 
     mouse_callbacks:
-        HashMap<MouseEventType, Box<dyn FnMut(&MouseEvent, &mut AppState) -> Action<AppState>>>,
-    build_callback: Option<Box<dyn FnMut(&AppState) -> Option<Vec<Node<AppState>>>>>,
-    file_drop_handler:
-        Option<Box<dyn FnMut(&mut AppState, &std::path::PathBuf) -> Action<AppState>>>,
+        HashMap<MouseEventType, Box<dyn FnMut(&MouseEvent, &mut Model) -> Action<Model>>>,
+    build_callback: Option<Box<dyn FnMut(&Model) -> Option<Vec<Node<Model>>>>>,
+    file_drop_handler: Option<Box<dyn FnMut(&mut Model, &std::path::PathBuf) -> Action<Model>>>,
 }
 
-impl<AppState> Node<AppState> {
+impl<Model: ApplicationModel> Node<Model> {
     pub fn new(tag: &str) -> Self {
         Node {
             name: String::from(""),
@@ -61,7 +61,7 @@ impl<AppState> Node<AppState> {
 
     pub fn widget<T>(mut self, w: T) -> Self
     where
-        T: Widget<AppState> + 'static,
+        T: Widget<Model> + 'static,
     {
         self.widget = Box::new(w);
         self
@@ -116,7 +116,7 @@ impl<AppState> Node<AppState> {
 
     pub fn with_mouse_event_callback<F>(mut self, event: MouseEventType, cb: F) -> Self
     where
-        F: FnMut(&MouseEvent, &mut AppState) -> Action<AppState> + 'static,
+        F: FnMut(&MouseEvent, &mut Model) -> Action<Model> + 'static,
     {
         self.mouse_callbacks.insert(event, Box::new(cb));
         self
@@ -132,7 +132,7 @@ impl<AppState> Node<AppState> {
 
     pub fn on_rebuild<F>(mut self, cb: F) -> Self
     where
-        F: FnMut(&AppState) -> Option<Vec<Node<AppState>>> + 'static,
+        F: FnMut(&Model) -> Option<Vec<Node<Model>>> + 'static,
     {
         self.build_callback = Some(Box::new(cb));
         self
@@ -140,18 +140,18 @@ impl<AppState> Node<AppState> {
 
     pub fn on_file_drop<F>(mut self, handler: F) -> Self
     where
-        F: FnMut(&mut AppState, &std::path::PathBuf) -> Action<AppState> + 'static,
+        F: FnMut(&mut Model, &std::path::PathBuf) -> Action<Model> + 'static,
     {
         self.file_drop_handler = Some(Box::new(handler));
         self
     }
 
-    pub fn add_child(&mut self, child: Node<AppState>) -> &mut Self {
+    pub fn add_child(&mut self, child: Node<Model>) -> &mut Self {
         self.children.push(child);
         return self;
     }
 
-    pub fn child(mut self, child: Node<AppState>) -> Self {
+    pub fn child(mut self, child: Node<Model>) -> Self {
         self.children.push(child);
         return self;
     }
@@ -170,13 +170,13 @@ impl<AppState> Node<AppState> {
         None
     }
 
-    pub fn resized(&mut self, state: &mut AppState) {
+    pub fn resized(&mut self, state: &mut Model) {
         for child in self.children.iter_mut() {
             child.resized(state);
         }
     }
 
-    pub fn send_mouse_enter(&mut self, state: &mut AppState, uid: u32, event: &MouseEvent) {
+    pub fn send_mouse_enter(&mut self, state: &mut Model, uid: u32, event: &MouseEvent) {
         if self.uid == uid {
             self.widget.mouse_enter(state, &self.rect, event);
         } else {
@@ -186,7 +186,7 @@ impl<AppState> Node<AppState> {
         }
     }
 
-    pub fn send_mouse_leave(&mut self, state: &mut AppState, uid: u32, event: &MouseEvent) {
+    pub fn send_mouse_leave(&mut self, state: &mut Model, uid: u32, event: &MouseEvent) {
         if self.uid == uid {
             self.widget.mouse_leave(state, &self.rect, event);
         } else {
@@ -198,10 +198,10 @@ impl<AppState> Node<AppState> {
 
     pub fn file_dropped(
         &mut self,
-        state: &mut AppState,
+        state: &mut Model,
         file: &std::path::PathBuf,
         position: &Point,
-    ) -> Action<AppState> {
+    ) -> Action<Model> {
         let mut action = Action::None;
 
         if self.hit_test(position) {
@@ -248,7 +248,7 @@ impl<AppState> Node<AppState> {
         }
     }
 
-    pub fn layout(&mut self, state: &AppState) {
+    pub fn layout(&mut self, state: &Model) {
         self.widget.layout(
             state,
             &self.rect,
@@ -261,7 +261,7 @@ impl<AppState> Node<AppState> {
         }
     }
 
-    pub fn layout_child_with_name(&mut self, name: &str, state: &AppState) {
+    pub fn layout_child_with_name(&mut self, name: &str, state: &Model) {
         if self.name == name {
             self.layout(state)
         } else {
@@ -271,7 +271,7 @@ impl<AppState> Node<AppState> {
         }
     }
 
-    pub fn build(&mut self, state: &AppState) {
+    pub fn build(&mut self, state: &Model) {
         if let Some(cb) = self.build_callback.as_mut() {
             if let Some(children) = cb(state) {
                 self.children = children;
@@ -289,7 +289,7 @@ impl<AppState> Node<AppState> {
         self.rect.set_wh(size.width, size.height);
     }
 
-    pub fn draw(&mut self, state: &AppState, canvas: &mut dyn Canvas2D, material: &Material) {
+    pub fn draw(&mut self, state: &Model, canvas: &mut dyn Canvas2D, material: &Material) {
         self.widget.paint(
             state,
             &self.rect,
@@ -310,7 +310,7 @@ impl<AppState> Node<AppState> {
         bx && by
     }
 
-    pub fn mouse_down(&mut self, state: &mut AppState, event: &MouseEvent) -> Action<AppState> {
+    pub fn mouse_down(&mut self, state: &mut Model, event: &MouseEvent) -> Action<Model> {
         let mut action = Action::None;
 
         if self.hit_test(&event.global_position()) {
@@ -333,7 +333,7 @@ impl<AppState> Node<AppState> {
         action
     }
 
-    pub fn mouse_up(&mut self, state: &mut AppState, event: &MouseEvent) -> Action<AppState> {
+    pub fn mouse_up(&mut self, state: &mut Model, event: &MouseEvent) -> Action<Model> {
         let mut action = Action::None;
 
         if self.hit_test(&event.global_position()) {
@@ -356,7 +356,7 @@ impl<AppState> Node<AppState> {
         action
     }
 
-    pub fn double_click(&mut self, state: &mut AppState, event: &MouseEvent) {
+    pub fn double_click(&mut self, state: &mut Model, event: &MouseEvent) {
         if self.hit_test(&event.global_position()) {
             let mut consume = true;
             for child in self.children.iter_mut() {
@@ -372,7 +372,7 @@ impl<AppState> Node<AppState> {
         }
     }
 
-    pub fn mouse_drag(&mut self, state: &mut AppState, event: &MouseEvent) -> Action<AppState> {
+    pub fn mouse_drag(&mut self, state: &mut Model, event: &MouseEvent) -> Action<Model> {
         if self.hit_test(&event.global_position()) {
             let mut consume = true;
             for child in self.children.iter_mut() {
@@ -390,7 +390,7 @@ impl<AppState> Node<AppState> {
         Action::None
     }
 
-    pub fn mouse_moved(&mut self, state: &mut AppState, event: &MouseEvent) -> Option<u32> {
+    pub fn mouse_moved(&mut self, state: &mut Model, event: &MouseEvent) -> Option<u32> {
         for child in self.children.iter_mut() {
             if child.hit_test(&event.global_position()) {
                 return child.mouse_moved(state, event);
@@ -400,7 +400,7 @@ impl<AppState> Node<AppState> {
         return Some(self.uid);
     }
 
-    pub fn mouse_leave(&mut self, state: &mut AppState, event: &MouseEvent) {
+    pub fn mouse_leave(&mut self, state: &mut Model, event: &MouseEvent) {
         self.widget.mouse_leave(state, &self.rect, event);
     }
 }

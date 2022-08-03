@@ -1,4 +1,5 @@
 pub mod application;
+pub mod application_model;
 pub mod canvas_2d;
 pub mod image_renderer;
 pub mod node;
