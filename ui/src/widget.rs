@@ -451,7 +451,7 @@ impl<Model> Widget<Model> for Row<Model> {
             .iter()
             .fold(Size::new(0f32, 0f32), |mut acc, child_size| {
                 acc.width += child_size.width;
-                acc.height += child_size.height;
+                acc.height = acc.height.max(child_size.height);
                 acc
             });
 
@@ -460,6 +460,82 @@ impl<Model> Widget<Model> for Row<Model> {
             self.children[index].set_position(&position);
             self.children[index].set_size(&child_sizes[index]);
             position.x += size.width;
+        }
+
+        size
+    }
+
+    fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
+        for child in &self.children {
+            child.paint(canvas, rect, model)
+        }
+    }
+
+    fn mouse_down(&mut self, event: &MouseEvent, model: &mut Model) {
+        for child in &mut self.children {
+            child.mouse_down(event, model)
+        }
+    }
+
+    fn mouse_up(&mut self, event: &MouseEvent, model: &mut Model) {
+        for child in &mut self.children {
+            child.mouse_up(event, model)
+        }
+    }
+
+    fn mouse_drag(&mut self, event: &MouseEvent, model: &mut Model) {
+        for child in &mut self.children {
+            child.mouse_drag(event, model)
+        }
+    }
+}
+
+pub struct Column<Model> {
+    children: Vec<ChildSlot<Model>>,
+}
+
+impl<Model> Column<Model> {
+    pub fn new() -> Self {
+        Self {
+            children: Vec::new(),
+        }
+    }
+
+    pub fn with_child<W>(mut self, child: W) -> Self
+    where
+        W: Widget<Model> + 'static,
+    {
+        self.children.push(ChildSlot::new(child));
+        self
+    }
+}
+
+impl<Model> Widget<Model> for Column<Model> {
+    fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
+        let child_sizes: Vec<Size> = self
+            .children
+            .iter_mut()
+            .map(|child| child.layout(constraints, model))
+            .collect();
+
+        let unconstrained_children: Vec<bool> = child_sizes
+            .iter()
+            .map(|size| size.width == 0f32 && size.height == 0f32)
+            .collect();
+
+        let size = child_sizes
+            .iter()
+            .fold(Size::new(0f32, 0f32), |mut acc, child_size| {
+                acc.width = acc.width.max(child_size.width);
+                acc.height += child_size.height;
+                acc
+            });
+
+        let mut position = Point::new(0f32, 0f32);
+        for (index, size) in child_sizes.iter().enumerate() {
+            self.children[index].set_position(&position);
+            self.children[index].set_size(&child_sizes[index]);
+            position.y += size.height;
         }
 
         size
