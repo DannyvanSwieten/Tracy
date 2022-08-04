@@ -167,8 +167,21 @@ impl ApplicationModel for State {
 
 pub struct UIBuilder {}
 
+use ui::widget::*;
+
 impl ui::user_interface::UIBuilder<State> for UIBuilder {
-    fn build(&self, _section: &str, _state: &State) -> ui::node::Node<State> {
-        ui::node::Node::new("joe").widget(ui::widget::Container::new())
+    fn build(&self, _section: &str, _state: &State) -> Box<dyn Widget<State>> {
+        Box::new(Center::new(
+            Row::new()
+                .with_child(
+                    TextButton::new("Button 1", 15f32).with_click_handler(|_| println!("Click 1 ")),
+                )
+                .with_child(
+                    TextButton::new("Button 2 With More Text", 15f32).with_click_handler(|_| println!("Click 2")),
+                )
+                .with_child(
+                    TextButton::new("Button 3", 15f32).with_click_handler(|_| println!("Click 3")),
+                ),
+        ))
     }
 }

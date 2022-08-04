@@ -589,14 +589,16 @@ impl Canvas2D for SkiaGpuCanvas2D {
             .draw_round_rect(rect, rx, ry, paint);
     }
 
-    fn draw_string(&mut self, text: &str, center: &Point, font: &Font, paint: &Paint) {
+    fn draw_string(&mut self, text: &str, font: &Font, paint: &Paint) {
         let blob = skia_safe::TextBlob::from_str(text.to_string(), font);
         if let Some(b) = blob {
             let rect = b.bounds();
-            let left = *center - rect.center();
-            self.surfaces[self.current_image_index]
-                .canvas()
-                .draw_str(text, left, font, paint);
+            self.surfaces[self.current_image_index].canvas().draw_str(
+                text,
+                Point::new(rect.left().abs(), rect.top().abs()),
+                font,
+                paint,
+            );
         }
     }
 
@@ -698,5 +700,11 @@ impl Canvas2D for SkiaGpuCanvas2D {
             SkiaCanvasImage::new(image.clone(), image.width() as _, image.height() as _),
             view,
         )
+    }
+
+    fn translate(&mut self, point: &Point) {
+        self.surfaces[self.current_image_index]
+            .canvas()
+            .translate(*point);
     }
 }

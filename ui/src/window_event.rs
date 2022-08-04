@@ -10,6 +10,7 @@ pub enum MouseEventType {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct MouseEvent {
     modifiers: u32,
     global_position: Point,
@@ -25,6 +26,12 @@ impl MouseEvent {
             local_position: *local_position,
             delta_position: Point::new(0., 0.),
         }
+    }
+
+    pub fn to_local(&self, position: &Point) -> Self {
+        let mut new_event = *self;
+        new_event.local_position = self.global_position - *position;
+        new_event
     }
 
     pub fn new_with_delta(
