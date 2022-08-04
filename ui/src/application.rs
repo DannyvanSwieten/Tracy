@@ -3,7 +3,7 @@ extern crate ash_window;
 extern crate winit;
 
 use crate::window_delegate::WindowDelegate;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use vk_utils::vulkan::Vulkan;
 
 use super::application_model::ApplicationModel;
@@ -188,23 +188,25 @@ impl<Model: ApplicationModel> WindowRegistry<Model> {
 
     fn mouse_down(
         &mut self,
+        app: &mut Application<Model>,
         state: &mut Model,
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) {
         if let Some(delegate) = self.window_delegates.get_mut(id) {
-            delegate.mouse_down(state, position.x as f32, position.y as f32);
+            delegate.mouse_down(app, state, position.x as f32, position.y as f32);
         }
     }
 
     fn mouse_up(
         &mut self,
+        app: &mut Application<Model>,
         state: &mut Model,
         id: &winit::window::WindowId,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) {
         if let Some(delegate) = self.window_delegates.get_mut(id) {
-            delegate.mouse_up(state, position.x as f32, position.y as f32);
+            delegate.mouse_up(app, state, position.x as f32, position.y as f32);
         }
     }
 
@@ -248,7 +250,7 @@ impl<Model: ApplicationModel> WindowRegistry<Model> {
 
 pub struct Application<Model: ApplicationModel> {
     vulkan: Vulkan,
-    pending_messages: Vec<Model::MessageType>,
+    pending_messages: VecDeque<Model::MessageType>,
     _state: std::marker::PhantomData<Model>,
 }
 
@@ -264,7 +266,7 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
 
         Self {
             vulkan,
-            pending_messages: Vec::new(),
+            pending_messages: VecDeque::new(),
             _state: std::marker::PhantomData::<Model>::default(),
         }
     }
@@ -273,7 +275,13 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
         &self.vulkan
     }
 
-    pub fn send_message(&mut self, msg: Model::MessageType) {}
+    pub fn send_message(&mut self, msg: Model::MessageType) {
+        self.pending_messages.push_back(msg)
+    }
+
+    pub fn pop_message(&mut self) -> Option<Model::MessageType> {
+        self.pending_messages.pop_front()
+    }
 
     pub fn run<Delegate>(mut self, delegate: Delegate, state: Model)
     where
@@ -293,6 +301,9 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
         let mut last_file_drop: Vec<std::path::PathBuf> = Vec::new();
         let mut mouse_is_down = false;
         event_loop.run(move |e, event_loop, control_flow| {
+            while let Some(msg) = self.pop_message() {
+                s.handle_message(msg)
+            }
             *control_flow = winit::event_loop::ControlFlow::Poll;
             match e {
                 Event::WindowEvent {
@@ -393,11 +404,21 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
                 } => match state {
                     winit::event::ElementState::Pressed => {
                         mouse_is_down = true;
-                        window_registry.mouse_down(&mut s, &window_id, &last_mouse_position)
+                        window_registry.mouse_down(
+                            &mut self,
+                            &mut s,
+                            &window_id,
+                            &last_mouse_position,
+                        )
                     }
                     winit::event::ElementState::Released => {
                         mouse_is_down = false;
-                        window_registry.mouse_up(&mut s, &window_id, &last_mouse_position)
+                        window_registry.mouse_up(
+                            &mut self,
+                            &mut s,
+                            &window_id,
+                            &last_mouse_position,
+                        )
                     }
                 },
                 Event::MainEventsCleared => {

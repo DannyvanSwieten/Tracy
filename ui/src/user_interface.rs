@@ -1,3 +1,4 @@
+use crate::application::Application;
 use crate::application_model::ApplicationModel;
 use crate::canvas_2d::Canvas2D;
 use crate::widget::*;
@@ -78,7 +79,12 @@ impl<Model: ApplicationModel + 'static> UserInterface<Model> {
         // self.root.resized(state);
     }
 
-    pub fn mouse_down(&mut self, state: &mut Model, event: &MouseEvent) {
+    pub fn mouse_down(
+        &mut self,
+        app: &mut Application<Model>,
+        state: &mut Model,
+        event: &MouseEvent,
+    ) {
         // let mut dismiss_popup = false;
         // if let Some(popup) = self.pop_up.as_mut() {
         //     if !popup.hit_test(&event.global_position()) {
@@ -93,16 +99,21 @@ impl<Model: ApplicationModel + 'static> UserInterface<Model> {
         //     self.pop_up = None;
         // }
 
-        self.root.mouse_down(event, state)
+        self.root.mouse_down(event, app, state)
     }
 
-    pub fn mouse_up(&mut self, state: &mut Model, event: &MouseEvent) {
+    pub fn mouse_up(
+        &mut self,
+        app: &mut Application<Model>,
+        state: &mut Model,
+        event: &MouseEvent,
+    ) {
         // if let Some(popup) = self.pop_up.as_mut() {
         //     self.actions.push(popup.mouse_up(state, event));
         //     return;
         // }
 
-        self.root.mouse_up(event, state)
+        self.root.mouse_up(event, app, state)
     }
 
     pub fn double_click(&mut self, state: &mut Model, event: &MouseEvent) {

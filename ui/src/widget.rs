@@ -1,3 +1,4 @@
+use crate::application::Application;
 use crate::application_model::ApplicationModel;
 use crate::canvas_2d::Canvas2D;
 // use crate::node::*;
@@ -193,11 +194,11 @@ impl BoxConstraints {
     }
 }
 
-pub trait Widget<Model> {
+pub trait Widget<Model: ApplicationModel> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size;
     fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model);
-    fn mouse_down(&mut self, event: &MouseEvent, model: &mut Model) {}
-    fn mouse_up(&mut self, event: &MouseEvent, model: &mut Model) {}
+    fn mouse_down(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {}
+    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {}
     fn mouse_drag(&mut self, event: &MouseEvent, model: &mut Model) {}
 }
 
@@ -207,7 +208,7 @@ pub struct ChildSlot<Model> {
     widget: Box<dyn Widget<Model>>,
 }
 
-impl<Model> ChildSlot<Model> {
+impl<Model: ApplicationModel> ChildSlot<Model> {
     pub fn new(widget: impl Widget<Model> + 'static) -> Self {
         Self {
             position: Point::default(),
@@ -248,7 +249,7 @@ impl<Model> ChildSlot<Model> {
     }
 }
 
-impl<Model> Widget<Model> for ChildSlot<Model> {
+impl<Model: ApplicationModel> Widget<Model> for ChildSlot<Model> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
         self.widget.layout(constraints, model)
     }
@@ -260,17 +261,17 @@ impl<Model> Widget<Model> for ChildSlot<Model> {
         canvas.restore();
     }
 
-    fn mouse_down(&mut self, event: &MouseEvent, model: &mut Model) {
+    fn mouse_down(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
         if self.hit_test(event.local_position()) {
             let new_event = event.to_local(self.position());
-            self.widget.mouse_down(&new_event, model);
+            self.widget.mouse_down(&new_event, app, model);
         }
     }
 
-    fn mouse_up(&mut self, event: &MouseEvent, model: &mut Model) {
+    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
         if self.hit_test(event.local_position()) {
             let new_event = event.to_local(self.position());
-            self.widget.mouse_up(&new_event, model);
+            self.widget.mouse_up(&new_event, app, model);
         }
     }
 
@@ -290,7 +291,7 @@ pub struct Container<Model> {
     paint: Option<Paint>,
 }
 
-impl<Model> Container<Model> {
+impl<Model: ApplicationModel> Container<Model> {
     pub fn new(child: impl Widget<Model> + 'static) -> Self {
         Self {
             padding: 0.0,
@@ -346,12 +347,12 @@ impl<Model: ApplicationModel> Widget<Model> for Container<Model> {
         self.child.paint(canvas, self.child.size(), model);
     }
 
-    fn mouse_up(&mut self, event: &MouseEvent, model: &mut Model) {
-        self.child.mouse_up(event, model);
+    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
+        self.child.mouse_up(event, app, model);
     }
 
-    fn mouse_down(&mut self, event: &MouseEvent, model: &mut Model) {
-        self.child.mouse_down(event, model);
+    fn mouse_down(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
+        self.child.mouse_down(event, app, model);
     }
 }
 
@@ -360,7 +361,7 @@ pub struct Center<Model> {
     size: Option<Size>,
 }
 
-impl<Model> Center<Model> {
+impl<Model: ApplicationModel> Center<Model> {
     pub fn new<W: Widget<Model> + 'static>(child: W) -> Self {
         Self {
             child: ChildSlot::new_with_box(Box::new(child)),
@@ -369,7 +370,7 @@ impl<Model> Center<Model> {
     }
 }
 
-impl<Model> Widget<Model> for Center<Model> {
+impl<Model: ApplicationModel> Widget<Model> for Center<Model> {
     // The layout strategy for a center node: return own size if not None, otherwise as big as possible within given constraints.
     // Then center the child.
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
@@ -401,12 +402,12 @@ impl<Model> Widget<Model> for Center<Model> {
         self.child.paint(canvas, rect, model)
     }
 
-    fn mouse_down(&mut self, event: &MouseEvent, model: &mut Model) {
-        self.child.mouse_down(event, model)
+    fn mouse_down(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
+        self.child.mouse_down(event, app, model)
     }
 
-    fn mouse_up(&mut self, event: &MouseEvent, model: &mut Model) {
-        self.child.mouse_up(event, model)
+    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
+        self.child.mouse_up(event, app, model)
     }
 
     fn mouse_drag(&mut self, event: &MouseEvent, model: &mut Model) {
@@ -418,7 +419,7 @@ pub struct Row<Model> {
     children: Vec<ChildSlot<Model>>,
 }
 
-impl<Model> Row<Model> {
+impl<Model: ApplicationModel> Row<Model> {
     pub fn new() -> Self {
         Self {
             children: Vec::new(),
@@ -434,7 +435,7 @@ impl<Model> Row<Model> {
     }
 }
 
-impl<Model> Widget<Model> for Row<Model> {
+impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
         let child_sizes: Vec<Size> = self
             .children
@@ -471,15 +472,15 @@ impl<Model> Widget<Model> for Row<Model> {
         }
     }
 
-    fn mouse_down(&mut self, event: &MouseEvent, model: &mut Model) {
+    fn mouse_down(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
         for child in &mut self.children {
-            child.mouse_down(event, model)
+            child.mouse_down(event, app, model)
         }
     }
 
-    fn mouse_up(&mut self, event: &MouseEvent, model: &mut Model) {
+    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
         for child in &mut self.children {
-            child.mouse_up(event, model)
+            child.mouse_up(event, app, model)
         }
     }
 
@@ -494,7 +495,7 @@ pub struct Column<Model> {
     children: Vec<ChildSlot<Model>>,
 }
 
-impl<Model> Column<Model> {
+impl<Model: ApplicationModel> Column<Model> {
     pub fn new() -> Self {
         Self {
             children: Vec::new(),
@@ -510,7 +511,7 @@ impl<Model> Column<Model> {
     }
 }
 
-impl<Model> Widget<Model> for Column<Model> {
+impl<Model: ApplicationModel> Widget<Model> for Column<Model> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
         let child_sizes: Vec<Size> = self
             .children
@@ -547,15 +548,15 @@ impl<Model> Widget<Model> for Column<Model> {
         }
     }
 
-    fn mouse_down(&mut self, event: &MouseEvent, model: &mut Model) {
+    fn mouse_down(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
         for child in &mut self.children {
-            child.mouse_down(event, model)
+            child.mouse_down(event, app, model)
         }
     }
 
-    fn mouse_up(&mut self, event: &MouseEvent, model: &mut Model) {
+    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
         for child in &mut self.children {
-            child.mouse_up(event, model)
+            child.mouse_up(event, app, model)
         }
     }
 
@@ -566,13 +567,13 @@ impl<Model> Widget<Model> for Column<Model> {
     }
 }
 
-pub struct TextButton<Model> {
+pub struct TextButton<Model: ApplicationModel> {
     text: String,
     font: Font,
-    on_click: Option<Box<dyn Fn(&mut Model)>>,
+    on_click: Option<Box<dyn Fn(&mut Application<Model>, &mut Model)>>,
 }
 
-impl<Model> TextButton<Model> {
+impl<Model: ApplicationModel> TextButton<Model> {
     pub fn new(text: &str, font_size: f32) -> Self {
         let font = Font::new(
             skia_safe::typeface::Typeface::new("arial", skia_safe::FontStyle::normal()).unwrap(),
@@ -585,13 +586,16 @@ impl<Model> TextButton<Model> {
         }
     }
 
-    pub fn with_click_handler(mut self, handler: impl Fn(&mut Model) + 'static) -> Self {
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&mut Application<Model>, &mut Model) + 'static,
+    ) -> Self {
         self.on_click = Some(Box::new(handler));
         self
     }
 }
 
-impl<Model> Widget<Model> for TextButton<Model> {
+impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
     fn layout(&mut self, constraints: &BoxConstraints, _: &Model) -> Size {
         let blob = skia_safe::TextBlob::from_str(&self.text, &self.font);
         let size = blob.unwrap().bounds().size();
@@ -609,9 +613,9 @@ impl<Model> Widget<Model> for TextButton<Model> {
         canvas.draw_string(&self.text, &self.font, &text_paint);
     }
 
-    fn mouse_up(&mut self, event: &MouseEvent, model: &mut Model) {
+    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
         if let Some(handler) = &self.on_click {
-            handler(model)
+            handler(app, model)
         }
     }
 }

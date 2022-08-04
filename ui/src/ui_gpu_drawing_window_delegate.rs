@@ -90,19 +90,19 @@ impl<'a, Model: ApplicationModel + 'static> WindowDelegate<Model>
         }
     }
 
-    fn mouse_down(&mut self, state: &mut Model, x: f32, y: f32) {
+    fn mouse_down(&mut self, app: &mut Application<Model>, state: &mut Model, x: f32, y: f32) {
         let p = skia_safe::Point::from((x, y));
         if let Some(ui) = self.ui.as_mut() {
             ui.user_interface
-                .mouse_down(state, &MouseEvent::new(0, &p, &p));
+                .mouse_down(app, state, &MouseEvent::new(0, &p, &p));
         }
     }
 
-    fn mouse_up(&mut self, state: &mut Model, x: f32, y: f32) {
+    fn mouse_up(&mut self, app: &mut Application<Model>, state: &mut Model, x: f32, y: f32) {
         let p = skia_safe::Point::from((x, y));
         if let Some(ui) = self.ui.as_mut() {
             ui.user_interface
-                .mouse_up(state, &MouseEvent::new(0, &p, &p));
+                .mouse_up(app, state, &MouseEvent::new(0, &p, &p));
         }
     }
 

@@ -161,7 +161,7 @@ impl ApplicationModel for State {
     type MessageType = i32;
 
     fn handle_message(&mut self, msg: Self::MessageType) {
-        todo!()
+        println!("Message handled: {}", msg)
     }
 }
 
@@ -174,14 +174,14 @@ impl ui::user_interface::UIBuilder<State> for UIBuilder {
         Box::new(Center::new(
             Column::new()
                 .with_child(
-                    TextButton::new("Button 1", 15f32).with_click_handler(|_| println!("Click 1 ")),
+                    TextButton::new("Button 1", 25f32).on_click(|_, _| println!("Click 1 ")),
                 )
                 .with_child(
-                    TextButton::new("Button 2 With More Text", 15f32)
-                        .with_click_handler(|_| println!("Click 2")),
+                    TextButton::new("Button 2 With More Text", 25f32)
+                        .on_click(|_, _| println!("Click 2")),
                 )
                 .with_child(
-                    TextButton::new("Button 3", 15f32).with_click_handler(|_| println!("Click 3")),
+                    TextButton::new("Button 3", 25f32).on_click(|app, _| app.send_message(1)),
                 ),
         ))
     }
