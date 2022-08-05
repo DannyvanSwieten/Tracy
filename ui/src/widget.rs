@@ -247,16 +247,19 @@ pub trait Widget<Model: ApplicationModel> {
     fn flex(&self) -> f32 {
         0f32
     }
-    fn mouse_down(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model);
-    fn mouse_up(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model);
-    fn mouse_drag(&mut self, _: &MouseEvent, _: &mut Model);
-    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model);
+    fn mouse_down(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {}
+    fn mouse_up(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {}
+    fn mouse_dragged(&mut self, _: &MouseEvent, _: &mut Model) {}
+    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {}
+    fn mouse_entered(&mut self, _: &MouseEvent, _: &mut Model) {}
+    fn mouse_left(&mut self, _: &MouseEvent, _: &mut Model) {}
 }
 
 pub struct ChildSlot<Model> {
     position: Point,
     size: Size,
     widget: Box<dyn Widget<Model>>,
+    has_mouse: bool,
 }
 
 impl<Model: ApplicationModel> ChildSlot<Model> {
@@ -265,6 +268,7 @@ impl<Model: ApplicationModel> ChildSlot<Model> {
             position: Point::default(),
             size: Size::default(),
             widget: Box::new(widget),
+            has_mouse: false,
         }
     }
 
@@ -273,6 +277,7 @@ impl<Model: ApplicationModel> ChildSlot<Model> {
             position: Point::default(),
             size: Size::default(),
             widget,
+            has_mouse: false,
         }
     }
 
@@ -326,15 +331,30 @@ impl<Model: ApplicationModel> Widget<Model> for ChildSlot<Model> {
         }
     }
 
-    fn mouse_drag(&mut self, event: &MouseEvent, model: &mut Model) {
+    fn mouse_dragged(&mut self, event: &MouseEvent, model: &mut Model) {
         if self.hit_test(event.local_position()) {
             let new_event = event.to_local(self.position());
-            self.widget.mouse_drag(&new_event, model);
+            self.widget.mouse_dragged(&new_event, model);
         }
     }
 
-    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
-        todo!()
+    fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
+        if self.hit_test(event.local_position()) {
+            let new_event = event.to_local(self.position());
+
+            if !self.has_mouse {
+                self.has_mouse = true;
+                self.widget.mouse_entered(&new_event, model);
+            }
+
+            self.widget.mouse_moved(&new_event, model);
+        } else {
+            let new_event = event.to_local(self.position());
+            if self.has_mouse {
+                self.has_mouse = false;
+                self.widget.mouse_left(&new_event, model);
+            }
+        }
     }
 }
 
@@ -410,7 +430,7 @@ impl<Model: ApplicationModel> Widget<Model> for Container<Model> {
         self.child.mouse_up(event, app, model);
     }
 
-    fn mouse_drag(&mut self, _: &MouseEvent, _: &mut Model) {
+    fn mouse_dragged(&mut self, _: &MouseEvent, _: &mut Model) {
         todo!()
     }
 
@@ -478,8 +498,8 @@ impl<Model: ApplicationModel> Widget<Model> for Center<Model> {
         self.child.mouse_up(event, app, model)
     }
 
-    fn mouse_drag(&mut self, event: &MouseEvent, model: &mut Model) {
-        self.child.mouse_drag(event, model)
+    fn mouse_dragged(&mut self, event: &MouseEvent, model: &mut Model) {
+        self.child.mouse_dragged(event, model)
     }
 
     fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
@@ -592,9 +612,9 @@ impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
         }
     }
 
-    fn mouse_drag(&mut self, event: &MouseEvent, model: &mut Model) {
+    fn mouse_dragged(&mut self, event: &MouseEvent, model: &mut Model) {
         for child in &mut self.children {
-            child.mouse_drag(event, model)
+            child.mouse_dragged(event, model)
         }
     }
 
@@ -672,9 +692,9 @@ impl<Model: ApplicationModel> Widget<Model> for Column<Model> {
         }
     }
 
-    fn mouse_drag(&mut self, event: &MouseEvent, model: &mut Model) {
+    fn mouse_dragged(&mut self, event: &MouseEvent, model: &mut Model) {
         for child in &mut self.children {
-            child.mouse_drag(event, model)
+            child.mouse_dragged(event, model)
         }
     }
 
@@ -715,7 +735,7 @@ impl<Model: ApplicationModel> Widget<Model> for SizedBox<Model> {
         todo!()
     }
 
-    fn mouse_drag(&mut self, _: &MouseEvent, _: &mut Model) {
+    fn mouse_dragged(&mut self, _: &MouseEvent, _: &mut Model) {
         todo!()
     }
 
@@ -750,7 +770,7 @@ impl<Model: ApplicationModel> Widget<Model> for FlexBox<Model> {
         todo!()
     }
 
-    fn mouse_drag(&mut self, _: &MouseEvent, _: &mut Model) {
+    fn mouse_dragged(&mut self, _: &MouseEvent, _: &mut Model) {
         todo!()
     }
 
@@ -818,7 +838,7 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
         todo!()
     }
 
-    fn mouse_drag(&mut self, _: &MouseEvent, _: &mut Model) {
+    fn mouse_dragged(&mut self, _: &MouseEvent, _: &mut Model) {
         todo!()
     }
 
@@ -887,7 +907,7 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
 //     ) -> Action<Model> {
 //         return Action::None;
 //     }
-//     fn mouse_drag(&mut self, _state: &mut Model, _rect: &Rect, _event: &MouseEvent) {}
+//     fn mouse_dragged(&mut self, _state: &mut Model, _rect: &Rect, _event: &MouseEvent) {}
 //     fn mouse_moved(&mut self, _state: &mut Model, _rect: &Rect, _event: &MouseEvent) {}
 //     fn mouse_enter(&mut self, _state: &mut Model, _rect: &Rect, _event: &MouseEvent) {}
 //     fn mouse_leave(&mut self, _state: &mut Model, _rect: &Rect, _event: &MouseEvent) {}
@@ -1623,7 +1643,7 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
 //         (Size::new(w, h), vec![Constraints::new(0.0, w, 0.0, h)])
 //     }
 
-//     // fn mouse_drag(&mut self, state: &mut Model, rect: &Rect, event: &MouseEvent) {
+//     // fn mouse_dragged(&mut self, state: &mut Model, rect: &Rect, event: &MouseEvent) {
 //     //     self.last_position += event.delta_position.x;
 //     //     self.current_normalized =
 //     //         (1. / rect.width()) * self.last_position.min(rect.width()).max(0.);
@@ -1726,7 +1746,7 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
 // //         );
 // //     }
 
-// //     fn mouse_drag(&mut self, state: &mut Model, _: &Rect, event: &MouseEvent) {
+// //     fn mouse_dragged(&mut self, state: &mut Model, _: &Rect, event: &MouseEvent) {
 // //         self.current_value += -event.delta_position.y * self.step_size;
 
 // //         if self.discrete {

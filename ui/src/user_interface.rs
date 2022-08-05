@@ -126,7 +126,7 @@ impl<Model: ApplicationModel + 'static> UserInterface<Model> {
         //     return;
         // }
 
-        self.root.mouse_drag(event, state);
+        self.root.mouse_dragged(event, state);
     }
 
     pub fn mouse_moved(&mut self, state: &mut Model, event: &MouseEvent) {
