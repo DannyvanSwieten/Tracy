@@ -71,7 +71,7 @@ impl<Model: ApplicationModel + 'static> UserInterface<Model> {
     }
 
     pub fn resize(&mut self, state: &Model, width: u32, height: u32) {
-        let constraints = BoxConstraints::new(Some(width as f32), Some(height as f32));
+        let constraints = BoxConstraints::new().with_tight_constraints(width as f32, height as f32);
         self.layout(&constraints, state);
     }
 
@@ -153,6 +153,8 @@ impl<Model: ApplicationModel + 'static> UserInterface<Model> {
         //     }
         //     self.hovered = uid;
         // }
+
+        self.root.mouse_moved(event, state);
     }
 
     pub fn mouse_leave(&mut self, state: &mut Model, event: &MouseEvent) {

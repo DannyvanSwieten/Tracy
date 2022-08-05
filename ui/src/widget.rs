@@ -160,46 +160,97 @@ pub trait AppAction<Model> {
 
 #[derive(Default)]
 pub struct BoxConstraints {
-    width: Option<f32>,
-    height: Option<f32>,
+    min_width: Option<f32>,
+    min_height: Option<f32>,
+    max_width: Option<f32>,
+    max_height: Option<f32>,
 }
 
 impl BoxConstraints {
-    pub fn new(width: Option<f32>, height: Option<f32>) -> Self {
-        Self { width, height }
+    pub fn new() -> Self {
+        Self {
+            min_width: None,
+            min_height: None,
+            max_width: None,
+            max_height: None,
+        }
+    }
+
+    pub fn with_min_width(mut self, min_width: f32) -> Self {
+        self.min_width = Some(min_width);
+        self
+    }
+
+    pub fn with_max_width(mut self, max_width: f32) -> Self {
+        self.max_width = Some(max_width);
+        self
+    }
+
+    pub fn with_min_height(mut self, min_height: f32) -> Self {
+        self.min_height = Some(min_height);
+        self
+    }
+
+    pub fn with_max_height(mut self, max_height: f32) -> Self {
+        self.max_height = Some(max_height);
+        self
+    }
+
+    pub fn with_tight_constraints(mut self, width: f32, height: f32) -> Self {
+        self.min_width = Some(width);
+        self.max_width = Some(width);
+        self.min_height = Some(height);
+        self.max_height = Some(height);
+        self
     }
 
     pub fn shrunk(&self, dw: f32, dh: f32) -> Self {
-        let width = if let Some(width) = self.width {
+        let width = if let Some(width) = self.max_width {
             Some(width - dw)
         } else {
             None
         };
 
-        let height = if let Some(height) = self.height {
+        let height = if let Some(height) = self.max_height {
             Some(height - dh)
         } else {
             None
         };
 
-        Self { width, height }
+        Self {
+            min_width: self.min_width,
+            min_height: self.min_height,
+            max_width: width,
+            max_height: height,
+        }
     }
 
-    pub fn width(&self) -> Option<f32> {
-        self.width
+    pub fn min_width(&self) -> Option<f32> {
+        self.min_width
+    }
+    pub fn max_width(&self) -> Option<f32> {
+        self.max_width
     }
 
-    pub fn height(&self) -> Option<f32> {
-        self.height
+    pub fn min_height(&self) -> Option<f32> {
+        self.min_height
+    }
+
+    pub fn max_height(&self) -> Option<f32> {
+        self.max_height
     }
 }
 
 pub trait Widget<Model: ApplicationModel> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size;
     fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model);
-    fn mouse_down(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {}
-    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {}
-    fn mouse_drag(&mut self, event: &MouseEvent, model: &mut Model) {}
+    fn flex(&self) -> f32 {
+        0f32
+    }
+    fn mouse_down(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model);
+    fn mouse_up(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model);
+    fn mouse_drag(&mut self, _: &MouseEvent, _: &mut Model);
+    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model);
 }
 
 pub struct ChildSlot<Model> {
@@ -281,6 +332,10 @@ impl<Model: ApplicationModel> Widget<Model> for ChildSlot<Model> {
             self.widget.mouse_drag(&new_event, model);
         }
     }
+
+    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
+        todo!()
+    }
 }
 
 pub struct Container<Model> {
@@ -347,12 +402,20 @@ impl<Model: ApplicationModel> Widget<Model> for Container<Model> {
         self.child.paint(canvas, self.child.size(), model);
     }
 
+    fn mouse_down(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
+        self.child.mouse_down(event, app, model);
+    }
+
     fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
         self.child.mouse_up(event, app, model);
     }
 
-    fn mouse_down(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
-        self.child.mouse_down(event, app, model);
+    fn mouse_drag(&mut self, _: &MouseEvent, _: &mut Model) {
+        todo!()
+    }
+
+    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
+        todo!()
     }
 }
 
@@ -378,14 +441,19 @@ impl<Model: ApplicationModel> Widget<Model> for Center<Model> {
             *size
         } else {
             // If not given a size then we need to have constraints from parent.
-            assert!(constraints.width().is_some());
-            assert!(constraints.height().is_some());
+            assert!(constraints.max_width().is_some());
+            assert!(constraints.max_height().is_some());
 
-            Size::new(constraints.width().unwrap(), constraints.height().unwrap())
+            Size::new(
+                constraints.max_width().unwrap(),
+                constraints.max_height().unwrap(),
+            )
         };
 
         let child_size = self.child.layout(
-            &BoxConstraints::new(Some(my_size.width), Some(my_size.height)),
+            &BoxConstraints::new()
+                .with_max_width(my_size.width)
+                .with_max_height(my_size.height),
             model,
         );
 
@@ -413,6 +481,10 @@ impl<Model: ApplicationModel> Widget<Model> for Center<Model> {
     fn mouse_drag(&mut self, event: &MouseEvent, model: &mut Model) {
         self.child.mouse_drag(event, model)
     }
+
+    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
+        todo!()
+    }
 }
 
 pub struct Row<Model> {
@@ -437,33 +509,69 @@ impl<Model: ApplicationModel> Row<Model> {
 
 impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
-        let child_sizes: Vec<Size> = self
+        let constrained_sizes: Vec<Size> = self
             .children
             .iter_mut()
-            .map(|child| child.layout(constraints, model))
+            .flat_map(|child| {
+                if child.flex() == 0f32 {
+                    let child_size = child.layout(constraints, model);
+                    child.set_size(&child_size);
+                    Some(child_size)
+                } else {
+                    None
+                }
+            })
             .collect();
 
-        let unconstrained_children: Vec<bool> = child_sizes
-            .iter()
-            .map(|size| size.width == 0f32 && size.height == 0f32)
-            .collect();
-
-        let size = child_sizes
-            .iter()
-            .fold(Size::new(0f32, 0f32), |mut acc, child_size| {
-                acc.width += child_size.width;
-                acc.height = acc.height.max(child_size.height);
-                acc
-            });
-
-        let mut position = Point::new(0f32, 0f32);
-        for (index, size) in child_sizes.iter().enumerate() {
-            self.children[index].set_position(&position);
-            self.children[index].set_size(&child_sizes[index]);
-            position.x += size.width;
+        if constrained_sizes.len() != self.children.len() {
+            // If there are flex children in this Row but there are no horizontal constraints, we are screwed.
+            // If you hit this assert, make sure you wrap this row inside a flexbox.
+            assert!(false);
         }
 
-        size
+        let constrained_size =
+            constrained_sizes
+                .iter()
+                .fold(Size::new(0f32, 0f32), |mut acc, child_size| {
+                    acc.width += child_size.width;
+                    acc.height = acc.height.max(child_size.height);
+                    acc
+                });
+
+        let total_flex = self
+            .children
+            .iter()
+            .fold(0f32, |acc, child| acc + child.flex());
+
+        if total_flex > 0f32 {
+            let width = constraints.max_width().unwrap();
+            let unconstraint_width = width - constrained_size.width;
+            let flex_factor = unconstraint_width / total_flex;
+            for child in &mut self.children {
+                if child.flex() != 0f32 {
+                    let child_constraints =
+                        BoxConstraints::new().with_max_width(flex_factor * child.flex());
+                    let child_size = child.layout(&child_constraints, model);
+                    child.set_size(&child_size);
+                }
+            }
+        }
+
+        let mut position = Point::new(0f32, 0f32);
+        for child in &mut self.children {
+            child.set_position(&position);
+            position.x += child.size().width;
+        }
+
+        let height = self
+            .children
+            .iter()
+            .fold(0f32, |result, child| result.max(child.size().height));
+
+        Size::new(
+            constraints.max_width().unwrap_or(position.x),
+            constraints.max_height().unwrap_or(height),
+        )
     }
 
     fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
@@ -488,6 +596,10 @@ impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
         for child in &mut self.children {
             child.mouse_drag(event, model)
         }
+    }
+
+    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
+        todo!()
     }
 }
 
@@ -565,8 +677,87 @@ impl<Model: ApplicationModel> Widget<Model> for Column<Model> {
             child.mouse_drag(event, model)
         }
     }
+
+    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
+        todo!()
+    }
 }
 
+pub struct SizedBox<Model> {
+    child: ChildSlot<Model>,
+    size: Size,
+}
+
+impl<Model: ApplicationModel> SizedBox<Model> {
+    pub fn new(size: Size, child: impl Widget<Model> + 'static) -> Self {
+        Self {
+            size,
+            child: ChildSlot::new(child),
+        }
+    }
+}
+
+impl<Model: ApplicationModel> Widget<Model> for SizedBox<Model> {
+    fn layout(&mut self, _: &BoxConstraints, _: &Model) -> Size {
+        self.child.set_size(&self.size);
+        self.size
+    }
+
+    fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
+        self.child.paint(canvas, rect, model);
+    }
+
+    fn mouse_down(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {
+        todo!()
+    }
+
+    fn mouse_up(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {
+        todo!()
+    }
+
+    fn mouse_drag(&mut self, _: &MouseEvent, _: &mut Model) {
+        todo!()
+    }
+
+    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
+        todo!()
+    }
+}
+
+pub struct FlexBox<Model> {
+    child: ChildSlot<Model>,
+    flex: f32,
+}
+
+impl<Model: ApplicationModel> Widget<Model> for FlexBox<Model> {
+    fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
+        self.child.layout(constraints, model)
+    }
+
+    fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
+        self.child.paint(canvas, rect, model)
+    }
+
+    fn flex(&self) -> f32 {
+        self.flex
+    }
+
+    fn mouse_down(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {
+        todo!()
+    }
+
+    fn mouse_up(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {
+        todo!()
+    }
+
+    fn mouse_drag(&mut self, _: &MouseEvent, _: &mut Model) {
+        todo!()
+    }
+
+    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
+        todo!()
+    }
+}
 pub struct TextButton<Model: ApplicationModel> {
     text: String,
     font: Font,
@@ -599,8 +790,12 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
     fn layout(&mut self, constraints: &BoxConstraints, _: &Model) -> Size {
         let blob = skia_safe::TextBlob::from_str(&self.text, &self.font);
         let size = blob.unwrap().bounds().size();
-        let width = size.width.min(constraints.width().unwrap_or(size.width));
-        let height = size.height.min(constraints.height().unwrap_or(size.height));
+        let width = size
+            .width
+            .min(constraints.max_width().unwrap_or(size.width));
+        let height = size
+            .height
+            .min(constraints.max_height().unwrap_or(size.height));
         Size::new(width, height)
     }
 
@@ -617,6 +812,18 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
         if let Some(handler) = &self.on_click {
             handler(app, model)
         }
+    }
+
+    fn mouse_down(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {
+        todo!()
+    }
+
+    fn mouse_drag(&mut self, _: &MouseEvent, _: &mut Model) {
+        todo!()
+    }
+
+    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
+        todo!()
     }
 }
 

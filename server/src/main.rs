@@ -172,7 +172,7 @@ use ui::widget::*;
 impl ui::user_interface::UIBuilder<State> for UIBuilder {
     fn build(&self, _section: &str, _state: &State) -> Box<dyn Widget<State>> {
         Box::new(Center::new(
-            Column::new()
+            Row::new()
                 .with_child(
                     TextButton::new("Button 1", 25f32).on_click(|_, _| println!("Click 1 ")),
                 )
