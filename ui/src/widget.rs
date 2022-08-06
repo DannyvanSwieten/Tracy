@@ -328,6 +328,12 @@ impl<Model: ApplicationModel> Widget<Model> for ChildSlot<Model> {
         if self.hit_test(event.local_position()) {
             let new_event = event.to_local(self.position());
             self.widget.mouse_up(&new_event, app, model);
+        } else {
+            if self.has_mouse {
+                self.has_mouse = false;
+                let new_event = event.to_local(self.position());
+                self.widget.mouse_left(&new_event, model);
+            }
         }
     }
 
@@ -344,7 +350,7 @@ impl<Model: ApplicationModel> Widget<Model> for ChildSlot<Model> {
 
             if !self.has_mouse {
                 self.has_mouse = true;
-                self.widget.mouse_entered(&new_event, model);
+                self.mouse_entered(&event, model);
             }
 
             self.widget.mouse_moved(&new_event, model);
@@ -352,8 +358,24 @@ impl<Model: ApplicationModel> Widget<Model> for ChildSlot<Model> {
             let new_event = event.to_local(self.position());
             if self.has_mouse {
                 self.has_mouse = false;
-                self.widget.mouse_left(&new_event, model);
+                self.widget.mouse_left(&event, model);
             }
+
+            self.widget.mouse_moved(&new_event, model);
+        }
+    }
+
+    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {
+        if self.hit_test(event.local_position()) {
+            let new_event = event.to_local(self.position());
+            self.widget.mouse_entered(&new_event, model)
+        }
+    }
+
+    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
+        if self.hit_test(event.local_position()) {
+            let new_event = event.to_local(self.position());
+            self.widget.mouse_left(&new_event, model)
         }
     }
 }
@@ -502,19 +524,29 @@ impl<Model: ApplicationModel> Widget<Model> for Center<Model> {
         self.child.mouse_dragged(event, model)
     }
 
-    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
-        todo!()
+    fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
+        self.child.mouse_moved(event, model)
+    }
+
+    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {
+        self.child.mouse_entered(event, model)
+    }
+
+    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
+        self.child.mouse_left(event, model)
     }
 }
 
 pub struct Row<Model> {
     children: Vec<ChildSlot<Model>>,
+    spacing: f32,
 }
 
 impl<Model: ApplicationModel> Row<Model> {
     pub fn new() -> Self {
         Self {
             children: Vec::new(),
+            spacing: 0f32,
         }
     }
 
@@ -523,6 +555,11 @@ impl<Model: ApplicationModel> Row<Model> {
         W: Widget<Model> + 'static,
     {
         self.children.push(ChildSlot::new(child));
+        self
+    }
+
+    pub fn with_spacing(mut self, spacing: f32) -> Self {
+        self.spacing = spacing;
         self
     }
 }
@@ -546,7 +583,7 @@ impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
         if constrained_sizes.len() != self.children.len() {
             // If there are flex children in this Row but there are no horizontal constraints, we are screwed.
             // If you hit this assert, make sure you wrap this row inside a flexbox.
-            assert!(false);
+            assert!(constraints.max_width().is_some());
         }
 
         let constrained_size =
@@ -580,7 +617,7 @@ impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
         let mut position = Point::new(0f32, 0f32);
         for child in &mut self.children {
             child.set_position(&position);
-            position.x += child.size().width;
+            position.x += child.size().width + self.spacing;
         }
 
         let height = self
@@ -589,8 +626,12 @@ impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
             .fold(0f32, |result, child| result.max(child.size().height));
 
         Size::new(
-            constraints.max_width().unwrap_or(position.x),
-            constraints.max_height().unwrap_or(height),
+            constraints
+                .min_width()
+                .unwrap_or(0f32)
+                .max(position.x)
+                .min(constraints.max_height.unwrap_or(std::f32::MAX)),
+            constraints.min_height().unwrap_or(height),
         )
     }
 
@@ -618,8 +659,22 @@ impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
         }
     }
 
-    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
-        todo!()
+    fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
+        for child in &mut self.children {
+            child.mouse_moved(event, model)
+        }
+    }
+
+    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {
+        for child in &mut self.children {
+            child.mouse_entered(event, model)
+        }
+    }
+
+    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
+        for child in &mut self.children {
+            child.mouse_left(event, model)
+        }
     }
 }
 
@@ -698,8 +753,10 @@ impl<Model: ApplicationModel> Widget<Model> for Column<Model> {
         }
     }
 
-    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
-        todo!()
+    fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
+        for child in &mut self.children {
+            child.mouse_moved(event, model)
+        }
     }
 }
 
@@ -782,6 +839,8 @@ pub struct TextButton<Model: ApplicationModel> {
     text: String,
     font: Font,
     on_click: Option<Box<dyn Fn(&mut Application<Model>, &mut Model)>>,
+    bg_paint: Paint,
+    text_paint: Paint,
 }
 
 impl<Model: ApplicationModel> TextButton<Model> {
@@ -790,10 +849,18 @@ impl<Model: ApplicationModel> TextButton<Model> {
             skia_safe::typeface::Typeface::new("arial", skia_safe::FontStyle::normal()).unwrap(),
             font_size,
         );
+        let mut bg_paint = Paint::default();
+        bg_paint.set_anti_alias(true);
+        bg_paint.set_color4f(skia_safe::Color4f::new(0.25, 0.25, 0.25, 1.0), None);
+        let mut text_paint = Paint::default();
+        text_paint.set_anti_alias(true);
+        text_paint.set_color4f(skia_safe::Color4f::new(1f32, 1f32, 1f32, 1f32), None);
         Self {
             text: text.to_string(),
             font,
             on_click: None,
+            bg_paint,
+            text_paint,
         }
     }
 
@@ -820,30 +887,32 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
     }
 
     fn paint(&self, canvas: &mut dyn Canvas2D, size: &Size, _: &Model) {
-        let mut bg_paint = Paint::new(skia_safe::Color4f::new(0.25, 0.25, 0.25, 1.0), None);
-        bg_paint.set_anti_alias(true);
-        let mut text_paint = Paint::new(skia_safe::Color4f::new(1f32, 1f32, 1f32, 1f32), None);
-        text_paint.set_anti_alias(true);
-        canvas.draw_rounded_rect(&Rect::from_size(*size), 3f32, 3f32, &bg_paint);
-        canvas.draw_string(&self.text, &self.font, &text_paint);
+        canvas.draw_rounded_rect(&Rect::from_size(*size), 3f32, 3f32, &self.bg_paint);
+        canvas.draw_string(&self.text, &self.font, &self.text_paint);
     }
 
     fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
         if let Some(handler) = &self.on_click {
             handler(app, model)
         }
+
+        self.bg_paint
+            .set_color4f(skia_safe::Color4f::new(0.35, 0.35, 0.35, 1.0), None);
     }
 
     fn mouse_down(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {
-        todo!()
+        self.bg_paint
+            .set_color4f(skia_safe::Color4f::new(0.45, 0.45, 0.45, 1.0), None);
     }
 
-    fn mouse_dragged(&mut self, _: &MouseEvent, _: &mut Model) {
-        todo!()
+    fn mouse_entered(&mut self, _: &MouseEvent, _: &mut Model) {
+        self.bg_paint
+            .set_color4f(skia_safe::Color4f::new(0.35, 0.35, 0.35, 1.0), None);
     }
 
-    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
-        todo!()
+    fn mouse_left(&mut self, _: &MouseEvent, _: &mut Model) {
+        self.bg_paint
+            .set_color4f(skia_safe::Color4f::new(0.25, 0.25, 0.25, 1.0), None);
     }
 }
 

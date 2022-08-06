@@ -182,7 +182,8 @@ impl ui::user_interface::UIBuilder<State> for UIBuilder {
                 )
                 .with_child(
                     TextButton::new("Button 3", 25f32).on_click(|app, _| app.send_message(1)),
-                ),
+                )
+                .with_spacing(2f32),
         ))
     }
 }
