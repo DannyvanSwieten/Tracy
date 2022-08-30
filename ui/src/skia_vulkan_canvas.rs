@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::canvas_2d::Canvas2D;
 use ash::vk::Handle;
 use skia_safe::gpu::{vk, DirectContext, RecordingContext, SemaphoresSubmitted, SurfaceOrigin};
@@ -578,11 +575,17 @@ impl Canvas2D for SkiaGpuCanvas2D {
         self.surfaces[self.current_image_index].canvas().restore();
     }
 
+    fn translate(&mut self, point: &Point) {
+        self.surfaces[self.current_image_index]
+            .canvas()
+            .translate(*point);
+    }
     fn draw_rect(&mut self, rect: &Rect, paint: &Paint) {
         self.surfaces[self.current_image_index]
             .canvas()
             .draw_rect(rect, paint);
     }
+
     fn draw_rounded_rect(&mut self, rect: &Rect, rx: f32, ry: f32, paint: &Paint) {
         self.surfaces[self.current_image_index]
             .canvas()
@@ -700,11 +703,5 @@ impl Canvas2D for SkiaGpuCanvas2D {
             SkiaCanvasImage::new(image.clone(), image.width() as _, image.height() as _),
             view,
         )
-    }
-
-    fn translate(&mut self, point: &Point) {
-        self.surfaces[self.current_image_index]
-            .canvas()
-            .translate(*point);
     }
 }

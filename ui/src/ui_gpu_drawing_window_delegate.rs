@@ -171,12 +171,6 @@ impl<'a, Model: ApplicationModel + 'static> WindowDelegate<Model>
         });
     }
 
-    fn update(&mut self, state: &mut Model) {
-        if let Some(ui) = self.ui.as_mut() {
-            ui.user_interface.update(state)
-        }
-    }
-
     fn file_dropped(&mut self, state: &mut Model, path: &std::path::PathBuf, x: f32, y: f32) {
         if let Some(ui) = self.ui.as_mut() {
             ui.user_interface
