@@ -2703,7 +2703,6 @@ version = "0.1.0"
 dependencies = [
  "ash",
  "ash-window",
- "byteorder",
  "skia-safe",
  "vk_utils",
  "winit",

@@ -33,27 +33,6 @@ use crate::resources::{GpuResourceCache, Resources};
 
 type ServerContext = Arc<Mutex<application::Model>>;
 fn main() {
-    let vulkan = Vulkan::new(
-        "tracey renderer",
-        &[std::ffi::CString::new("VK_LAYER_KHRONOS_validation").expect("String Creation Failed")],
-        &[
-            DebugUtils::name(),
-            Surface::name(),
-            vk_utils::vulkan::surface_extension_name(),
-        ],
-    );
-    let gpu = &vulkan.hardware_devices_with_queue_support(ash::vk::QueueFlags::GRAPHICS)[0];
-    let extensions = gpu.device_extensions();
-    for extension in extensions {
-        let v = extension.extension_name.iter().map(|i| *i as u8).collect();
-        println!("{}", String::from_utf8(v).unwrap());
-    }
-    let context = if cfg!(unix) {
-        Rc::new(Renderer::create_suitable_device_mac(gpu))
-    } else {
-        Rc::new(Renderer::create_suitable_device_windows(gpu))
-    };
-
     let args: Vec<String> = std::env::args().collect();
     let mode = if args.len() == 5 {
         args[1].clone()
@@ -61,11 +40,32 @@ fn main() {
         panic!("Invalid arguments")
     };
 
-    println!("{}", args[2]);
-    let image_width = args[3].parse::<u32>().expect("Invalid width argument");
-    let image_height = args[4].parse::<u32>().expect("Invalid height argument");
-
     if mode == "--file".to_string() {
+        let vulkan = Vulkan::new(
+            "tracey renderer",
+            &[std::ffi::CString::new("VK_LAYER_KHRONOS_validation")
+                .expect("String Creation Failed")],
+            &[
+                DebugUtils::name(),
+                Surface::name(),
+                vk_utils::vulkan::surface_extension_name(),
+            ],
+        );
+        let gpu = &vulkan.hardware_devices_with_queue_support(ash::vk::QueueFlags::GRAPHICS)[0];
+        let extensions = gpu.device_extensions();
+        for extension in extensions {
+            let v = extension.extension_name.iter().map(|i| *i as u8).collect();
+            println!("{}", String::from_utf8(v).unwrap());
+        }
+        let context = if cfg!(unix) {
+            Rc::new(Renderer::create_suitable_device_mac(gpu))
+        } else {
+            Rc::new(Renderer::create_suitable_device_windows(gpu))
+        };
+
+        println!("{}", args[2]);
+        let image_width = args[3].parse::<u32>().expect("Invalid width argument");
+        let image_height = args[4].parse::<u32>().expect("Invalid height argument");
         let mut renderer = Renderer::new(context.clone(), image_width, image_height);
         let mut cpu_cache = Resources::default();
         let mut gpu_cache = GpuResourceCache::default();
@@ -93,55 +93,6 @@ fn main() {
             image::ColorType::Rgba8,
         )
         .expect("Image Write failed");
-    } else if mode == "--server".to_string() {
-        let (sender, receiver) = std::sync::mpsc::channel();
-        let _image_join_handle = thread::spawn(move || {
-            let listener = std::net::TcpListener::bind("localhost:8000").unwrap();
-            for stream in listener.incoming() {
-                sender
-                    .send(stream.expect("Connection failed"))
-                    .expect("send failed");
-            }
-        });
-
-        // set up server
-        let server = application::ServerApplication::new(
-            context.clone(),
-            &args[2],
-            image_width,
-            image_height,
-        );
-
-        let event_loop = EventLoop::new();
-
-        let mut streams = Vec::new();
-
-        event_loop.run(move |event, _, control_flow| match event {
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                window_id: _,
-            } => *control_flow = ControlFlow::Exit,
-            _ => {
-                match receiver.try_recv() {
-                    Ok(stream) => streams.push(stream),
-                    Err(_error) => (),
-                }
-
-                if let Some(mut model) = server.model.try_lock() {
-                    if model.has_new_frame {
-                        let buf = &model.download_image::<u8>();
-                        for stream in &mut streams {
-                            match stream.write_all(buf) {
-                                Ok(_) => (),
-                                Err(err) => println!("{}", err.to_string()),
-                            }
-                        }
-                    }
-                }
-
-                *control_flow = ControlFlow::Poll;
-            }
-        });
     } else if mode == "--ui_application".to_string() {
         let application = ui::application::Application::<State>::new("My App");
         application.run(
@@ -183,6 +134,7 @@ impl ui::user_interface::UIBuilder<State> for UIBuilder {
                 .with_child(
                     TextButton::new("Button 3", 25f32).on_click(|app, _| app.send_message(1)),
                 )
+                .with_child(Slider::new("label"))
                 .with_spacing(2f32),
         ))
     }

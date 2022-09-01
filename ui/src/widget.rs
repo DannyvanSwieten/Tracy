@@ -178,13 +178,38 @@ impl BoxConstraints {
     }
 }
 
+pub struct DragSource<Model> {
+    child: ChildSlot<Model>,
+    on_drag_start: Box<Fn() -> Box<dyn Widget<Model>>>,
+}
+
+pub struct DragContext<Model> {
+    dragged_sources: Vec<Box<dyn Widget<Model>>>,
+}
+
+pub struct Contexts<Model> {
+    drag_context: DragContext<Model>,
+}
+
+pub struct Properties {
+    pub position: Point,
+    pub size: Size,
+}
+
 pub trait Widget<Model: ApplicationModel> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size;
     fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model);
     fn flex(&self) -> f32 {
         0f32
     }
-    fn mouse_down(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {}
+    fn mouse_down(
+        &mut self,
+        _: &MouseEvent,
+        _: &Properties,
+        _: &mut Application<Model>,
+        _: &mut Model,
+    ) {
+    }
     fn mouse_up(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {}
     fn mouse_dragged(&mut self, _: &MouseEvent, _: &mut Model) {}
     fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {}
@@ -254,10 +279,20 @@ impl<Model: ApplicationModel> Widget<Model> for ChildSlot<Model> {
         canvas.restore();
     }
 
-    fn mouse_down(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
+    fn mouse_down(
+        &mut self,
+        event: &MouseEvent,
+        _: &Properties,
+        app: &mut Application<Model>,
+        model: &mut Model,
+    ) {
         if self.hit_test(event.local_position()) {
+            let properties = Properties {
+                position: *self.position(),
+                size: *self.size(),
+            };
             let new_event = event.to_local(self.position());
-            self.widget.mouse_down(&new_event, app, model);
+            self.widget.mouse_down(&new_event, &properties, app, model);
         }
     }
 
@@ -381,8 +416,14 @@ impl<Model: ApplicationModel> Widget<Model> for Container<Model> {
         self.child.paint(canvas, self.child.size(), model);
     }
 
-    fn mouse_down(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
-        self.child.mouse_down(event, app, model);
+    fn mouse_down(
+        &mut self,
+        event: &MouseEvent,
+        properties: &Properties,
+        app: &mut Application<Model>,
+        model: &mut Model,
+    ) {
+        self.child.mouse_down(event, properties, app, model);
     }
 
     fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
@@ -449,8 +490,14 @@ impl<Model: ApplicationModel> Widget<Model> for Center<Model> {
         self.child.paint(canvas, rect, model)
     }
 
-    fn mouse_down(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
-        self.child.mouse_down(event, app, model)
+    fn mouse_down(
+        &mut self,
+        event: &MouseEvent,
+        properties: &Properties,
+        app: &mut Application<Model>,
+        model: &mut Model,
+    ) {
+        self.child.mouse_down(event, properties, app, model)
     }
 
     fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
@@ -578,9 +625,15 @@ impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
         }
     }
 
-    fn mouse_down(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
+    fn mouse_down(
+        &mut self,
+        event: &MouseEvent,
+        properties: &Properties,
+        app: &mut Application<Model>,
+        model: &mut Model,
+    ) {
         for child in &mut self.children {
-            child.mouse_down(event, app, model)
+            child.mouse_down(event, properties, app, model)
         }
     }
 
@@ -672,9 +725,15 @@ impl<Model: ApplicationModel> Widget<Model> for Column<Model> {
         }
     }
 
-    fn mouse_down(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
+    fn mouse_down(
+        &mut self,
+        event: &MouseEvent,
+        properties: &Properties,
+        app: &mut Application<Model>,
+        model: &mut Model,
+    ) {
         for child in &mut self.children {
-            child.mouse_down(event, app, model)
+            child.mouse_down(event, properties, app, model)
         }
     }
 
@@ -721,8 +780,14 @@ impl<Model: ApplicationModel> Widget<Model> for SizedBox<Model> {
         self.child.paint(canvas, rect, model);
     }
 
-    fn mouse_down(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {
-        todo!()
+    fn mouse_down(
+        &mut self,
+        event: &MouseEvent,
+        properties: &Properties,
+        app: &mut Application<Model>,
+        model: &mut Model,
+    ) {
+        self.child.mouse_down(event, properties, app, model)
     }
 
     fn mouse_up(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {
@@ -756,7 +821,13 @@ impl<Model: ApplicationModel> Widget<Model> for FlexBox<Model> {
         self.flex
     }
 
-    fn mouse_down(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {
+    fn mouse_down(
+        &mut self,
+        _: &MouseEvent,
+        properties: &Properties,
+        _: &mut Application<Model>,
+        _: &mut Model,
+    ) {
         todo!()
     }
 
@@ -837,7 +908,13 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
             .set_color4f(skia_safe::Color4f::new(0.35, 0.35, 0.35, 1.0), None);
     }
 
-    fn mouse_down(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {
+    fn mouse_down(
+        &mut self,
+        _: &MouseEvent,
+        properties: &Properties,
+        _: &mut Application<Model>,
+        _: &mut Model,
+    ) {
         self.bg_paint
             .set_color4f(skia_safe::Color4f::new(0.45, 0.45, 0.45, 1.0), None);
     }
@@ -1004,154 +1081,133 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
 //     }
 // }
 
-// pub struct Slider<Model> {
-//     label: String,
-//     border_paint: Paint,
-//     bg_paint: Paint,
-//     fill_paint: Paint,
-//     text_paint: Paint,
-//     font: Font,
-//     min: f32,
-//     max: f32,
-//     discrete: bool,
-//     current_normalized: f32,
-//     current_value: f32,
-//     last_position: f32,
-//     value_changed: Option<Box<dyn FnMut(f32, &mut Model)>>,
-// }
+pub struct Slider<Model> {
+    label: String,
+    border_paint: Paint,
+    bg_paint: Paint,
+    fill_paint: Paint,
+    text_paint: Paint,
+    font: Font,
+    min: f32,
+    max: f32,
+    discrete: bool,
+    current_normalized: f32,
+    current_value: f32,
+    last_position: f32,
+    value_changed: Option<Box<dyn FnMut(f32, &mut Model)>>,
+}
 
-// impl<Model> Slider<Model> {
-//     pub fn new(label: &str) -> Self {
-//         Slider::new_with_min_max_and_value(label, 0., 1., 0., false)
-//     }
+impl<Model> Slider<Model> {
+    pub fn new(label: &str) -> Self {
+        Slider::new_with_min_max_and_value(label, 0., 1., 0., false)
+    }
 
-//     pub fn new_with_min_max_and_value(
-//         label: &str,
-//         min: f32,
-//         max: f32,
-//         value: f32,
-//         discrete: bool,
-//     ) -> Self {
-//         Slider {
-//             label: label.to_string(),
-//             bg_paint: Paint::default(),
-//             fill_paint: Paint::default(),
-//             text_paint: Paint::default(),
-//             border_paint: Paint::default(),
-//             font: Font::default(),
-//             min,
-//             max,
-//             discrete,
-//             current_normalized: value / (max - min),
-//             current_value: value,
-//             last_position: 0.,
-//             value_changed: None,
-//         }
-//     }
+    pub fn new_with_min_max_and_value(
+        label: &str,
+        min: f32,
+        max: f32,
+        value: f32,
+        discrete: bool,
+    ) -> Self {
+        Slider {
+            label: label.to_string(),
+            bg_paint: Paint::default(),
+            fill_paint: Paint::default(),
+            text_paint: Paint::default(),
+            border_paint: Paint::default(),
+            font: Font::default(),
+            min,
+            max,
+            discrete,
+            current_normalized: value / (max - min),
+            current_value: value,
+            last_position: 0.,
+            value_changed: None,
+        }
+    }
 
-//     pub fn with_handler<F>(mut self, handler: F) -> Self
-//     where
-//         F: FnMut(f32, &mut Model) + 'static,
-//     {
-//         self.value_changed = Some(Box::new(handler));
-//         self
-//     }
+    pub fn with_handler<F>(mut self, handler: F) -> Self
+    where
+        F: FnMut(f32, &mut Model) + 'static,
+    {
+        self.value_changed = Some(Box::new(handler));
+        self
+    }
 
-//     pub fn set_value(&mut self, value: f32) {
-//         self.current_value = value.max(self.min).min(self.max);
-//         self.current_normalized = map_range(self.current_value, self.min, self.max, 0., 1.)
-//     }
-// }
+    pub fn set_value(&mut self, value: f32) {
+        self.current_value = value.max(self.min).min(self.max);
+        self.current_normalized = map_range(self.current_value, self.min, self.max, 0., 1.)
+    }
+}
 
-// impl<Model: ApplicationModel> Widget<Model> for Slider<Model> {
-//     fn paint(&mut self, _: &Model, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
-//         assert_ne!(rect.width(), 0f32);
-//         assert_ne!(rect.height(), 0f32);
+impl<Model: ApplicationModel> Widget<Model> for Slider<Model> {
+    fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
+        // Boldly unwrapping here. If you have not given constraints to a slider then we don't know how big it should be.
+        Size::new(
+            constraints.max_width().unwrap(),
+            constraints.max_height().unwrap(),
+        )
+    }
 
-//         let bg_color = style.get("bg-color");
-//         let fill_color = style.get("fill-color");
-//         let border_color = style.get("border-color");
+    // fn mouse_dragged(&mut self, state: &mut Model, rect: &Rect, event: &MouseEvent) {
+    //     self.last_position += event.delta_position.x;
+    //     self.current_normalized =
+    //         (1. / rect.width()) * self.last_position.min(rect.width()).max(0.);
 
-//         self.bg_paint
-//             .set_color(*bg_color.unwrap_or(&Color::new(128)));
-//         self.border_paint
-//             .set_color(*border_color.unwrap_or(&Color::new(128)));
-//         self.border_paint.set_style(PaintStyle::Stroke);
-//         self.fill_paint
-//             .set_color(*fill_color.unwrap_or(&Color::new(128)));
-//         self.text_paint.set_color(Color::new(255));
-//         canvas.draw_rounded_rect(rect, 2., 2., &self.bg_paint);
-//         canvas.draw_rounded_rect(rect, 2., 2., &self.border_paint);
-//         let mut fill_rect = Rect::from_xywh(
-//             rect.left(),
-//             rect.top(),
-//             rect.width() * self.current_normalized,
-//             rect.height(),
-//         );
-//         fill_rect.inset((2, 2));
+    //     self.current_value = map_range(self.current_normalized, 0., 1., self.min, self.max);
 
-//         canvas.draw_rounded_rect(&fill_rect, 0., 0., &self.fill_paint);
+    //     if self.discrete {
+    //         self.current_value = self.current_value.round();
+    //     }
+    //     if let Some(l) = &mut self.value_changed {
+    //         (l)(self.current_value, state);
+    //     }
+    // }
 
-//         let t = self.label.to_string() + ": " + &format!("{:.4}", &self.current_value.to_string());
-//         canvas.draw_string(&t, &rect.center(), &self.font, &self.text_paint);
-//     }
+    fn mouse_down(
+        &mut self,
+        event: &MouseEvent,
+        properties: &Properties,
+        app: &mut Application<Model>,
+        model: &mut Model,
+    ) {
+        let x = event.global_position().x - properties.position.x;
+        self.current_normalized = (1. / properties.size.width) * x;
 
-//     fn mouse_down(&mut self, state: &mut Model, rect: &Rect, event: &MouseEvent) {
-//         let x = event.global_position().x - rect.left();
-//         self.current_normalized = (1. / rect.width()) * x;
+        self.current_value = map_range(self.current_normalized, 0., 1., self.min, self.max);
+        if self.discrete {
+            self.current_value = self.current_value.round();
+        }
+        if let Some(l) = &mut self.value_changed {
+            (l)(self.current_value, model);
+        }
 
-//         self.current_value = map_range(self.current_normalized, 0., 1., self.min, self.max);
-//         if self.discrete {
-//             self.current_value = self.current_value.round();
-//         }
-//         if let Some(l) = &mut self.value_changed {
-//             (l)(self.current_value, state);
-//         }
+        self.last_position = x;
+    }
 
-//         self.last_position = x;
-//     }
+    fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, _: &Model) {
+        let bg_paint = Paint::new(Color4f::new(0.5, 0.5, 0.5, 1.0), None);
+        let fill_paint = Paint::new(Color4f::new(0.6, 0.6, 0.6, 1.0), None);
+        let border_paint = Paint::new(Color4f::new(0.5, 0.5, 0.5, 1.0), None);
+        let text_paint = Paint::new(Color4f::new(1.0, 1.0, 1.0, 1.0), None);
 
-//     fn calculate_size(
-//         &self,
-//         preferred_width: Option<f32>,
-//         preferred_height: Option<f32>,
-//         constraints: &Constraints,
-//         _children: &[Node<Model>],
-//     ) -> (Size, Vec<Constraints>) {
-//         let w = if let Some(preferred_width) = preferred_width {
-//             let width = constraints.min_width;
-//             let width = width.max(preferred_width).min(constraints.max_width);
-//             width
-//         } else {
-//             constraints.max_width
-//         };
+        let rect = Rect::from_size(*rect);
+        canvas.draw_rounded_rect(&rect, 2., 2., &bg_paint);
+        canvas.draw_rounded_rect(&rect, 2., 2., &border_paint);
+        let mut fill_rect = Rect::from_xywh(
+            rect.left(),
+            rect.top(),
+            rect.width() * self.current_normalized,
+            rect.height(),
+        );
+        fill_rect.inset((2, 2));
 
-//         let h = if let Some(preferred_height) = preferred_height {
-//             let height = constraints.min_height;
-//             let height = height.max(preferred_height).min(constraints.max_height);
-//             height
-//         } else {
-//             constraints.max_height
-//         };
+        canvas.draw_rounded_rect(&fill_rect, 0., 0., &fill_paint);
 
-//         (Size::new(w, h), vec![Constraints::new(0.0, w, 0.0, h)])
-//     }
-
-//     // fn mouse_dragged(&mut self, state: &mut Model, rect: &Rect, event: &MouseEvent) {
-//     //     self.last_position += event.delta_position.x;
-//     //     self.current_normalized =
-//     //         (1. / rect.width()) * self.last_position.min(rect.width()).max(0.);
-
-//     //     self.current_value = map_range(self.current_normalized, 0., 1., self.min, self.max);
-
-//     //     if self.discrete {
-//     //         self.current_value = self.current_value.round();
-//     //     }
-//     //     if let Some(l) = &mut self.value_changed {
-//     //         (l)(self.current_value, state);
-//     //     }
-//     // }
-// }
+        let t = self.label.to_string() + ": " + &format!("{:.4}", &self.current_value.to_string());
+        canvas.draw_string(&t, &self.font, &text_paint);
+    }
+}
 
 // // pub struct Spinner<Model> {
 // //     label: String,

@@ -10,5 +10,4 @@ vk_utils = {path = "../vk_utils"}
 ash = "*"
 ash-window = "*"
 winit = "*"
-byteorder = "*"
 skia-safe = { version = "*", features = ["vulkan", "gpu"] }

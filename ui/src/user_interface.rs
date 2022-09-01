@@ -48,7 +48,10 @@ impl<Model: ApplicationModel + 'static> UserInterface<Model> {
         state: &mut Model,
         event: &MouseEvent,
     ) {
-        self.root.mouse_down(event, app, state)
+        let position = Point::new(0f32, 0f32);
+        let size = *self.root.size();
+        self.root
+            .mouse_down(event, &Properties { position, size }, app, state)
     }
 
     pub fn mouse_up(
