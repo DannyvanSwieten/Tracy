@@ -1,6 +1,7 @@
 use crate::application::Application;
 use crate::application_model::ApplicationModel;
 use crate::canvas_2d::Canvas2D;
+use crate::constraints::BoxConstraints;
 use crate::widget::*;
 use crate::window_event::MouseEvent;
 use skia_safe::Point;

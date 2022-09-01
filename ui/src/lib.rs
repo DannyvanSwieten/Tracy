@@ -10,5 +10,6 @@ pub mod user_interface;
 pub mod widget;
 pub mod window_delegate;
 pub mod window_event;
+pub mod constraints;
 
 pub use skia_safe::Color4f;
