@@ -30,7 +30,7 @@ impl MouseEvent {
 
     pub fn to_local(&self, position: &Point) -> Self {
         let mut new_event = *self;
-        new_event.local_position = self.global_position - *position;
+        new_event.local_position = self.local_position - *position;
         new_event
     }
 
