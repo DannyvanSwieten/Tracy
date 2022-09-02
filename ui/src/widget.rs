@@ -122,14 +122,14 @@ pub trait Widget<Model: ApplicationModel> {
     }
     fn mouse_down(
         &mut self,
-        _: &MouseEvent,
+        event: &MouseEvent,
         _: &Properties,
         _: &mut Application<Model>,
-        _: &mut Model,
+        model: &mut Model,
     ) {
     }
     fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model);
-    fn mouse_dragged(&mut self, event: &MouseEvent, model: &mut Model);
+    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model);
     fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model);
     fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model);
     fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model);
@@ -227,10 +227,10 @@ impl<Model: ApplicationModel> Widget<Model> for ChildSlot<Model> {
         }
     }
 
-    fn mouse_dragged(&mut self, event: &MouseEvent, model: &mut Model) {
+    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
         if self.hit_test(event.local_position()) {
             let new_event = event.to_local(self.position());
-            self.widget.mouse_dragged(&new_event, model);
+            self.widget.mouse_dragged(&new_event, properties, model);
         }
     }
 
@@ -354,11 +354,11 @@ impl<Model: ApplicationModel> Widget<Model> for Container<Model> {
         self.child.mouse_up(event, app, model);
     }
 
-    fn mouse_dragged(&mut self, _: &MouseEvent, _: &mut Model) {
+    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
         todo!()
     }
 
-    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
+    fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
         todo!()
     }
 
@@ -433,8 +433,8 @@ impl<Model: ApplicationModel> Widget<Model> for Center<Model> {
         self.child.mouse_up(event, app, model)
     }
 
-    fn mouse_dragged(&mut self, event: &MouseEvent, model: &mut Model) {
-        self.child.mouse_dragged(event, model)
+    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
+        self.child.mouse_dragged(event, properties, model)
     }
 
     fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
@@ -520,13 +520,17 @@ impl<Model: ApplicationModel> Widget<Model> for Expanded<Model> {
         self.child.mouse_up(event, app, model)
     }
 
-    fn mouse_dragged(&mut self, _: &MouseEvent, _: &mut Model) {}
+    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
+        self.child.mouse_dragged(event, properties, model)
+    }
 
-    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {}
+    fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
+        self.child.mouse_moved(event, model)
+    }
 
-    fn mouse_entered(&mut self, _: &MouseEvent, _: &mut Model) {}
+    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {}
 
-    fn mouse_left(&mut self, _: &MouseEvent, _: &mut Model) {}
+    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {}
 }
 
 pub struct Row<Model> {
@@ -648,9 +652,9 @@ impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
         }
     }
 
-    fn mouse_dragged(&mut self, event: &MouseEvent, model: &mut Model) {
+    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
         for child in &mut self.children {
-            child.mouse_dragged(event, model)
+            child.mouse_dragged(event, properties, model)
         }
     }
 
@@ -748,9 +752,9 @@ impl<Model: ApplicationModel> Widget<Model> for Column<Model> {
         }
     }
 
-    fn mouse_dragged(&mut self, event: &MouseEvent, model: &mut Model) {
+    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
         for child in &mut self.children {
-            child.mouse_dragged(event, model)
+            child.mouse_dragged(event, properties, model)
         }
     }
 
@@ -803,15 +807,15 @@ impl<Model: ApplicationModel> Widget<Model> for SizedBox<Model> {
         self.child.mouse_down(event, properties, app, model)
     }
 
-    fn mouse_up(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {
+    fn mouse_up(&mut self, event: &MouseEvent, _: &mut Application<Model>, model: &mut Model) {
         todo!()
     }
 
-    fn mouse_dragged(&mut self, _: &MouseEvent, _: &mut Model) {
+    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
         todo!()
     }
 
-    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
+    fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
         todo!()
     }
 
@@ -844,23 +848,23 @@ impl<Model: ApplicationModel> Widget<Model> for FlexBox<Model> {
 
     fn mouse_down(
         &mut self,
-        _: &MouseEvent,
+        event: &MouseEvent,
         properties: &Properties,
         _: &mut Application<Model>,
-        _: &mut Model,
+        model: &mut Model,
     ) {
         todo!()
     }
 
-    fn mouse_up(&mut self, _: &MouseEvent, _: &mut Application<Model>, _: &mut Model) {
+    fn mouse_up(&mut self, event: &MouseEvent, _: &mut Application<Model>, model: &mut Model) {
         todo!()
     }
 
-    fn mouse_dragged(&mut self, _: &MouseEvent, _: &mut Model) {
+    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
         todo!()
     }
 
-    fn mouse_moved(&mut self, _: &MouseEvent, _: &mut Model) {
+    fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
         todo!()
     }
 
@@ -930,10 +934,10 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
 
     fn mouse_down(
         &mut self,
-        _: &MouseEvent,
+        event: &MouseEvent,
         properties: &Properties,
         _: &mut Application<Model>,
-        _: &mut Model,
+        model: &mut Model,
     ) {
         self.bg_paint
             .set_color4f(skia_safe::Color4f::new(0.45, 0.45, 0.45, 1.0), None);
@@ -948,17 +952,17 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
             .set_color4f(skia_safe::Color4f::new(0.35, 0.35, 0.35, 1.0), None);
     }
 
-    fn mouse_entered(&mut self, _: &MouseEvent, _: &mut Model) {
+    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {
         self.bg_paint
             .set_color4f(skia_safe::Color4f::new(0.35, 0.35, 0.35, 1.0), None);
     }
 
-    fn mouse_left(&mut self, _: &MouseEvent, _: &mut Model) {
+    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
         self.bg_paint
             .set_color4f(skia_safe::Color4f::new(0.25, 0.25, 0.25, 1.0), None);
     }
 
-    fn mouse_dragged(&mut self, event: &MouseEvent, model: &mut Model) {}
+    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {}
 
     fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {}
 }
@@ -1174,21 +1178,6 @@ impl<Model: ApplicationModel> Widget<Model> for Slider<Model> {
         )
     }
 
-    // fn mouse_dragged(&mut self, state: &mut Model, rect: &Rect, event: &MouseEvent) {
-    //     self.last_position += event.delta_position.x;
-    //     self.current_normalized =
-    //         (1. / rect.width()) * self.last_position.min(rect.width()).max(0.);
-
-    //     self.current_value = map_range(self.current_normalized, 0., 1., self.min, self.max);
-
-    //     if self.discrete {
-    //         self.current_value = self.current_value.round();
-    //     }
-    //     if let Some(l) = &mut self.value_changed {
-    //         (l)(self.current_value, state);
-    //     }
-    // }
-
     fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, _: &Model) {
         let mut bg_paint = Paint::new(Color4f::new(0.5, 0.5, 0.5, 1.0), None);
         bg_paint.set_anti_alias(true);
@@ -1223,7 +1212,7 @@ impl<Model: ApplicationModel> Widget<Model> for Slider<Model> {
         _: &mut Application<Model>,
         model: &mut Model,
     ) {
-        let x = event.local_position().x - properties.position.x;
+        let x = event.local_position().x;
         self.current_normalized = (1. / properties.size.width) * x;
 
         self.current_value = map_range(self.current_normalized, 0., 1., self.min, self.max);
@@ -1239,19 +1228,26 @@ impl<Model: ApplicationModel> Widget<Model> for Slider<Model> {
 
     fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {}
 
-    fn mouse_dragged(&mut self, event: &MouseEvent, model: &mut Model) {
-        todo!()
+    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
+        self.last_position = event.local_position().x;
+        self.current_normalized =
+            (1. / properties.size.width) * self.last_position.min(properties.size.width).max(0.);
+
+        self.current_value = map_range(self.current_normalized, 0., 1., self.min, self.max);
+
+        if self.discrete {
+            self.current_value = self.current_value.round();
+        }
+        if let Some(l) = &mut self.value_changed {
+            (l)(self.current_value, model);
+        }
     }
 
     fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {}
 
-    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {
-        todo!()
-    }
+    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {}
 
-    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
-        todo!()
-    }
+    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {}
 }
 
 // // pub struct Spinner<Model> {
@@ -1309,7 +1305,7 @@ impl<Model: ApplicationModel> Widget<Model> for Slider<Model> {
 // // }
 
 // // impl<Model> Widget<Model> for Spinner<Model> {
-// //     fn paint(&mut self, _: &mut Model, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
+// //     fn paint(&mut self, model: &mut Model, rect: &Rect, canvas: &mut dyn Canvas2D, style: &StyleSheet) {
 // //         let bg_color = style.get("bg-color");
 // //         let fill_color = style.get("fill-color");
 // //         let border_color = style.get("border-color");
@@ -1480,7 +1476,7 @@ impl<Model: ApplicationModel> Widget<Model> for PopupMenuWidget {
         todo!()
     }
 
-    fn mouse_dragged(&mut self, event: &MouseEvent, model: &mut Model) {
+    fn mouse_dragged(&mut self, event: &MouseEvent, properies: &Properties, model: &mut Model) {
         todo!()
     }
 

@@ -67,7 +67,11 @@ impl<Model: ApplicationModel + 'static> UserInterface<Model> {
     pub fn double_click(&mut self, state: &mut Model, event: &MouseEvent) {}
 
     pub fn mouse_drag(&mut self, state: &mut Model, event: &MouseEvent) {
-        self.root.mouse_dragged(event, state);
+        let properties = Properties {
+            size: *self.root.size(),
+            position: *self.root.position(),
+        };
+        self.root.mouse_dragged(event, &properties, state);
     }
 
     pub fn mouse_moved(&mut self, state: &mut Model, event: &MouseEvent) {

@@ -135,7 +135,7 @@ impl ui::user_interface::UIBuilder<State> for UIBuilder {
                     TextButton::new("Button 3", 25f32).on_click(|app, _| app.send_message(1)),
                 )
                 .with_child(Expanded::new(Slider::new("value")).with_height(32f32))
-                .with_spacing(5f32),
+                .with_spacing(3f32),
         ))
     }
 }
