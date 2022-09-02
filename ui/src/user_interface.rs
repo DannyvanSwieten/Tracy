@@ -2,6 +2,7 @@ use crate::application::Application;
 use crate::application_model::ApplicationModel;
 use crate::canvas_2d::Canvas2D;
 use crate::constraints::BoxConstraints;
+use crate::style::StyleContext;
 use crate::widget::*;
 use crate::window_event::MouseEvent;
 use skia_safe::Point;
@@ -13,16 +14,18 @@ pub trait UIBuilder<Model: ApplicationModel> {
 #[repr(C)]
 pub struct UserInterface<Model: ApplicationModel> {
     pub root: ChildSlot<Model>,
-    pub material: Material,
+    pub style_ctx: StyleContext,
     actions: Vec<Action<Model>>,
+    theme: String,
 }
 
 impl<Model: ApplicationModel + 'static> UserInterface<Model> {
-    pub fn new(root: Box<dyn Widget<Model>>) -> Self {
+    pub fn new(root: Box<dyn Widget<Model>>, theme: &str) -> Self {
         UserInterface {
             root: ChildSlot::new_with_box(root),
-            material: Material::new(),
+            style_ctx: StyleContext::new(),
             actions: Vec::new(),
+            theme: theme.to_string(),
         }
     }
 
@@ -89,13 +92,12 @@ impl<Model: ApplicationModel + 'static> UserInterface<Model> {
     }
 
     pub fn paint(&mut self, state: &Model, canvas: &mut dyn Canvas2D) {
-        canvas.clear(
-            self.material
-                .get_child("body")
-                .unwrap()
-                .get("bg-color")
-                .unwrap(),
+        canvas.clear(&self.style_ctx.theme(&self.theme).unwrap().background);
+        self.root.paint(
+            self.style_ctx.theme(&self.theme).unwrap(),
+            canvas,
+            self.root.size(),
+            state,
         );
-        self.root.paint(canvas, self.root.size(), state);
     }
 }

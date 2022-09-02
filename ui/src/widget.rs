@@ -1,10 +1,10 @@
 use crate::application::Application;
 use crate::application_model::ApplicationModel;
 use crate::canvas_2d::Canvas2D;
-use crate::constraints::{self, BoxConstraints};
+use crate::constraints::BoxConstraints;
+use crate::style::{StyleContext, Theme};
 // use crate::node::*;
 use crate::window_event::{MouseEvent, MouseEventType};
-use skia_safe::runtime_effect::Child;
 use skia_safe::{Color, Color4f, Font, Paint, PaintStyle, Point, Rect, Size};
 
 use std::collections::HashMap;
@@ -105,8 +105,8 @@ pub struct DragContext<Model> {
     dragged_sources: Vec<Box<dyn Widget<Model>>>,
 }
 
-pub struct Contexts<Model> {
-    drag_context: DragContext<Model>,
+pub struct Contexts {
+    style: StyleContext,
 }
 
 pub struct Properties {
@@ -116,7 +116,7 @@ pub struct Properties {
 
 pub trait Widget<Model: ApplicationModel> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size;
-    fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model);
+    fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model);
     fn flex(&self) -> f32 {
         0f32
     }
@@ -190,10 +190,10 @@ impl<Model: ApplicationModel> Widget<Model> for ChildSlot<Model> {
         self.widget.layout(constraints, model)
     }
 
-    fn paint(&self, canvas: &mut dyn Canvas2D, _: &Size, model: &Model) {
+    fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, _: &Size, model: &Model) {
         canvas.save();
         canvas.translate(self.position());
-        self.widget.paint(canvas, self.size(), model);
+        self.widget.paint(theme, canvas, self.size(), model);
         canvas.restore();
     }
 
@@ -330,14 +330,14 @@ impl<Model: ApplicationModel> Widget<Model> for Container<Model> {
         )
     }
 
-    fn paint(&self, canvas: &mut dyn Canvas2D, size: &Size, model: &Model) {
+    fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, size: &Size, model: &Model) {
         if let Some(paint) = &self.paint {
             let margin_rect =
                 Rect::from_point_and_size(Point::new(self.margin, self.margin), *size);
             canvas.draw_rect(&margin_rect, paint);
         }
 
-        self.child.paint(canvas, self.child.size(), model);
+        self.child.paint(theme, canvas, self.child.size(), model);
     }
 
     fn mouse_down(
@@ -415,8 +415,8 @@ impl<Model: ApplicationModel> Widget<Model> for Center<Model> {
         my_size
     }
 
-    fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
-        self.child.paint(canvas, rect, model)
+    fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
+        self.child.paint(theme, canvas, rect, model)
     }
 
     fn mouse_down(
@@ -450,332 +450,9 @@ impl<Model: ApplicationModel> Widget<Model> for Center<Model> {
     }
 }
 
-pub struct Expanded<Model> {
-    child: ChildSlot<Model>,
-    width: Option<f32>,
-    height: Option<f32>,
-    flex: f32,
-}
-
-impl<Model: ApplicationModel> Expanded<Model> {
-    pub fn new(child: impl Widget<Model> + 'static) -> Self {
-        Self {
-            child: ChildSlot::new(child),
-            width: None,
-            height: None,
-            flex: 1f32,
-        }
-    }
-
-    pub fn with_width(mut self, w: f32) -> Self {
-        self.width = Some(w);
-        self
-    }
-
-    pub fn with_height(mut self, h: f32) -> Self {
-        self.height = Some(h);
-        self
-    }
-}
-
-impl<Model: ApplicationModel> Widget<Model> for Expanded<Model> {
-    // If given to a flex container it will expand based on it's flex parameter in the dominant layout direction.
-    // If for example you add it to a row it will expand in the horizontal direction. Therefor you should provide a height.
-    fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
-        let size = Size::new(
-            self.width.unwrap_or(constraints.max_width().unwrap()),
-            self.height.unwrap_or(constraints.max_height().unwrap()),
-        );
-
-        let child_size = self.child.layout(
-            &BoxConstraints::new()
-                .with_max_width(size.width)
-                .with_max_height(size.height),
-            model,
-        );
-
-        self.child.set_size(&child_size);
-        child_size
-    }
-
-    fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
-        self.child.paint(canvas, rect, model)
-    }
-
-    fn flex(&self) -> f32 {
-        self.flex
-    }
-
-    fn mouse_down(
-        &mut self,
-        event: &MouseEvent,
-        properties: &Properties,
-        app: &mut Application<Model>,
-        model: &mut Model,
-    ) {
-        self.child.mouse_down(event, properties, app, model)
-    }
-
-    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
-        self.child.mouse_up(event, app, model)
-    }
-
-    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
-        self.child.mouse_dragged(event, properties, model)
-    }
-
-    fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
-        self.child.mouse_moved(event, model)
-    }
-
-    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {}
-
-    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {}
-}
-
-pub struct Row<Model> {
-    children: Vec<ChildSlot<Model>>,
-    spacing: f32,
-}
-
-impl<Model: ApplicationModel> Row<Model> {
-    pub fn new() -> Self {
-        Self {
-            children: Vec::new(),
-            spacing: 0f32,
-        }
-    }
-
-    pub fn with_child<W>(mut self, child: W) -> Self
-    where
-        W: Widget<Model> + 'static,
-    {
-        self.children.push(ChildSlot::new(child));
-        self
-    }
-
-    pub fn with_spacing(mut self, spacing: f32) -> Self {
-        self.spacing = spacing;
-        self
-    }
-}
-
-impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
-    fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
-        let constrained_sizes: Vec<Size> = self
-            .children
-            .iter_mut()
-            .flat_map(|child| {
-                if child.flex() == 0f32 {
-                    let child_size = child.layout(constraints, model);
-                    child.set_size(&child_size);
-                    Some(child_size)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        if constrained_sizes.len() != self.children.len() {
-            // If there are flex children in this Row but there are no horizontal constraints, we are screwed.
-            // If you hit this assert, make sure you wrap this row inside a flexbox.
-            assert!(constraints.max_width().is_some());
-        }
-
-        let constrained_size =
-            constrained_sizes
-                .iter()
-                .fold(Size::new(0f32, 0f32), |mut acc, child_size| {
-                    acc.width += child_size.width + self.spacing;
-                    acc.height = acc.height.max(child_size.height);
-                    acc
-                });
-
-        let total_flex = self
-            .children
-            .iter()
-            .fold(0f32, |acc, child| acc + child.flex());
-
-        if total_flex > 0f32 {
-            let width = constraints.max_width().unwrap();
-            let unconstraint_width = width - constrained_size.width;
-            let flex_factor = unconstraint_width / total_flex;
-            for child in &mut self.children {
-                if child.flex() != 0f32 {
-                    let child_constraints = BoxConstraints::new()
-                        .with_max_width(flex_factor * child.flex())
-                        .with_max_height(constraints.max_height().unwrap());
-                    let child_size = child.layout(&child_constraints, model);
-                    child.set_size(&child_size);
-                }
-            }
-        }
-
-        let mut position = Point::new(0f32, 0f32);
-        for child in &mut self.children {
-            child.set_position(&position);
-            position.x += child.size().width + self.spacing;
-        }
-
-        let height = self
-            .children
-            .iter()
-            .fold(0f32, |result, child| result.max(child.size().height));
-
-        Size::new(
-            constraints.max_width().unwrap(),
-            constraints.min_height().unwrap_or(height),
-        )
-    }
-
-    fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
-        for child in &self.children {
-            child.paint(canvas, rect, model)
-        }
-    }
-
-    fn mouse_down(
-        &mut self,
-        event: &MouseEvent,
-        properties: &Properties,
-        app: &mut Application<Model>,
-        model: &mut Model,
-    ) {
-        for child in &mut self.children {
-            child.mouse_down(event, properties, app, model)
-        }
-    }
-
-    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
-        for child in &mut self.children {
-            child.mouse_up(event, app, model)
-        }
-    }
-
-    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
-        for child in &mut self.children {
-            child.mouse_dragged(event, properties, model)
-        }
-    }
-
-    fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
-        for child in &mut self.children {
-            child.mouse_moved(event, model)
-        }
-    }
-
-    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {
-        for child in &mut self.children {
-            child.mouse_entered(event, model)
-        }
-    }
-
-    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
-        for child in &mut self.children {
-            child.mouse_left(event, model)
-        }
-    }
-}
-
-pub struct Column<Model> {
-    children: Vec<ChildSlot<Model>>,
-}
-
-impl<Model: ApplicationModel> Column<Model> {
-    pub fn new() -> Self {
-        Self {
-            children: Vec::new(),
-        }
-    }
-
-    pub fn with_child<W>(mut self, child: W) -> Self
-    where
-        W: Widget<Model> + 'static,
-    {
-        self.children.push(ChildSlot::new(child));
-        self
-    }
-}
-
-impl<Model: ApplicationModel> Widget<Model> for Column<Model> {
-    fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
-        let child_sizes: Vec<Size> = self
-            .children
-            .iter_mut()
-            .map(|child| child.layout(constraints, model))
-            .collect();
-
-        let unconstrained_children: Vec<bool> = child_sizes
-            .iter()
-            .map(|size| size.width == 0f32 && size.height == 0f32)
-            .collect();
-
-        let size = child_sizes
-            .iter()
-            .fold(Size::new(0f32, 0f32), |mut acc, child_size| {
-                acc.width = acc.width.max(child_size.width);
-                acc.height += child_size.height;
-                acc
-            });
-
-        let mut position = Point::new(0f32, 0f32);
-        for (index, size) in child_sizes.iter().enumerate() {
-            self.children[index].set_position(&position);
-            self.children[index].set_size(&child_sizes[index]);
-            position.y += size.height;
-        }
-
-        size
-    }
-
-    fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
-        for child in &self.children {
-            child.paint(canvas, rect, model)
-        }
-    }
-
-    fn mouse_down(
-        &mut self,
-        event: &MouseEvent,
-        properties: &Properties,
-        app: &mut Application<Model>,
-        model: &mut Model,
-    ) {
-        for child in &mut self.children {
-            child.mouse_down(event, properties, app, model)
-        }
-    }
-
-    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
-        for child in &mut self.children {
-            child.mouse_up(event, app, model)
-        }
-    }
-
-    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
-        for child in &mut self.children {
-            child.mouse_dragged(event, properties, model)
-        }
-    }
-
-    fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
-        for child in &mut self.children {
-            child.mouse_moved(event, model)
-        }
-    }
-
-    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {
-        todo!()
-    }
-
-    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
-        todo!()
-    }
-}
-
 pub struct SizedBox<Model> {
-    child: ChildSlot<Model>,
     size: Size,
+    child: ChildSlot<Model>,
 }
 
 impl<Model: ApplicationModel> SizedBox<Model> {
@@ -793,8 +470,8 @@ impl<Model: ApplicationModel> Widget<Model> for SizedBox<Model> {
         self.size
     }
 
-    fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
-        self.child.paint(canvas, rect, model);
+    fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
+        self.child.paint(theme, canvas, rect, model);
     }
 
     fn mouse_down(
@@ -838,8 +515,8 @@ impl<Model: ApplicationModel> Widget<Model> for FlexBox<Model> {
         self.child.layout(constraints, model)
     }
 
-    fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
-        self.child.paint(canvas, rect, model)
+    fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
+        self.child.paint(theme, canvas, rect, model)
     }
 
     fn flex(&self) -> f32 {
@@ -875,96 +552,6 @@ impl<Model: ApplicationModel> Widget<Model> for FlexBox<Model> {
     fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
         todo!()
     }
-}
-pub struct TextButton<Model: ApplicationModel> {
-    text: String,
-    font: Font,
-    on_click: Option<Box<dyn Fn(&mut Application<Model>, &mut Model)>>,
-    bg_paint: Paint,
-    text_paint: Paint,
-}
-
-impl<Model: ApplicationModel> TextButton<Model> {
-    pub fn new(text: &str, font_size: f32) -> Self {
-        let font = Font::new(
-            skia_safe::typeface::Typeface::new("arial", skia_safe::FontStyle::normal()).unwrap(),
-            font_size,
-        );
-        let mut bg_paint = Paint::default();
-        bg_paint.set_anti_alias(true);
-        bg_paint.set_color4f(skia_safe::Color4f::new(0.25, 0.25, 0.25, 1.0), None);
-        let mut text_paint = Paint::default();
-        text_paint.set_anti_alias(true);
-        text_paint.set_color4f(skia_safe::Color4f::new(1f32, 1f32, 1f32, 1f32), None);
-        Self {
-            text: text.to_string(),
-            font,
-            on_click: None,
-            bg_paint,
-            text_paint,
-        }
-    }
-
-    pub fn on_click(
-        mut self,
-        handler: impl Fn(&mut Application<Model>, &mut Model) + 'static,
-    ) -> Self {
-        self.on_click = Some(Box::new(handler));
-        self
-    }
-}
-
-impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
-    fn layout(&mut self, constraints: &BoxConstraints, _: &Model) -> Size {
-        let blob = skia_safe::TextBlob::from_str(&self.text, &self.font);
-        let size = blob.unwrap().bounds().size();
-        let width = size
-            .width
-            .min(constraints.max_width().unwrap_or(size.width));
-        let height = size
-            .height
-            .min(constraints.max_height().unwrap_or(size.height));
-        Size::new(width, height)
-    }
-
-    fn paint(&self, canvas: &mut dyn Canvas2D, size: &Size, _: &Model) {
-        canvas.draw_rounded_rect(&Rect::from_size(*size), 3f32, 3f32, &self.bg_paint);
-        canvas.draw_string(&self.text, &self.font, &self.text_paint);
-    }
-
-    fn mouse_down(
-        &mut self,
-        event: &MouseEvent,
-        properties: &Properties,
-        _: &mut Application<Model>,
-        model: &mut Model,
-    ) {
-        self.bg_paint
-            .set_color4f(skia_safe::Color4f::new(0.45, 0.45, 0.45, 1.0), None);
-    }
-
-    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
-        if let Some(handler) = &self.on_click {
-            handler(app, model)
-        }
-
-        self.bg_paint
-            .set_color4f(skia_safe::Color4f::new(0.35, 0.35, 0.35, 1.0), None);
-    }
-
-    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {
-        self.bg_paint
-            .set_color4f(skia_safe::Color4f::new(0.35, 0.35, 0.35, 1.0), None);
-    }
-
-    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
-        self.bg_paint
-            .set_color4f(skia_safe::Color4f::new(0.25, 0.25, 0.25, 1.0), None);
-    }
-
-    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {}
-
-    fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {}
 }
 
 // pub struct Label {
@@ -1178,7 +765,7 @@ impl<Model: ApplicationModel> Widget<Model> for Slider<Model> {
         )
     }
 
-    fn paint(&self, canvas: &mut dyn Canvas2D, rect: &Size, _: &Model) {
+    fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, rect: &Size, _: &Model) {
         let mut bg_paint = Paint::new(Color4f::new(0.5, 0.5, 0.5, 1.0), None);
         bg_paint.set_anti_alias(true);
         let mut fill_paint = Paint::new(Color4f::new(0.6, 0.6, 0.6, 1.0), None);
@@ -1468,7 +1055,7 @@ impl<Model: ApplicationModel> Widget<Model> for PopupMenuWidget {
         todo!()
     }
 
-    fn paint(&self, canvas: &mut dyn Canvas2D, size: &Size, model: &Model) {
+    fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, size: &Size, model: &Model) {
         todo!()
     }
 

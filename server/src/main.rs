@@ -16,7 +16,12 @@ pub mod simple_shapes;
 
 use load_scene::load_scene_gltf;
 use nalgebra_glm::{vec3, Mat4};
-use ui::application_model::ApplicationModel;
+use ui::{
+    application_model::ApplicationModel,
+    button::TextButton,
+    flex::{Expanded, Row},
+    widget::{Center, Slider, Widget},
+};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -117,8 +122,6 @@ impl ApplicationModel for State {
 }
 
 pub struct UIBuilder {}
-
-use ui::widget::*;
 
 impl ui::user_interface::UIBuilder<State> for UIBuilder {
     fn build(&self, _section: &str, _state: &State) -> Box<dyn Widget<State>> {

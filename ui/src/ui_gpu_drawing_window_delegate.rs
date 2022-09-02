@@ -139,7 +139,7 @@ impl<'a, Model: ApplicationModel + 'static> WindowDelegate<Model>
             height,
         );
         self.renderpass = Some(RenderPass::from_swapchain(self.device.clone(), &swapchain));
-        let mut user_interface = UserInterface::new(self.ui_delegate.build("root", state));
+        let mut user_interface = UserInterface::new(self.ui_delegate.build("root", state), "light");
         let image_renderer = ImageRenderer::new(
             &self.device,
             swapchain.render_pass(),
