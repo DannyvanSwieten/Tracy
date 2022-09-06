@@ -3,6 +3,8 @@ extern crate ash_window;
 extern crate winit;
 
 use crate::ui_gpu_drawing_window_delegate::UIGpuDrawingWindowDelegate;
+use crate::user_interface::UIBuilder;
+use crate::widget::Widget;
 use crate::window_delegate::WindowDelegate;
 use std::collections::{HashMap, VecDeque};
 use vk_utils::vulkan::Vulkan;
@@ -41,7 +43,7 @@ pub fn surface_extension_name() -> &'static CStr {
 pub trait ApplicationDelegate<Model: ApplicationModel> {
     fn application_will_start(
         &mut self,
-        _: &Application<Model>,
+        _: &mut Application<Model>,
         _: &mut Model,
         _: &mut WindowRegistry<Model>,
         _: &EventLoopWindowTarget<()>,
@@ -56,6 +58,16 @@ pub trait ApplicationDelegate<Model: ApplicationModel> {
         _: &mut Model,
         _: &mut WindowRegistry<Model>,
         _: &EventLoopWindowTarget<()>,
+    ) {
+    }
+
+    fn window_requested(
+        &mut self,
+        _: &Application<Model>,
+        _: &mut Model,
+        _: &EventLoopWindowTarget<()>,
+        _: &mut WindowRegistry<Model>,
+        _: WindowRequest<Model>,
     ) {
     }
 
@@ -249,16 +261,17 @@ impl<Model: ApplicationModel> WindowRegistry<Model> {
     }
 }
 
-pub struct WindowRequest{
-    title: Option<String>,
-    width: u32,
-    height: u32,
+pub struct WindowRequest<Model: ApplicationModel> {
+    pub builder: Box<dyn Fn(&Model) -> Box<dyn Widget<Model>>>,
+    pub title: Option<String>,
+    pub width: u32,
+    pub height: u32,
 }
 
 pub struct Application<Model: ApplicationModel> {
     vulkan: Vulkan,
     pending_messages: VecDeque<Model::MessageType>,
-    pending_window_requests: VecDeque<WindowRequest>,
+    pending_window_requests: VecDeque<WindowRequest<Model>>,
     _state: std::marker::PhantomData<Model>,
 }
 
@@ -288,11 +301,11 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
         self.pending_messages.push_back(msg)
     }
 
-    pub fn pop_message(&mut self) -> Option<Model::MessageType> {
+    fn pop_message(&mut self) -> Option<Model::MessageType> {
         self.pending_messages.pop_front()
     }
 
-    pub fn window_request(&mut self, request: WindowRequest){
+    pub fn ui_window_request(&mut self, request: WindowRequest<Model>) {
         self.pending_window_requests.push_back(request)
     }
 
@@ -309,7 +322,7 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
             window_delegates: HashMap::new(),
         };
 
-        d.application_will_start(&self, &mut s, &mut window_registry, &event_loop);
+        d.application_will_start(&mut self, &mut s, &mut window_registry, &event_loop);
         let mut last_mouse_position = winit::dpi::PhysicalPosition::<f64>::new(0., 0.);
         let mut last_file_drop: Vec<std::path::PathBuf> = Vec::new();
         let mut mouse_is_down = false;
@@ -318,10 +331,9 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
                 s.handle_message(msg)
             }
 
-            // while let Some(request) = self.pending_window_requests.pop_front(){
-            //     let window = window_registry.create_window(event_loop, &request.title.unwrap_or("Untitled".to_string()), request.width, request.height);
-            //     window_registry.register_with_delegate(window, UIGpuDrawingWindowDelegate::new(device, ui_delegate))
-            // }
+            while let Some(request) = self.pending_window_requests.pop_front() {
+                d.window_requested(&mut self, &mut s, event_loop, &mut window_registry, request)
+            }
             *control_flow = winit::event_loop::ControlFlow::Poll;
             match e {
                 Event::WindowEvent {

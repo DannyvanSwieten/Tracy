@@ -3,6 +3,7 @@ use crate::application_model::ApplicationModel;
 use crate::canvas_2d::Canvas2D;
 use crate::image_renderer::ImageRenderer;
 use crate::skia_vulkan_canvas::SkiaGpuCanvas2D;
+use crate::widget::Widget;
 use crate::window_delegate::WindowDelegate;
 
 use ash::vk::QueueFlags;
@@ -30,20 +31,23 @@ pub struct UIGpuDrawingWindowDelegate<Model: ApplicationModel> {
     queue: Rc<CommandQueue>,
     renderpass: Option<RenderPass>,
     ui: Option<UI<Model>>,
-    ui_delegate: Box<dyn UIBuilder<Model>>,
+    builder: Box<dyn Fn(&Model) -> Box<dyn Widget<Model>>>,
     fences: Vec<Vec<Option<WaitHandle>>>,
     sub_optimal_swapchain: bool,
 }
 
 impl<'a, Model: ApplicationModel + 'static> UIGpuDrawingWindowDelegate<Model> {
-    pub fn new(device: Rc<DeviceContext>, ui_delegate: Box<dyn UIBuilder<Model>>) -> Self {
+    pub fn new<F>(device: Rc<DeviceContext>, builder: F) -> Self
+    where
+        F: Fn(&Model) -> Box<dyn Widget<Model>> + 'static,
+    {
         let queue = Rc::new(CommandQueue::new(device.clone(), QueueFlags::GRAPHICS));
         Self {
             device: device.clone(),
             queue,
             renderpass: None,
             ui: None,
-            ui_delegate,
+            builder: Box::new(builder),
             fences: vec![Vec::new(), Vec::new(), Vec::new()],
             sub_optimal_swapchain: false,
         }
@@ -139,7 +143,7 @@ impl<'a, Model: ApplicationModel + 'static> WindowDelegate<Model>
             height,
         );
         self.renderpass = Some(RenderPass::from_swapchain(self.device.clone(), &swapchain));
-        let mut user_interface = UserInterface::new(self.ui_delegate.build("root", state), "light");
+        let mut user_interface = UserInterface::new((self.builder)(state), "light");
         let image_renderer = ImageRenderer::new(
             &self.device,
             swapchain.render_pass(),

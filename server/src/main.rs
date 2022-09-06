@@ -17,14 +17,14 @@ pub mod simple_shapes;
 use load_scene::load_scene_gltf;
 use nalgebra_glm::{vec3, Mat4};
 use ui::{
-    application::Application,
+    application::{Application, WindowRequest},
     application_model::ApplicationModel,
     button::{ButtonStyle, TextButton},
-    flex::{Expanded, Row, Column},
+    flex::{Column, Expanded, Row},
     slider::Slider,
     ui_application_delegate::UIApplicationDelegate,
     widget::{Center, Container, List, SizedBox, Widget},
-    Size, Color4f,
+    Color4f, Size,
 };
 use winit::{
     event::{Event, WindowEvent},
@@ -105,7 +105,31 @@ fn main() {
     } else if mode == "--ui_application".to_string() {
         let application = Application::<State>::new("My App");
         application.run(
-            UIApplicationDelegate::new().with_window("Window 1", 800, 600, UIBuilder {}),
+            UIApplicationDelegate::new().on_start(|app, model| {
+                let request = WindowRequest {
+                    width: 800,
+                    height: 600,
+                    title: Some("Window 1".to_string()),
+                    builder: Box::new(|_state| {
+                        Box::new(Container::new(Row::new().push(Expanded::new(
+                            TextButton::new("Button", 20f32).on_click(|app, model| {
+                                let request = WindowRequest {
+                                    width: 800,
+                                    height: 600,
+                                    title: Some("Window 2".to_string()),
+                                    builder: Box::new(|_state| {
+                                        Box::new(Container::new(Row::new().push(Expanded::new(
+                                            TextButton::new("Button 2", 20f32),
+                                        ))))
+                                    }),
+                                };
+                                app.ui_window_request(request);
+                            }),
+                        ))))
+                    }),
+                };
+                app.ui_window_request(request);
+            }),
             State {},
         )
     }
@@ -126,8 +150,16 @@ impl ui::user_interface::UIBuilder<State> for UIBuilder {
     fn build(&self, _section: &str, _state: &State) -> Box<dyn Widget<State>> {
         Box::new(
             Container::new(
-                Column::new().push(Expanded::new(Container::new(Row::new()).with_color(&Color4f::new(0.1, 0.1, 0.1, 1.0)))
-        ).push(Expanded::new(Container::new(Row::new()).with_color(&Color4f::new(0.1, 0.1, 0.1, 1.0)))
-        ).with_spacing(5f32)).with_margin(3f32))
+                Column::new()
+                    .push(Expanded::new(
+                        Container::new(Row::new()).with_color(&Color4f::new(0.1, 0.1, 0.1, 1.0)),
+                    ))
+                    .push(Expanded::new(
+                        Container::new(Row::new()).with_color(&Color4f::new(0.1, 0.1, 0.1, 1.0)),
+                    ))
+                    .with_spacing(5f32),
+            )
+            .with_margin(3f32),
+        )
     }
 }
