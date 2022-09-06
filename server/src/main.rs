@@ -17,10 +17,12 @@ pub mod simple_shapes;
 use load_scene::load_scene_gltf;
 use nalgebra_glm::{vec3, Mat4};
 use ui::{
+    application::Application,
     application_model::ApplicationModel,
     button::{ButtonStyle, TextButton},
     flex::{Expanded, Row},
     slider::Slider,
+    ui_application_delegate::UIApplicationDelegate,
     widget::{Center, Container, List, SizedBox, Widget},
     Size,
 };
@@ -101,14 +103,9 @@ fn main() {
         )
         .expect("Image Write failed");
     } else if mode == "--ui_application".to_string() {
-        let application = ui::application::Application::<State>::new("My App");
+        let application = Application::<State>::new("My App");
         application.run(
-            ui::ui_application_delegate::UIApplicationDelegate::new().with_window(
-                "Window 1",
-                800,
-                600,
-                UIBuilder {},
-            ),
+            UIApplicationDelegate::new().with_window("Window 1", 800, 600, UIBuilder {}),
             State {},
         )
     }
