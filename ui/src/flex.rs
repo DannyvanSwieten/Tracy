@@ -39,12 +39,16 @@ impl<Model: ApplicationModel> Row<Model> {
 
 impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
+        // This is not a scrollable view. It needs constraints
+        assert!(constraints.max_width().is_some() && constraints.max_height().is_some());
+        // Start without child constraints
+        let child_constraints = BoxConstraints::new();
         let constrained_sizes: Vec<Size> = self
             .children
             .iter_mut()
             .flat_map(|child| {
                 if child.flex() == 0f32 {
-                    let child_size = child.layout(constraints, model);
+                    let child_size = child.layout(&child_constraints, model);
                     child.set_size(&child_size);
                     Some(child_size)
                 } else {
@@ -52,12 +56,6 @@ impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
                 }
             })
             .collect();
-
-        if constrained_sizes.len() != self.children.len() {
-            // If there are flex children in this Row but there are no horizontal constraints, we are screwed.
-            // If you hit this assert, make sure you wrap this row inside a flexbox.
-            assert!(constraints.max_width().is_some());
-        }
 
         let constrained_size =
             constrained_sizes
@@ -94,14 +92,9 @@ impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
             position.x += child.size().width + self.spacing;
         }
 
-        let height = self
-            .children
-            .iter()
-            .fold(0f32, |result, child| result.max(child.size().height));
-
         Size::new(
             constraints.max_width().unwrap(),
-            constraints.min_height().unwrap_or(height),
+            constraints.max_height().unwrap(),
         )
     }
 
@@ -156,53 +149,90 @@ impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
 
 pub struct Column<Model> {
     children: Vec<ChildSlot<Model>>,
+    spacing: f32,
 }
 
 impl<Model: ApplicationModel> Column<Model> {
     pub fn new() -> Self {
         Self {
             children: Vec::new(),
+            spacing: 0f32,
         }
     }
 
-    pub fn with_child<W>(mut self, child: W) -> Self
+    pub fn push<W>(mut self, child: W) -> Self
     where
         W: Widget<Model> + 'static,
     {
         self.children.push(ChildSlot::new(child));
         self
     }
+
+    pub fn with_spacing(mut self, spacing: f32) -> Self {
+        self.spacing = spacing;
+        self
+    }
 }
 
 impl<Model: ApplicationModel> Widget<Model> for Column<Model> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
-        let child_sizes: Vec<Size> = self
+        // It needs constraints
+        assert!(constraints.max_width().is_some() && constraints.max_height().is_some());
+        // Start with no constraints
+        let child_constraints = BoxConstraints::new();
+        let constrained_sizes: Vec<Size> = self
             .children
             .iter_mut()
-            .map(|child| child.layout(constraints, model))
+            .flat_map(|child| {
+                if child.flex() == 0f32 {
+                    let child_size = child.layout(&child_constraints, model);
+                    child.set_size(&child_size);
+                    Some(child_size)
+                } else {
+                    None
+                }
+            })
             .collect();
 
-        let unconstrained_children: Vec<bool> = child_sizes
-            .iter()
-            .map(|size| size.width == 0f32 && size.height == 0f32)
-            .collect();
+        let constrained_size =
+            constrained_sizes
+                .iter()
+                .fold(Size::new(0f32, 0f32), |mut acc, child_size| {
+                    acc.height += child_size.height + self.spacing;
+                    acc.width = acc.width.max(child_size.width);
+                    acc
+                });
 
-        let size = child_sizes
+        let total_flex = self
+            .children
             .iter()
-            .fold(Size::new(0f32, 0f32), |mut acc, child_size| {
-                acc.width = acc.width.max(child_size.width);
-                acc.height += child_size.height;
-                acc
-            });
+            .fold(0f32, |acc, child| acc + child.flex());
 
-        let mut position = Point::new(0f32, 0f32);
-        for (index, size) in child_sizes.iter().enumerate() {
-            self.children[index].set_position(&position);
-            self.children[index].set_size(&child_sizes[index]);
-            position.y += size.height;
+        if total_flex > 0f32 {
+            let height = constraints.max_height().unwrap();
+            let unconstraint_height = height - constrained_size.height;
+            let flex_factor = unconstraint_height / total_flex;
+            for child in &mut self.children {
+                if child.flex() != 0f32 {
+                    let child_constraints = BoxConstraints::new()
+                        .with_max_height(flex_factor * child.flex())
+                        .with_max_width(constraints.max_width().unwrap());
+                    let child_size = child.layout(&child_constraints, model);
+                    child.set_size(&child_size);
+                }
+            }
         }
 
-        size
+        let mut position = Point::new(0f32, 0f32);
+        for child in &mut self.children {
+            child.set_position(&position);
+            position.y += child.size().height + self.spacing;
+        }
+
+        Size::new(
+            constraints.max_width().unwrap(),
+            constraints.max_height().unwrap(),
+        )
     }
 
     fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {

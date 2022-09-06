@@ -20,11 +20,11 @@ use ui::{
     application::Application,
     application_model::ApplicationModel,
     button::{ButtonStyle, TextButton},
-    flex::{Expanded, Row},
+    flex::{Expanded, Row, Column},
     slider::Slider,
     ui_application_delegate::UIApplicationDelegate,
     widget::{Center, Container, List, SizedBox, Widget},
-    Size,
+    Size, Color4f,
 };
 use winit::{
     event::{Event, WindowEvent},
@@ -126,18 +126,8 @@ impl ui::user_interface::UIBuilder<State> for UIBuilder {
     fn build(&self, _section: &str, _state: &State) -> Box<dyn Widget<State>> {
         Box::new(
             Container::new(
-                List::new()
-                    .with_builder(6, |i, model| {
-                        if i % 2 == 0 {
-                            Box::new(TextButton::new("Button", 20f32).style(ButtonStyle::Fill))
-                        } else {
-                            Box::new(TextButton::new("Button", 20f32).style(ButtonStyle::Outline))
-                        }
-                    })
-                    .with_item_size(30f32)
-                    .with_spacing(5f32),
-            )
-            .with_padding(10f32),
-        )
+                Column::new().push(Expanded::new(Container::new(Row::new()).with_color(&Color4f::new(0.1, 0.1, 0.1, 1.0)))
+        ).push(Expanded::new(Container::new(Row::new()).with_color(&Color4f::new(0.1, 0.1, 0.1, 1.0)))
+        ).with_spacing(5f32)).with_margin(3f32))
     }
 }

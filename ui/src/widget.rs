@@ -319,30 +319,37 @@ impl<Model: ApplicationModel> Widget<Model> for Container<Model> {
     // Then return its child's size as its own size.
 
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
+        // If the container is not given constraints from the parent check if we've been given a size
+        // If not given a size we ask the child to layout without constraints
+        // This might panic if the child is a flex container.
+        // If given a size we ask the child to layout with that size.
+        // This might still panic if the child is for example a horizontal container, but only height is given.
+
+        // If the container is given constraints we'll shrink them by padding/margin and ask the child to layout with those constraints
+
         let space_around = self.padding + self.margin + self.border;
+        let child_size = if constraints.max_width().is_none() || constraints.max_height().is_none(){
+            if self.width.is_none() || self.height.is_none(){
+                self.child.layout(&BoxConstraints::new(), model)
+            } else {
+                let mut child_constraints = BoxConstraints::new();
+                if self.width.is_some() {child_constraints = child_constraints.with_max_width(self.width.unwrap_or(0f32))}
+                if self.height.is_some(){ child_constraints = child_constraints.with_max_height(self.height.unwrap_or(0f32))}
+                self.child.layout(&child_constraints.shrunk(space_around, space_around), model)
+            }
+            
+        } else {
+            let child_constraints = constraints.shrunk(space_around * 2f32, space_around * 2f32);
+            self.child.layout(&child_constraints, model)
+        };
 
         self.child
             .set_position(&Point::new(space_around, space_around));
-        let space_around = space_around * 2f32;
-        let mut child_constraints = constraints.shrunk(space_around, space_around);
-        if let Some(width) = self.width {
-            child_constraints = child_constraints
-                .with_max_width(width)
-                .with_min_width(width);
-        }
-
-        if let Some(height) = self.height {
-            child_constraints = child_constraints
-                .with_max_height(height)
-                .with_min_height(height);
-        }
-
-        let child_size = self.child.layout(&child_constraints, model);
         self.child.set_size(&child_size);
 
         Size::new(
-            child_size.width + space_around,
-            child_size.height + space_around,
+            child_size.width + space_around * 2f32,
+            child_size.height + space_around * 2f32,
         )
     }
 
