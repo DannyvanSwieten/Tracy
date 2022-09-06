@@ -18,9 +18,11 @@ use load_scene::load_scene_gltf;
 use nalgebra_glm::{vec3, Mat4};
 use ui::{
     application_model::ApplicationModel,
-    button::TextButton,
+    button::{ButtonStyle, TextButton},
     flex::{Expanded, Row},
-    widget::{Center, Slider, Widget},
+    slider::Slider,
+    widget::{Center, Container, List, SizedBox, Widget},
+    Size,
 };
 use winit::{
     event::{Event, WindowEvent},
@@ -32,7 +34,7 @@ use renderer::gpu_path_tracer::Renderer;
 use vk_utils::vulkan::Vulkan;
 
 use futures::lock::Mutex;
-use std::{io::Write, rc::Rc, sync::Arc, thread};
+use std::{rc::Rc, sync::Arc};
 
 use crate::resources::{GpuResourceCache, Resources};
 
@@ -125,20 +127,20 @@ pub struct UIBuilder {}
 
 impl ui::user_interface::UIBuilder<State> for UIBuilder {
     fn build(&self, _section: &str, _state: &State) -> Box<dyn Widget<State>> {
-        Box::new(Center::new(
-            Row::new()
-                .with_child(
-                    TextButton::new("Button 1", 25f32).on_click(|_, _| println!("Click 1 ")),
-                )
-                .with_child(
-                    TextButton::new("Button 2 With More Text", 25f32)
-                        .on_click(|_, _| println!("Click 2")),
-                )
-                .with_child(
-                    TextButton::new("Button 3", 25f32).on_click(|app, _| app.send_message(1)),
-                )
-                .with_child(Expanded::new(Slider::new("value")).with_height(32f32))
-                .with_spacing(3f32),
-        ))
+        Box::new(
+            Container::new(
+                List::new()
+                    .with_builder(6, |i, model| {
+                        if i % 2 == 0 {
+                            Box::new(TextButton::new("Button", 20f32).style(ButtonStyle::Fill))
+                        } else {
+                            Box::new(TextButton::new("Button", 20f32).style(ButtonStyle::Outline))
+                        }
+                    })
+                    .with_item_size(30f32)
+                    .with_spacing(5f32),
+            )
+            .with_padding(10f32),
+        )
     }
 }

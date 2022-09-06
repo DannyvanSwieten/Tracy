@@ -6,16 +6,28 @@ use crate::{
     canvas_2d::Canvas2D,
     constraints::BoxConstraints,
     style::Theme,
-    widget::{Contexts, Properties, Widget},
+    widget::{Properties, Widget},
     window_event::MouseEvent,
 };
 
+enum ButtonState {
+    Inactive,
+    Active,
+    Hover,
+}
+
+pub enum ButtonStyle {
+    Text,
+    Outline,
+    Fill,
+}
+
 pub struct TextButton<Model: ApplicationModel> {
+    state: ButtonState,
+    style: ButtonStyle,
     text: String,
     font: Font,
     on_click: Option<Box<dyn Fn(&mut Application<Model>, &mut Model)>>,
-    bg_paint: Paint,
-    text_paint: Paint,
 }
 
 impl<Model: ApplicationModel> TextButton<Model> {
@@ -31,12 +43,17 @@ impl<Model: ApplicationModel> TextButton<Model> {
         text_paint.set_anti_alias(true);
         text_paint.set_color4f(skia_safe::Color4f::new(1f32, 1f32, 1f32, 1f32), None);
         Self {
+            state: ButtonState::Inactive,
             text: text.to_string(),
             font,
             on_click: None,
-            bg_paint,
-            text_paint,
+            style: ButtonStyle::Text,
         }
+    }
+
+    pub fn style(mut self, style: ButtonStyle) -> Self {
+        self.style = style;
+        self
     }
 
     pub fn on_click(
@@ -62,8 +79,42 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
     }
 
     fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, size: &Size, _: &Model) {
-        canvas.draw_rounded_rect(&Rect::from_size(*size), 3f32, 3f32, &self.bg_paint);
-        canvas.draw_string(&self.text, &self.font, &self.text_paint);
+        let mut text_paint = Paint::default();
+        text_paint.set_anti_alias(true);
+
+        match self.style {
+            ButtonStyle::Fill => {
+                let mut bg_paint = Paint::default();
+                bg_paint.set_anti_alias(true);
+                bg_paint.set_color(theme.primary);
+                canvas.draw_rounded_rect(
+                    &Rect::from_wh(size.width, size.height),
+                    4f32,
+                    4f32,
+                    &bg_paint,
+                );
+                text_paint.set_color(theme.text);
+                canvas.draw_string(&self.text, &self.font, &text_paint);
+            }
+            ButtonStyle::Outline => {
+                let mut bg_paint = Paint::default();
+                bg_paint.set_anti_alias(true);
+                bg_paint.set_color(theme.primary);
+                bg_paint.set_stroke(true);
+                canvas.draw_rounded_rect(
+                    &Rect::from_wh(size.width, size.height),
+                    4f32,
+                    4f32,
+                    &bg_paint,
+                );
+                text_paint.set_color(theme.primary);
+                canvas.draw_string(&self.text, &self.font, &text_paint);
+            }
+            ButtonStyle::Text => {
+                text_paint.set_color(theme.primary);
+                canvas.draw_string(&self.text, &self.font, &text_paint);
+            }
+        }
     }
 
     fn mouse_down(
@@ -73,8 +124,7 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
         _: &mut Application<Model>,
         model: &mut Model,
     ) {
-        self.bg_paint
-            .set_color4f(skia_safe::Color4f::new(0.45, 0.45, 0.45, 1.0), None);
+        self.state = ButtonState::Active
     }
 
     fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
@@ -82,21 +132,17 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
             handler(app, model)
         }
 
-        self.bg_paint
-            .set_color4f(skia_safe::Color4f::new(0.35, 0.35, 0.35, 1.0), None);
-    }
-
-    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {
-        self.bg_paint
-            .set_color4f(skia_safe::Color4f::new(0.35, 0.35, 0.35, 1.0), None);
-    }
-
-    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
-        self.bg_paint
-            .set_color4f(skia_safe::Color4f::new(0.25, 0.25, 0.25, 1.0), None);
+        self.state = ButtonState::Hover
     }
 
     fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {}
 
     fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {}
+
+    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {
+        self.state = ButtonState::Hover
+    }
+    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
+        self.state = ButtonState::Inactive
+    }
 }

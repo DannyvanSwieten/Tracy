@@ -2,15 +2,16 @@ use skia_safe::{Color, Font};
 use std::collections::HashMap;
 #[derive(Default)]
 pub struct SliderThumbStyle {
-    color: Color,
-    size: f32,
+    pub color: Color,
+    pub size: f32,
 }
 #[derive(Default)]
 pub struct SliderStyle {
-    background: Color,
-    label_font: Font,
-    thumb: SliderThumbStyle,
+    pub background: Color,
+    pub fill: Color,
+    pub thumb: SliderThumbStyle,
 }
+
 #[derive(Default)]
 pub struct TextButtonStyle {
     inactive: Color,
@@ -24,6 +25,7 @@ pub struct Theme {
     pub background: Color,
     pub primary: Color,
     pub secondary: Color,
+    pub text: Color,
 
     pub button: TextButtonStyle,
     pub slider: SliderStyle,
@@ -35,8 +37,16 @@ impl Theme {
             background: Color::new(0xFFFFFFFF),
             primary: Color::new(0xFF766AC8),
             secondary: Color::new(0xFF73C8A6),
+            text: Color::new(0xFFFFFFFF),
             button: TextButtonStyle::default(),
-            slider: SliderStyle::default(),
+            slider: SliderStyle {
+                background: Color::new(0xFFFFFFFF),
+                fill: Color::new(0xFF766AC8),
+                thumb: SliderThumbStyle {
+                    color: Color::new(0xFF73C8A6),
+                    size: 0.125,
+                },
+            },
         }
     }
 }

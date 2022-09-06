@@ -278,6 +278,8 @@ pub struct Container<Model> {
     padding: f32,
     margin: f32,
     border: f32,
+    width: Option<f32>,
+    height: Option<f32>,
     child: ChildSlot<Model>,
     paint: Option<Paint>,
 }
@@ -288,12 +290,14 @@ impl<Model: ApplicationModel> Container<Model> {
             padding: 0.0,
             margin: 0.0,
             border: 0.0,
+            width: None,
+            height: None,
             child: ChildSlot::new(child),
             paint: None,
         }
     }
 
-    pub fn with_bg_color(mut self, color: &Color4f) -> Self {
+    pub fn with_color(mut self, color: &Color4f) -> Self {
         self.paint = Some(Paint::new(*color, None));
         self
     }
@@ -320,7 +324,19 @@ impl<Model: ApplicationModel> Widget<Model> for Container<Model> {
         self.child
             .set_position(&Point::new(space_around, space_around));
         let space_around = space_around * 2f32;
-        let child_constraints = constraints.shrunk(space_around, space_around);
+        let mut child_constraints = constraints.shrunk(space_around, space_around);
+        if let Some(width) = self.width {
+            child_constraints = child_constraints
+                .with_max_width(width)
+                .with_min_width(width);
+        }
+
+        if let Some(height) = self.height {
+            child_constraints = child_constraints
+                .with_max_height(height)
+                .with_min_height(height);
+        }
+
         let child_size = self.child.layout(&child_constraints, model);
         self.child.set_size(&child_size);
 
@@ -355,19 +371,19 @@ impl<Model: ApplicationModel> Widget<Model> for Container<Model> {
     }
 
     fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
-        todo!()
+        self.child.mouse_dragged(event, properties, model)
     }
 
     fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
-        todo!()
+        self.child.mouse_moved(event, model)
     }
 
     fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {
-        todo!()
+        self.child.mouse_entered(event, model)
     }
 
     fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
-        todo!()
+        self.child.mouse_left(event, model)
     }
 }
 
@@ -554,6 +570,150 @@ impl<Model: ApplicationModel> Widget<Model> for FlexBox<Model> {
     }
 }
 
+pub struct List<Model> {
+    spacing: f32,
+    // If not None this will force all children to this size in the scroll direction
+    item_size: Option<f32>,
+    // If not None this will call the builder callback with index 0..item_count
+    item_count: Option<usize>,
+    builder: Option<Box<dyn Fn(usize, &Model) -> Box<dyn Widget<Model>>>>,
+    children: Vec<ChildSlot<Model>>,
+    viewport_position: f32,
+}
+
+impl<Model: ApplicationModel> List<Model> {
+    pub fn new() -> Self {
+        Self {
+            spacing: 0f32,
+            item_size: None,
+            item_count: None,
+            builder: None,
+            children: Vec::new(),
+            viewport_position: 0f32,
+        }
+    }
+
+    pub fn with_builder<F>(mut self, item_count: usize, builder: F) -> Self
+    where
+        F: Fn(usize, &Model) -> Box<dyn Widget<Model>> + 'static,
+    {
+        self.builder = Some(Box::new(builder));
+        self.item_count = Some(item_count);
+        self
+    }
+
+    pub fn new_with_children(children: Vec<Box<dyn Widget<Model>>>) -> Self {
+        Self {
+            spacing: 0f32,
+            item_size: None,
+            item_count: None,
+            builder: None,
+            children: children
+                .into_iter()
+                .map(|child| ChildSlot::new_with_box(child))
+                .collect(),
+            viewport_position: 0f32,
+        }
+    }
+
+    pub fn with_item_size(mut self, size: f32) -> Self {
+        self.item_size = Some(size);
+        self
+    }
+
+    pub fn with_spacing(mut self, spacing: f32) -> Self {
+        self.spacing = spacing;
+        self
+    }
+
+    pub fn push(mut self, child: impl Widget<Model> + 'static) -> Self {
+        self.children.push(ChildSlot::new(child));
+        self
+    }
+}
+
+impl<Model: ApplicationModel> Widget<Model> for List<Model> {
+    fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
+        if let Some(builder) = &self.builder {
+            self.children.clear();
+            for i in 0..self.item_count.unwrap() {
+                self.children
+                    .push(ChildSlot::new_with_box(builder(i, model)))
+            }
+        }
+
+        let mut y = 0f32;
+
+        for child in &mut self.children {
+            let child_constraints = if let Some(item_size) = self.item_size {
+                BoxConstraints::new()
+                    .with_max_height(item_size)
+                    .with_max_width(constraints.max_width().unwrap())
+            } else {
+                BoxConstraints::new().with_max_width(constraints.max_width().unwrap())
+            };
+            let mut child_size = child.layout(&child_constraints, model);
+            child_size.height = self.item_size.unwrap_or(child_size.height);
+            child.set_size(&child_size);
+            child.set_position(&Point::new(0f32, y));
+            y += child_size.height + self.spacing
+        }
+
+        Size::new(
+            constraints.max_width().unwrap(),
+            constraints.max_height().unwrap(),
+        )
+    }
+
+    fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
+        for child in &self.children {
+            child.paint(theme, canvas, rect, model)
+        }
+    }
+
+    fn mouse_down(
+        &mut self,
+        event: &MouseEvent,
+        properties: &Properties,
+        app: &mut Application<Model>,
+        model: &mut Model,
+    ) {
+        for child in &mut self.children {
+            child.mouse_down(event, properties, app, model)
+        }
+    }
+
+    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
+        for child in &mut self.children {
+            child.mouse_up(event, app, model)
+        }
+    }
+
+    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
+        for child in &mut self.children {
+            child.mouse_dragged(event, properties, model)
+        }
+    }
+
+    fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
+        for child in &mut self.children {
+            child.mouse_moved(event, model)
+        }
+    }
+
+    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {
+        for child in &mut self.children {
+            child.mouse_entered(event, model)
+        }
+    }
+
+    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
+        for child in &mut self.children {
+            child.mouse_left(event, model)
+        }
+    }
+}
+
 // pub struct Label {
 //     text: String,
 //     font: Font,
@@ -704,138 +864,6 @@ impl<Model: ApplicationModel> Widget<Model> for FlexBox<Model> {
 //         (Size::new(w, h), vec![Constraints::new(0.0, w, 0.0, h)])
 //     }
 // }
-
-pub struct Slider<Model> {
-    label: String,
-    font: Font,
-    min: f32,
-    max: f32,
-    discrete: bool,
-    current_normalized: f32,
-    current_value: f32,
-    last_position: f32,
-    value_changed: Option<Box<dyn FnMut(f32, &mut Model)>>,
-}
-
-impl<Model> Slider<Model> {
-    pub fn new(label: &str) -> Self {
-        Slider::new_with_min_max_and_value(label, 0., 1., 0., false)
-    }
-
-    pub fn new_with_min_max_and_value(
-        label: &str,
-        min: f32,
-        max: f32,
-        value: f32,
-        discrete: bool,
-    ) -> Self {
-        Slider {
-            label: label.to_string(),
-            font: Font::default(),
-            min,
-            max,
-            discrete,
-            current_normalized: value / (max - min),
-            current_value: value,
-            last_position: 0.,
-            value_changed: None,
-        }
-    }
-
-    pub fn with_handler<F>(mut self, handler: F) -> Self
-    where
-        F: FnMut(f32, &mut Model) + 'static,
-    {
-        self.value_changed = Some(Box::new(handler));
-        self
-    }
-
-    pub fn set_value(&mut self, value: f32) {
-        self.current_value = value.max(self.min).min(self.max);
-        self.current_normalized = map_range(self.current_value, self.min, self.max, 0., 1.)
-    }
-}
-
-impl<Model: ApplicationModel> Widget<Model> for Slider<Model> {
-    fn layout(&mut self, constraints: &BoxConstraints, _: &Model) -> Size {
-        // Boldly unwrapping here. If you have not given constraints to a slider then we don't know how big it should be.
-        Size::new(
-            constraints.max_width().unwrap(),
-            constraints.max_height().unwrap(),
-        )
-    }
-
-    fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, rect: &Size, _: &Model) {
-        let mut bg_paint = Paint::new(Color4f::new(0.5, 0.5, 0.5, 1.0), None);
-        bg_paint.set_anti_alias(true);
-        let mut fill_paint = Paint::new(Color4f::new(0.6, 0.6, 0.6, 1.0), None);
-        fill_paint.set_anti_alias(true);
-        let mut border_paint = Paint::new(Color4f::new(0.5, 0.5, 0.5, 1.0), None);
-        border_paint.set_anti_alias(true);
-        let mut text_paint = Paint::new(Color4f::new(1.0, 1.0, 1.0, 1.0), None);
-        text_paint.set_anti_alias(true);
-
-        let rect = Rect::from_size(*rect);
-        canvas.draw_rounded_rect(&rect, 3., 3., &bg_paint);
-        canvas.draw_rounded_rect(&rect, 3., 3., &border_paint);
-        let mut fill_rect = Rect::from_xywh(
-            rect.left(),
-            rect.top(),
-            rect.width() * self.current_normalized,
-            rect.height(),
-        );
-        fill_rect.inset((2, 2));
-
-        canvas.draw_rounded_rect(&fill_rect, 3., 3., &fill_paint);
-
-        let t = self.label.to_string() + ": " + &format!("{:.4}", &self.current_value.to_string());
-        canvas.draw_string(&t, &self.font, &text_paint);
-    }
-
-    fn mouse_down(
-        &mut self,
-        event: &MouseEvent,
-        properties: &Properties,
-        _: &mut Application<Model>,
-        model: &mut Model,
-    ) {
-        let x = event.local_position().x;
-        self.current_normalized = (1. / properties.size.width) * x;
-
-        self.current_value = map_range(self.current_normalized, 0., 1., self.min, self.max);
-        if self.discrete {
-            self.current_value = self.current_value.round();
-        }
-        if let Some(l) = &mut self.value_changed {
-            (l)(self.current_value, model);
-        }
-
-        self.last_position = x;
-    }
-
-    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {}
-
-    fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
-        self.last_position = event.local_position().x;
-        self.current_normalized =
-            (1. / properties.size.width) * self.last_position.min(properties.size.width).max(0.);
-
-        self.current_value = map_range(self.current_normalized, 0., 1., self.min, self.max);
-
-        if self.discrete {
-            self.current_value = self.current_value.round();
-        }
-        if let Some(l) = &mut self.value_changed {
-            (l)(self.current_value, model);
-        }
-    }
-
-    fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {}
-
-    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {}
-
-    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {}
-}
 
 // // pub struct Spinner<Model> {
 // //     label: String,

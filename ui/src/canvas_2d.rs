@@ -11,6 +11,8 @@ pub trait Canvas2D {
     fn draw_rect(&mut self, rect: &Rect, paint: &Paint);
     fn draw_rounded_rect(&mut self, rect: &Rect, rx: f32, ry: f32, paint: &Paint);
 
+    fn draw_circle(&mut self, center: &Point, radius: f32, paint: &Paint);
+
     fn draw_string(&mut self, text: &str, font: &Font, paint: &Paint);
 
     fn draw_vk_image(&mut self, image: &ash::vk::Image, width: u32, height: u32);

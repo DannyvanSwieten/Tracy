@@ -14,3 +14,5 @@ pub mod widget;
 pub mod window_delegate;
 pub mod window_event;
 pub use skia_safe::Color4f;
+pub use skia_safe::Size;
+pub mod slider;

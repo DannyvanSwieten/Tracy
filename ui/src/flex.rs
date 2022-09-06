@@ -23,7 +23,7 @@ impl<Model: ApplicationModel> Row<Model> {
         }
     }
 
-    pub fn with_child<W>(mut self, child: W) -> Self
+    pub fn push<W>(mut self, child: W) -> Self
     where
         W: Widget<Model> + 'static,
     {
