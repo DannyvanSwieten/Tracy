@@ -8,7 +8,7 @@ use crate::window_event::MouseEvent;
 use skia_safe::Point;
 
 pub trait UIBuilder<Model: ApplicationModel> {
-    fn build(&self, section: &str, state: &Model) -> Box<dyn Widget<Model>>;
+    fn build(&self, window: &str, state: &Model) -> Box<dyn Widget<Model>>;
 }
 
 #[repr(C)]

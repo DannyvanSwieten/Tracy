@@ -2,79 +2,14 @@ use crate::application::Application;
 use crate::application_model::ApplicationModel;
 use crate::canvas_2d::Canvas2D;
 use crate::constraints::BoxConstraints;
-use crate::style::{StyleContext, Theme};
+use crate::style::Theme;
 // use crate::node::*;
 use crate::window_event::{MouseEvent, MouseEventType};
 use skia_safe::{Color, Color4f, Font, Paint, PaintStyle, Point, Rect, Size};
 
-use std::collections::HashMap;
-
 pub fn map_range(x: f32, a: f32, b: f32, c: f32, d: f32) -> f32 {
     let slope = (d - c) / (b - a);
     c + slope * (x - a)
-}
-
-pub type StyleSheet = HashMap<String, Color>;
-
-#[derive(Clone)]
-pub struct Material {
-    data: HashMap<String, StyleSheet>,
-}
-
-impl Material {
-    pub fn new() -> Self {
-        let mut body = StyleSheet::new();
-        body.insert(String::from("bg-color"), Color::BLACK);
-
-        body.insert(String::from("border-color"), Color::BLACK);
-
-        let mut div = StyleSheet::new();
-        div.insert(String::from("bg-color"), Color::DARK_GRAY);
-        div.insert(String::from("border-color"), Color::LIGHT_GRAY);
-
-        let mut btn = StyleSheet::new();
-        btn.insert(String::from("bg-color"), Color::from_rgb(51, 51, 51));
-        btn.insert(String::from("hovered"), Color::from_rgb(89, 89, 89));
-        btn.insert(String::from("pressed"), Color::from_rgb(77, 77, 77));
-
-        let mut label = StyleSheet::new();
-        label.insert(String::from("bg-color"), Color::from_rgb(38, 38, 38));
-        label.insert(String::from("border-color"), Color::TRANSPARENT);
-
-        let mut slider = StyleSheet::new();
-        slider.insert(String::from("bg-color"), Color::from_rgb(51, 51, 51));
-        slider.insert(String::from("fill-color"), Color::from_rgb(102, 102, 102));
-        slider.insert(String::from("border-color"), Color::from_rgb(89, 89, 89));
-
-        let mut menu = StyleSheet::new();
-        menu.insert(String::from("bg-color"), Color::BLACK);
-        menu.insert(String::from("border-color"), Color::BLACK);
-
-        let mut table = StyleSheet::new();
-        table.insert(String::from("bg-color"), Color::BLACK);
-        table.insert(String::from("even"), Color::from_rgb(89, 89, 89));
-        table.insert(String::from("uneven"), Color::from_rgb(77, 77, 77));
-
-        let mut data = HashMap::new();
-        data.insert(String::from("body"), body);
-        data.insert(String::from("div"), div);
-        data.insert(String::from("btn"), btn);
-        data.insert(String::from("slider"), slider);
-        data.insert(String::from("label"), label);
-        data.insert(String::from("menu"), menu);
-        data.insert(String::from("table"), table);
-
-        Material { data: data }
-    }
-
-    pub fn create_child(&mut self, tag: &str) -> Option<&mut StyleSheet> {
-        self.data.insert(tag.to_string(), StyleSheet::new());
-        self.data.get_mut(tag)
-    }
-
-    pub fn get_child(&self, key: &str) -> Option<&StyleSheet> {
-        self.data.get(key)
-    }
 }
 
 pub enum Action<Model> {
@@ -103,10 +38,6 @@ pub struct DragSource<Model> {
 
 pub struct DragContext<Model> {
     dragged_sources: Vec<Box<dyn Widget<Model>>>,
-}
-
-pub struct Contexts {
-    style: StyleContext,
 }
 
 pub struct Properties {

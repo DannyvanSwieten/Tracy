@@ -6,7 +6,7 @@ use crate::{
     canvas_2d::Canvas2D,
     constraints::BoxConstraints,
     style::Theme,
-    widget::{ChildSlot, Contexts, Properties, Widget},
+    widget::{ChildSlot, Properties, Widget},
     window_event::MouseEvent,
 };
 
@@ -272,11 +272,15 @@ impl<Model: ApplicationModel> Widget<Model> for Column<Model> {
     }
 
     fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {
-        todo!()
+        for child in &mut self.children {
+            child.mouse_entered(event, model)
+        }
     }
 
     fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
-        todo!()
+        for child in &mut self.children {
+            child.mouse_left(event, model)
+        }
     }
 }
 

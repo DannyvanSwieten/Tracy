@@ -2,6 +2,7 @@ extern crate ash;
 extern crate ash_window;
 extern crate winit;
 
+use crate::ui_gpu_drawing_window_delegate::UIGpuDrawingWindowDelegate;
 use crate::window_delegate::WindowDelegate;
 use std::collections::{HashMap, VecDeque};
 use vk_utils::vulkan::Vulkan;
@@ -248,9 +249,16 @@ impl<Model: ApplicationModel> WindowRegistry<Model> {
     }
 }
 
+pub struct WindowRequest{
+    title: Option<String>,
+    width: u32,
+    height: u32,
+}
+
 pub struct Application<Model: ApplicationModel> {
     vulkan: Vulkan,
     pending_messages: VecDeque<Model::MessageType>,
+    pending_window_requests: VecDeque<WindowRequest>,
     _state: std::marker::PhantomData<Model>,
 }
 
@@ -267,6 +275,7 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
         Self {
             vulkan,
             pending_messages: VecDeque::new(),
+            pending_window_requests: VecDeque::new(),
             _state: std::marker::PhantomData::<Model>::default(),
         }
     }
@@ -281,6 +290,10 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
 
     pub fn pop_message(&mut self) -> Option<Model::MessageType> {
         self.pending_messages.pop_front()
+    }
+
+    pub fn window_request(&mut self, request: WindowRequest){
+        self.pending_window_requests.push_back(request)
     }
 
     pub fn run<Delegate>(mut self, delegate: Delegate, state: Model)
@@ -304,6 +317,11 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
             while let Some(msg) = self.pop_message() {
                 s.handle_message(msg)
             }
+
+            // while let Some(request) = self.pending_window_requests.pop_front(){
+            //     let window = window_registry.create_window(event_loop, &request.title.unwrap_or("Untitled".to_string()), request.width, request.height);
+            //     window_registry.register_with_delegate(window, UIGpuDrawingWindowDelegate::new(device, ui_delegate))
+            // }
             *control_flow = winit::event_loop::ControlFlow::Poll;
             match e {
                 Event::WindowEvent {
