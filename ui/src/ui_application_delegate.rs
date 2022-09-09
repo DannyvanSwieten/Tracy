@@ -1,7 +1,6 @@
 use crate::application::{Application, ApplicationDelegate, WindowRegistry, WindowRequest};
 use crate::application_model::ApplicationModel;
 use crate::ui_gpu_drawing_window_delegate::UIGpuDrawingWindowDelegate;
-use crate::user_interface::UIBuilder;
 use crate::window_delegate::WindowDelegate;
 use std::rc::Rc;
 use vk_utils::device_context::DeviceContext;
@@ -14,6 +13,7 @@ pub struct UIApplicationDelegate<Model: ApplicationModel> {
     device_builder:
         Option<Box<dyn FnMut(&vk_utils::gpu::Gpu, Vec<&'static std::ffi::CStr>) -> DeviceContext>>,
     _state: std::marker::PhantomData<Model>,
+    device: Option<Rc<DeviceContext>>,
 }
 
 impl<Model: ApplicationModel> UIApplicationDelegate<Model> {
@@ -24,6 +24,7 @@ impl<Model: ApplicationModel> UIApplicationDelegate<Model> {
             on_device_created: None,
             device_builder: None,
             _state: std::marker::PhantomData::default(),
+            device: None,
         }
     }
 
@@ -65,9 +66,22 @@ impl<Model: ApplicationModel> ApplicationDelegate<Model> for UIApplicationDelega
         &mut self,
         app: &mut Application<Model>,
         state: &mut Model,
-        window_registry: &mut WindowRegistry<Model>,
-        target: &EventLoopWindowTarget<()>,
+        _: &mut WindowRegistry<Model>,
+        _: &EventLoopWindowTarget<()>,
     ) {
+        let gpu = &app
+            .vulkan()
+            .hardware_devices_with_queue_support(ash::vk::QueueFlags::GRAPHICS)[0];
+        let device_extensions = vec![ash::extensions::khr::Swapchain::name()];
+        let device = {
+            if let Some(cb) = self.device_builder.as_mut() {
+                Rc::new(cb(&gpu, device_extensions))
+            } else {
+                Rc::new(gpu.device_context(&device_extensions, |builder| builder))
+            }
+        };
+
+        self.device = Some(device);
         if let Some(cb) = self.on_start.as_mut() {
             cb(app, state)
         }
@@ -100,21 +114,8 @@ impl<Model: ApplicationModel> ApplicationDelegate<Model> for UIApplicationDelega
             request.height,
         );
 
-        let device_extensions = vec![ash::extensions::khr::Swapchain::name()];
-        let gpu = &app
-            .vulkan()
-            .hardware_devices_with_queue_support(ash::vk::QueueFlags::GRAPHICS)[0];
-        let device = {
-            if let Some(cb) = self.device_builder.as_mut() {
-                Rc::new(cb(&gpu, device_extensions))
-            } else {
-                Rc::new(gpu.device_context(&device_extensions, |builder| builder))
-            }
-        };
-        if let Some(cb) = self.on_device_created.as_mut() {
-            cb(&gpu, device.clone(), state)
-        }
-        let mut window_delegate = UIGpuDrawingWindowDelegate::new(device, request.builder);
+        let mut window_delegate =
+            UIGpuDrawingWindowDelegate::new(self.device.as_ref().unwrap().clone(), request.builder);
         window_delegate.resized(
             &window,
             app,

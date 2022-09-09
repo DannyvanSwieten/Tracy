@@ -6,11 +6,6 @@ use crate::style::StyleContext;
 use crate::widget::*;
 use crate::window_event::MouseEvent;
 use skia_safe::Point;
-
-pub trait UIBuilder<Model: ApplicationModel> {
-    fn build(&self, window: &str, state: &Model) -> Box<dyn Widget<Model>>;
-}
-
 #[repr(C)]
 pub struct UserInterface<Model: ApplicationModel> {
     pub root: ChildSlot<Model>,

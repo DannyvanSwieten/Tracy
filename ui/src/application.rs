@@ -2,8 +2,6 @@ extern crate ash;
 extern crate ash_window;
 extern crate winit;
 
-use crate::ui_gpu_drawing_window_delegate::UIGpuDrawingWindowDelegate;
-use crate::user_interface::UIBuilder;
 use crate::widget::Widget;
 use crate::window_delegate::WindowDelegate;
 use std::collections::{HashMap, VecDeque};
@@ -116,7 +114,6 @@ impl<Model: ApplicationModel> WindowRegistry<Model> {
         WindowBuilder::new()
             .with_title(title)
             .with_inner_size(winit::dpi::LogicalSize { width, height })
-            //.with_maximized(true)
             .build(target)
             .unwrap()
     }

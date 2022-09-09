@@ -14,8 +14,10 @@ pub mod schema;
 pub mod server;
 pub mod simple_shapes;
 
+use ash::extensions::{ext::DebugUtils, khr::Surface};
 use load_scene::load_scene_gltf;
 use nalgebra_glm::{vec3, Mat4};
+use renderer::gpu_path_tracer::Renderer;
 use ui::{
     application::{Application, WindowRequest},
     application_model::ApplicationModel,
@@ -26,13 +28,6 @@ use ui::{
     widget::{Center, Container, List, SizedBox, Widget},
     Color4f, Size,
 };
-use winit::{
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-};
-
-use ash::extensions::{ext::DebugUtils, khr::Surface};
-use renderer::gpu_path_tracer::Renderer;
 use vk_utils::vulkan::Vulkan;
 
 use futures::lock::Mutex;
@@ -111,21 +106,43 @@ fn main() {
                     height: 600,
                     title: Some("Window 1".to_string()),
                     builder: Box::new(|_state| {
-                        Box::new(Container::new(Row::new().push(Expanded::new(
-                            TextButton::new("Button", 20f32).on_click(|app, model| {
-                                let request = WindowRequest {
-                                    width: 800,
-                                    height: 600,
-                                    title: Some("Window 2".to_string()),
-                                    builder: Box::new(|_state| {
-                                        Box::new(Container::new(Row::new().push(Expanded::new(
-                                            TextButton::new("Button 2", 20f32),
-                                        ))))
-                                    }),
-                                };
-                                app.ui_window_request(request);
-                            }),
-                        ))))
+                        Box::new(Container::new(
+                            Column::new()
+                                .push(Expanded::new(
+                                    Container::new(Row::new())
+                                        .with_color(&Color4f::new(0.75, 0.75, 0.75, 1.0)),
+                                ))
+                                .push(
+                                    Expanded::new(
+                                        Row::new()
+                                            .with_spacing(5f32)
+                                            .push(Expanded::new(
+                                                Container::new(Row::new()).with_color(
+                                                    &Color4f::new(0.75, 0.75, 0.75, 1.0),
+                                                ),
+                                            ))
+                                            .push(
+                                                Expanded::new(
+                                                    Container::new(Row::new()).with_color(
+                                                        &Color4f::new(0.75, 0.75, 0.75, 1.0),
+                                                    ),
+                                                )
+                                                .with_flex(4.0),
+                                            )
+                                            .push(Expanded::new(
+                                                Container::new(Row::new()).with_color(
+                                                    &Color4f::new(0.75, 0.75, 0.75, 1.0),
+                                                ),
+                                            )),
+                                    )
+                                    .with_flex(2.0),
+                                )
+                                .push(Expanded::new(
+                                    Container::new(Row::new())
+                                        .with_color(&Color4f::new(0.75, 0.75, 0.75, 1.0)),
+                                ))
+                                .with_spacing(5f32),
+                        ))
                     }),
                 };
                 app.ui_window_request(request);
@@ -141,25 +158,5 @@ impl ApplicationModel for State {
 
     fn handle_message(&mut self, msg: Self::MessageType) {
         println!("Message handled: {}", msg)
-    }
-}
-
-pub struct UIBuilder {}
-
-impl ui::user_interface::UIBuilder<State> for UIBuilder {
-    fn build(&self, _section: &str, _state: &State) -> Box<dyn Widget<State>> {
-        Box::new(
-            Container::new(
-                Column::new()
-                    .push(Expanded::new(
-                        Container::new(Row::new()).with_color(&Color4f::new(0.1, 0.1, 0.1, 1.0)),
-                    ))
-                    .push(Expanded::new(
-                        Container::new(Row::new()).with_color(&Color4f::new(0.1, 0.1, 0.1, 1.0)),
-                    ))
-                    .with_spacing(5f32),
-            )
-            .with_margin(3f32),
-        )
     }
 }

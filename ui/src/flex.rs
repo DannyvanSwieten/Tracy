@@ -301,6 +301,11 @@ impl<Model: ApplicationModel> Expanded<Model> {
         }
     }
 
+    pub fn with_flex(mut self, flex: f32) -> Self {
+        self.flex = flex;
+        self
+    }
+
     pub fn with_width(mut self, w: f32) -> Self {
         self.width = Some(w);
         self

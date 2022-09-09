@@ -14,7 +14,7 @@ use vk_utils::renderpass::RenderPass;
 use vk_utils::swapchain::Swapchain;
 use vk_utils::wait_handle::WaitHandle;
 
-use super::user_interface::{UIBuilder, UserInterface};
+use super::user_interface::UserInterface;
 use super::window_event::MouseEvent;
 
 use std::rc::Rc;
