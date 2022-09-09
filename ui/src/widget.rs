@@ -259,16 +259,22 @@ impl<Model: ApplicationModel> Widget<Model> for Container<Model> {
         // If the container is given constraints we'll shrink them by padding/margin and ask the child to layout with those constraints
 
         let space_around = self.padding + self.margin + self.border;
-        let child_size = if constraints.max_width().is_none() || constraints.max_height().is_none(){
-            if self.width.is_none() || self.height.is_none(){
+        let child_size = if constraints.max_width().is_none() || constraints.max_height().is_none()
+        {
+            if self.width.is_none() || self.height.is_none() {
                 self.child.layout(&BoxConstraints::new(), model)
             } else {
                 let mut child_constraints = BoxConstraints::new();
-                if self.width.is_some() {child_constraints = child_constraints.with_max_width(self.width.unwrap_or(0f32))}
-                if self.height.is_some(){ child_constraints = child_constraints.with_max_height(self.height.unwrap_or(0f32))}
-                self.child.layout(&child_constraints.shrunk(space_around, space_around), model)
+                if self.width.is_some() {
+                    child_constraints = child_constraints.with_max_width(self.width.unwrap_or(0f32))
+                }
+                if self.height.is_some() {
+                    child_constraints =
+                        child_constraints.with_max_height(self.height.unwrap_or(0f32))
+                }
+                self.child
+                    .layout(&child_constraints.shrunk(space_around, space_around), model)
             }
-            
         } else {
             let child_constraints = constraints.shrunk(space_around * 2f32, space_around * 2f32);
             self.child.layout(&child_constraints, model)
@@ -419,7 +425,10 @@ impl<Model: ApplicationModel> SizedBox<Model> {
 }
 
 impl<Model: ApplicationModel> Widget<Model> for SizedBox<Model> {
-    fn layout(&mut self, _: &BoxConstraints, _: &Model) -> Size {
+    fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
+        let child_constraints =
+            BoxConstraints::new().with_tight_constraints(self.size.width, self.size.height);
+        self.child.layout(&child_constraints, model);
         self.child.set_size(&self.size);
         self.size
     }
@@ -438,24 +447,24 @@ impl<Model: ApplicationModel> Widget<Model> for SizedBox<Model> {
         self.child.mouse_down(event, properties, app, model)
     }
 
-    fn mouse_up(&mut self, event: &MouseEvent, _: &mut Application<Model>, model: &mut Model) {
-        todo!()
+    fn mouse_up(&mut self, event: &MouseEvent, app: &mut Application<Model>, model: &mut Model) {
+        self.child.mouse_up(event, app, model)
     }
 
     fn mouse_dragged(&mut self, event: &MouseEvent, properties: &Properties, model: &mut Model) {
-        todo!()
+        self.child.mouse_dragged(event, properties, model)
     }
 
     fn mouse_moved(&mut self, event: &MouseEvent, model: &mut Model) {
-        todo!()
+        self.child.mouse_moved(event, model)
     }
 
     fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {
-        todo!()
+        self.child.mouse_entered(event, model)
     }
 
     fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {
-        todo!()
+        self.child.mouse_left(event, model)
     }
 }
 

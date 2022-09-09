@@ -23,7 +23,7 @@ use ui::{
     application_model::ApplicationModel,
     button::{ButtonStyle, TextButton},
     flex::{Column, Expanded, Row},
-    slider::Slider,
+    slider::{Slider, Switch},
     ui_application_delegate::UIApplicationDelegate,
     widget::{Center, Container, List, SizedBox, Widget},
     Color4f, Size,
@@ -117,9 +117,14 @@ fn main() {
                                         Row::new()
                                             .with_spacing(5f32)
                                             .push(Expanded::new(
-                                                Container::new(Row::new()).with_color(
-                                                    &Color4f::new(0.75, 0.75, 0.75, 1.0),
-                                                ),
+                                                Container::new(SizedBox::new(
+                                                    Size {
+                                                        width: 50f32,
+                                                        height: 50f32,
+                                                    },
+                                                    Switch::new(),
+                                                ))
+                                                .with_color(&Color4f::new(0.75, 0.75, 0.75, 1.0)),
                                             ))
                                             .push(
                                                 Expanded::new(

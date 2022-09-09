@@ -95,8 +95,6 @@ pub struct GpuResourceCache {
     pub textures: HashMap<usize, Arc<renderer::resource::Resource<GpuTexture>>>,
     pub samplers: HashMap<usize, Arc<renderer::resource::Resource<ash::vk::Sampler>>>,
     pub materials: HashMap<usize, Arc<renderer::resource::Resource<renderer::material::Material>>>,
-
-    default_material_id: usize,
 }
 
 impl GpuResourceCache {
