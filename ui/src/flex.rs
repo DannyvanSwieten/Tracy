@@ -327,14 +327,12 @@ impl<Model: ApplicationModel> Widget<Model> for Expanded<Model> {
         );
 
         let child_size = self.child.layout(
-            &BoxConstraints::new()
-                .with_max_width(size.width)
-                .with_max_height(size.height),
+            &BoxConstraints::new().with_tight_constraints(size.width, size.height),
             model,
         );
 
         self.child.set_size(&child_size);
-        child_size
+        size
     }
 
     fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {

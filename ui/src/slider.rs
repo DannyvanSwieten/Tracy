@@ -242,16 +242,18 @@ impl<Model: ApplicationModel + 'static> Switch<Model> {
 
 impl<Model: ApplicationModel> Widget<Model> for Switch<Model> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
-        // Boldly unwrapping here. If you have not given constraints to a slider then we don't know how big it should be.
+        // Boldly unwrapping here. If you have not given constraints to a switch then we don't know how big it should be.
         let my_size = Size::new(
             constraints.max_height().unwrap() * 2.0,
             constraints.max_height().unwrap(),
         );
 
-        let thumb_size = self.thumb.layout(constraints, model);
+        let thumb_constraints = BoxConstraints::new()
+            .with_tight_constraints(my_size.width / 4f32, my_size.width / 4f32);
+        let thumb_size = self.thumb.layout(&thumb_constraints, model);
         self.thumb.set_size(&thumb_size);
         let thumb_pos = if self.active {
-            Point::new(my_size.width / 2.0, my_size.height / 2.0)
+            Point::new(my_size.width - thumb_size.width, my_size.height / 2.0)
         } else {
             Point::new(0f32, my_size.height / 2.0)
         };
@@ -297,7 +299,7 @@ impl<Model: ApplicationModel> Widget<Model> for Switch<Model> {
         self.active = !self.active;
         let mut thumb_pos = *self.thumb.position();
         if self.active {
-            thumb_pos.x = properties.size.width / 2.0
+            thumb_pos.x = properties.size.width - self.thumb.size().width
         } else {
             thumb_pos.x = 0f32
         }

@@ -117,13 +117,30 @@ fn main() {
                                         Row::new()
                                             .with_spacing(5f32)
                                             .push(Expanded::new(
-                                                Container::new(SizedBox::new(
-                                                    Size {
-                                                        width: 50f32,
-                                                        height: 50f32,
-                                                    },
-                                                    Switch::new(),
-                                                ))
+                                                Container::new(
+                                                    Column::new()
+                                                        .push(SizedBox::new(
+                                                            Size {
+                                                                width: 50f32,
+                                                                height: 50f32,
+                                                            },
+                                                            Switch::new(),
+                                                        ))
+                                                        .push(SizedBox::new(
+                                                            Size {
+                                                                width: 150f32,
+                                                                height: 50f32,
+                                                            },
+                                                            Slider::new(),
+                                                        ))
+                                                        .push(SizedBox::new(
+                                                            Size {
+                                                                width: 150f32,
+                                                                height: 50f32,
+                                                            },
+                                                            TextButton::new("Button", 20f32),
+                                                        )),
+                                                )
                                                 .with_color(&Color4f::new(0.75, 0.75, 0.75, 1.0)),
                                             ))
                                             .push(

@@ -285,8 +285,8 @@ impl<Model: ApplicationModel> Widget<Model> for Container<Model> {
         self.child.set_size(&child_size);
 
         Size::new(
-            child_size.width + space_around * 2f32,
-            child_size.height + space_around * 2f32,
+            (child_size.width + space_around * 2f32).max(constraints.min_width().unwrap_or(0f32)),
+            (child_size.height + space_around * 2f32).max(constraints.min_height().unwrap_or(0f32)),
         )
     }
 
