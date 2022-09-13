@@ -598,16 +598,14 @@ impl Canvas2D for SkiaGpuCanvas2D {
             .draw_circle(*center, radius, paint);
     }
 
-    fn draw_string(&mut self, text: &str, font: &Font, paint: &Paint) {
+    fn draw_string(&mut self, rect: &Rect, text: &str, font: &Font, paint: &Paint) {
         let blob = skia_safe::TextBlob::from_str(text.to_string(), font);
         if let Some(b) = blob {
-            let rect = b.bounds();
-            self.surfaces[self.current_image_index].canvas().draw_str(
-                text,
-                Point::new(rect.left().abs(), rect.top().abs()),
-                font,
-                paint,
-            );
+            let text_bounds = b.bounds();
+            let p = rect.center() - text_bounds.center();
+            self.surfaces[self.current_image_index]
+                .canvas()
+                .draw_str(text, p, font, paint);
         }
     }
 

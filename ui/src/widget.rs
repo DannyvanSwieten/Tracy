@@ -292,9 +292,7 @@ impl<Model: ApplicationModel> Widget<Model> for Container<Model> {
 
     fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, size: &Size, model: &Model) {
         if let Some(paint) = &self.paint {
-            let margin_rect =
-                Rect::from_point_and_size(Point::new(self.margin, self.margin), *size);
-            canvas.draw_rect(&margin_rect, paint);
+            canvas.draw_rect(&Rect::from_size(*size), paint);
         }
 
         self.child.paint(theme, canvas, self.child.size(), model);

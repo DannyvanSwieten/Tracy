@@ -32,10 +32,12 @@ pub struct TextButton<Model: ApplicationModel> {
 
 impl<Model: ApplicationModel> TextButton<Model> {
     pub fn new(text: &str, font_size: f32) -> Self {
-        let font = Font::new(
-            skia_safe::typeface::Typeface::new("arial", skia_safe::FontStyle::normal()).unwrap(),
+        let mut font = Font::new(
+            skia_safe::typeface::Typeface::new("arial black", skia_safe::FontStyle::normal())
+                .unwrap(),
             font_size,
         );
+        font.set_subpixel(true);
         let mut bg_paint = Paint::default();
         bg_paint.set_anti_alias(true);
         bg_paint.set_color4f(skia_safe::Color4f::new(0.25, 0.25, 0.25, 1.0), None);
@@ -69,12 +71,8 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
     fn layout(&mut self, constraints: &BoxConstraints, _: &Model) -> Size {
         let blob = skia_safe::TextBlob::from_str(&self.text, &self.font);
         let size = blob.unwrap().bounds().size();
-        let width = size
-            .width
-            .min(constraints.max_width().unwrap_or(size.width));
-        let height = size
-            .height
-            .min(constraints.max_height().unwrap_or(size.height));
+        let width = constraints.max_width().unwrap_or(size.width);
+        let height = constraints.max_height().unwrap_or(size.height);
         Size::new(width, height)
     }
 
@@ -94,7 +92,7 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
                     &bg_paint,
                 );
                 text_paint.set_color(theme.text);
-                canvas.draw_string(&self.text, &self.font, &text_paint);
+                canvas.draw_string(&Rect::from_size(*size), &self.text, &self.font, &text_paint);
             }
             ButtonStyle::Outline => {
                 let mut bg_paint = Paint::default();
@@ -108,11 +106,11 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
                     &bg_paint,
                 );
                 text_paint.set_color(theme.primary);
-                canvas.draw_string(&self.text, &self.font, &text_paint);
+                canvas.draw_string(&Rect::from_size(*size), &self.text, &self.font, &text_paint);
             }
             ButtonStyle::Text => {
                 text_paint.set_color(theme.primary);
-                canvas.draw_string(&self.text, &self.font, &text_paint);
+                canvas.draw_string(&Rect::from_size(*size), &self.text, &self.font, &text_paint);
             }
         }
     }

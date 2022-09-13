@@ -178,6 +178,7 @@ impl<Model: ApplicationModel> Widget<Model> for Column<Model> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
         // It needs constraints
         assert!(constraints.max_width().is_some() && constraints.max_height().is_some());
+        let total_spacing = (self.children.len() as f32 - 1.0) * self.spacing;
         // Start with no constraints
         let child_constraints = BoxConstraints::new();
         let constrained_sizes: Vec<Size> = self
@@ -210,7 +211,7 @@ impl<Model: ApplicationModel> Widget<Model> for Column<Model> {
 
         if total_flex > 0f32 {
             let height = constraints.max_height().unwrap();
-            let unconstraint_height = height - constrained_size.height;
+            let unconstraint_height = height - total_spacing - constrained_size.height;
             let flex_factor = unconstraint_height / total_flex;
             for child in &mut self.children {
                 if child.flex() != 0f32 {
