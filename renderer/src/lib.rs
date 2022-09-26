@@ -7,6 +7,5 @@ pub mod descriptor_sets;
 pub mod gpu_scene;
 pub mod instance;
 pub mod material;
-pub mod rasterizer;
 pub mod resource;
 pub mod shape;

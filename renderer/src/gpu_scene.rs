@@ -49,7 +49,7 @@ impl Mesh {
                 | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
         );
 
-        index_buffer.copy_to(&indices);
+        index_buffer.upload(&indices);
 
         let mut vertex_buffer = BufferResource::new(
             device.clone(),
@@ -60,7 +60,7 @@ impl Mesh {
                 | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
         );
 
-        vertex_buffer.copy_to(&positions);
+        vertex_buffer.upload(&positions);
 
         let mut normal_buffer = BufferResource::new(
             device.clone(),
@@ -71,7 +71,7 @@ impl Mesh {
                 | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
         );
 
-        normal_buffer.copy_to(&normals);
+        normal_buffer.upload(&normals);
 
         let mut tangent_buffer = BufferResource::new(
             device.clone(),
@@ -82,7 +82,7 @@ impl Mesh {
                 | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
         );
 
-        tangent_buffer.copy_to(&tangents);
+        tangent_buffer.upload(&tangents);
 
         let mut tex_coord_buffer = BufferResource::new(
             device.clone(),
@@ -93,7 +93,7 @@ impl Mesh {
                 | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
         );
 
-        tex_coord_buffer.copy_to(&tex_coords);
+        tex_coord_buffer.upload(&tex_coords);
 
         let blas = BottomLevelAccelerationStructure::new(
             device.clone(),

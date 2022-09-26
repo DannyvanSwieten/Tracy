@@ -231,7 +231,7 @@ impl TopLevelAccelerationStructure {
                 | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
         );
 
-        _instance_buffer.copy_to(instances);
+        _instance_buffer.upload(instances);
 
         let data = AccelerationStructureGeometryDataKHR {
             instances: AccelerationStructureGeometryInstancesDataKHR::builder()

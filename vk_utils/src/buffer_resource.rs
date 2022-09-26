@@ -17,7 +17,7 @@ pub struct BufferResource {
 }
 
 impl BufferResource {
-    pub fn copy_to<T>(&mut self, data: &[T]) {
+    pub fn upload<T>(&mut self, data: &[T]) {
         unsafe {
             let ptr = self
                 .device

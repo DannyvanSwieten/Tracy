@@ -77,7 +77,7 @@ impl GpuResource for TextureImageData {
             ash::vk::BufferUsageFlags::TRANSFER_SRC,
         );
 
-        buffer.copy_to(&self.pixels);
+        buffer.upload(&self.pixels);
 
         let mut command_buffer = CommandBuffer::new(device.clone(), queue.clone());
         command_buffer.begin();

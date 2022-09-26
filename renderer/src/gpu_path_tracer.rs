@@ -301,7 +301,7 @@ impl Renderer {
             BufferUsageFlags::STORAGE_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
         );
 
-        material_buffer.copy_to(&materials);
+        material_buffer.upload(&materials);
 
         let mut mesh_address_buffer = BufferResource::new(
             self.device.clone(),
@@ -310,7 +310,7 @@ impl Renderer {
             BufferUsageFlags::STORAGE_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
         );
 
-        mesh_address_buffer.copy_to(&mesh_addresses);
+        mesh_address_buffer.upload(&mesh_addresses);
 
         let mut material_address_buffer = BufferResource::new(
             self.device.clone(),
@@ -319,7 +319,7 @@ impl Renderer {
             BufferUsageFlags::UNIFORM_BUFFER,
         );
 
-        material_address_buffer.copy_to(&[material_buffer.device_address()]);
+        material_address_buffer.upload(&[material_buffer.device_address()]);
 
         let acceleration_structure = TopLevelAccelerationStructure::new(
             self.device.clone(),
@@ -462,7 +462,7 @@ impl Renderer {
             MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::UNIFORM_BUFFER,
         );
-        camera_buffer.copy_to(&[cam_data]);
+        camera_buffer.upload(&[cam_data]);
         camera_buffer
     }
 
