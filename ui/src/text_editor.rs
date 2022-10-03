@@ -2,7 +2,7 @@ use skia_safe::{
     font::Edging,
     shaper::{BiDiRunIterator, TextBlobBuilderRunHandler},
     textlayout::{FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle, TextStyle},
-    Font, FontMgr, FourByteTag, Paint, Point, Rect, Shaper, Size, TextBlobBuilder,
+    Color, Color4f, Font, FontMgr, FourByteTag, Paint, Point, Rect, Shaper, Size, TextBlobBuilder,
 };
 use winit::event::{ElementState, VirtualKeyCode};
 
@@ -56,11 +56,13 @@ impl<Model: ApplicationModel> Widget<Model> for TextBox {
         let paragraph_style = ParagraphStyle::new();
         let mut paragraph_builder = ParagraphBuilder::new(&paragraph_style, font_collection);
         let mut ts = TextStyle::new();
-        ts.set_foreground_color(Paint::default());
-        paragraph_builder.push_style(&ts);
         if self.state.text.len() > 0 {
+            ts.set_foreground_color(Paint::default());
+            paragraph_builder.push_style(&ts);
             paragraph_builder.add_text(&self.state.text);
         } else {
+            ts.set_foreground_color(Paint::new(Color4f::new(0.0, 0.0, 0.0, 0.5), None));
+            paragraph_builder.push_style(&ts);
             paragraph_builder.add_text(&self.placeholder);
         }
 
@@ -68,7 +70,10 @@ impl<Model: ApplicationModel> Widget<Model> for TextBox {
         paragraph.layout(rect.width);
 
         let mut border_paint = Paint::default();
+        border_paint.set_color(Color::from_rgb(255, 255, 255));
+        canvas.draw_rect(&Rect::from_size(*rect), &border_paint);
         border_paint.set_stroke(true);
+        border_paint.set_color(Color::from_rgb(0, 0, 0));
         canvas.draw_rect(&Rect::from_size(*rect), &border_paint);
         canvas.draw_paragraph(&Point::new(0f32, 0f32), &paragraph)
     }
