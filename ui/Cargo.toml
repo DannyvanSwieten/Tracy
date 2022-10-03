@@ -8,6 +8,6 @@ edition = "2018"
 [dependencies]
 vk_utils = {path = "../vk_utils"}
 ash = "*"
-ash-window = "*"
+ash-window = "0.11.0"
 winit = "*"
-skia-safe = { version = "*", features = ["vulkan", "gpu"] }
+skia-safe = { version = "*", features = ["vulkan", "gpu", "textlayout"] }

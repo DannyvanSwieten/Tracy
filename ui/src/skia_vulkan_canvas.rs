@@ -708,4 +708,10 @@ impl Canvas2D for SkiaGpuCanvas2D {
             view,
         )
     }
+
+    fn draw_text_blob(&mut self, pos: &Point, blob: &skia_safe::TextBlob, paint: &Paint) {
+        self.surfaces[self.current_image_index]
+            .canvas()
+            .draw_text_blob(blob, *pos, paint);
+    }
 }

@@ -25,7 +25,7 @@ use ui::{
     flex::{Column, Expanded, Row},
     slider::{Slider, Switch},
     ui_application_delegate::UIApplicationDelegate,
-    widget::{Center, Container, List, SizedBox, Widget},
+    widget::{Center, Container, SizedBox, Widget},
     Color4f, Size,
 };
 use vk_utils::vulkan::Vulkan;

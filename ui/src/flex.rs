@@ -145,6 +145,16 @@ impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
             child.mouse_left(event, model)
         }
     }
+
+    fn flex(&self) -> f32 {
+        0f32
+    }
+
+    fn keyboard_event(&mut self, event: &winit::event::KeyboardInput, model: &mut Model) {
+        for child in &mut self.children {
+            child.keyboard_event(event, model)
+        }
+    }
 }
 
 pub struct Column<Model> {
@@ -283,6 +293,16 @@ impl<Model: ApplicationModel> Widget<Model> for Column<Model> {
             child.mouse_left(event, model)
         }
     }
+
+    fn flex(&self) -> f32 {
+        0f32
+    }
+
+    fn keyboard_event(&mut self, event: &winit::event::KeyboardInput, model: &mut Model) {
+        for child in &mut self.children {
+            child.keyboard_event(event, model)
+        }
+    }
 }
 
 pub struct Expanded<Model> {
@@ -366,7 +386,11 @@ impl<Model: ApplicationModel> Widget<Model> for Expanded<Model> {
         self.child.mouse_moved(event, model)
     }
 
-    fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model) {}
+    fn mouse_entered(&mut self, _event: &MouseEvent, _model: &mut Model) {}
 
-    fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model) {}
+    fn mouse_left(&mut self, _event: &MouseEvent, _model: &mut Model) {}
+
+    fn keyboard_event(&mut self, event: &winit::event::KeyboardInput, model: &mut Model) {
+        self.child.keyboard_event(event, model)
+    }
 }

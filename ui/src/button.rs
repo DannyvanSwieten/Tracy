@@ -1,4 +1,4 @@
-use skia_safe::{Font, Paint, Rect, Size};
+use skia_safe::{font::Edging, Font, Paint, Rect, Size};
 
 use crate::{
     application::Application,
@@ -37,6 +37,7 @@ impl<Model: ApplicationModel> TextButton<Model> {
                 .unwrap(),
             font_size,
         );
+        font.set_edging(Edging::SubpixelAntiAlias);
         font.set_subpixel(true);
         let mut bg_paint = Paint::default();
         bg_paint.set_anti_alias(true);
@@ -84,7 +85,11 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
             ButtonStyle::Fill => {
                 let mut bg_paint = Paint::default();
                 bg_paint.set_anti_alias(true);
-                bg_paint.set_color(theme.primary);
+                match self.state {
+                    ButtonState::Inactive => bg_paint.set_color(theme.primary.with_a(200)),
+                    ButtonState::Active => bg_paint.set_color(theme.primary),
+                    ButtonState::Hover => bg_paint.set_color(theme.primary.with_a(230)),
+                };
                 canvas.draw_rounded_rect(
                     &Rect::from_wh(size.width, size.height),
                     4f32,
@@ -97,6 +102,7 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
             ButtonStyle::Outline => {
                 let mut bg_paint = Paint::default();
                 bg_paint.set_anti_alias(true);
+
                 bg_paint.set_color(theme.primary);
                 bg_paint.set_stroke(true);
                 canvas.draw_rounded_rect(
@@ -105,11 +111,64 @@ impl<Model: ApplicationModel> Widget<Model> for TextButton<Model> {
                     4f32,
                     &bg_paint,
                 );
+
+                match self.state {
+                    ButtonState::Inactive => (),
+                    ButtonState::Active => {
+                        bg_paint.set_color(theme.primary.with_a(100));
+                        bg_paint.set_stroke(false);
+                        canvas.draw_rounded_rect(
+                            &Rect::from_wh(size.width, size.height),
+                            4f32,
+                            4f32,
+                            &bg_paint,
+                        );
+                    }
+                    ButtonState::Hover => {
+                        bg_paint.set_color(theme.primary.with_a(50));
+                        bg_paint.set_stroke(false);
+                        canvas.draw_rounded_rect(
+                            &Rect::from_wh(size.width, size.height),
+                            4f32,
+                            4f32,
+                            &bg_paint,
+                        );
+                    }
+                }
+
                 text_paint.set_color(theme.primary);
+
                 canvas.draw_string(&Rect::from_size(*size), &self.text, &self.font, &text_paint);
             }
             ButtonStyle::Text => {
                 text_paint.set_color(theme.primary);
+
+                let mut bg_paint = Paint::default();
+                bg_paint.set_anti_alias(true);
+                match self.state {
+                    ButtonState::Inactive => (),
+                    ButtonState::Active => {
+                        bg_paint.set_color(theme.primary.with_a(100));
+                        bg_paint.set_stroke(false);
+                        canvas.draw_rounded_rect(
+                            &Rect::from_wh(size.width, size.height),
+                            4f32,
+                            4f32,
+                            &bg_paint,
+                        );
+                    }
+                    ButtonState::Hover => {
+                        bg_paint.set_color(theme.primary.with_a(50));
+                        bg_paint.set_stroke(false);
+                        canvas.draw_rounded_rect(
+                            &Rect::from_wh(size.width, size.height),
+                            4f32,
+                            4f32,
+                            &bg_paint,
+                        );
+                    }
+                }
+
                 canvas.draw_string(&Rect::from_size(*size), &self.text, &self.font, &text_paint);
             }
         }

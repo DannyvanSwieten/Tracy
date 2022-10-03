@@ -33,7 +33,7 @@ use ash::vk::{
 };
 // Core objects
 use ash::vk::{
-    BufferUsageFlags, DescriptorBufferInfo, DescriptorImageInfo, DescriptorType, Format, Image,
+    BufferUsageFlags, DescriptorBufferInfo, DescriptorImageInfo, DescriptorType, Format,
     ImageAspectFlags, ImageLayout, ImageSubresourceRange, ImageUsageFlags, ImageView,
     ImageViewCreateInfo, ImageViewType, MemoryPropertyFlags, Pipeline, PipelineBindPoint,
     PipelineCache, PipelineShaderStageCreateInfo, ShaderModuleCreateInfo, ShaderStageFlags,

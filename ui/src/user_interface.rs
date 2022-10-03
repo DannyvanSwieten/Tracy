@@ -5,8 +5,19 @@ use crate::constraints::BoxConstraints;
 use crate::style::StyleContext;
 use crate::widget::*;
 use crate::window_event::MouseEvent;
-use skia_safe::Point;
-#[repr(C)]
+use skia_safe::{Point, Size};
+use winit::{event::KeyboardInput, window::WindowId};
+
+pub struct WindowContext {
+    origin: Point,
+    size: Size,
+    id: WindowId,
+}
+
+pub struct DragContext<Model> {
+    dragged_widgets: Vec<Box<dyn Widget<Model>>>,
+}
+
 pub struct UserInterface<Model: ApplicationModel> {
     pub root: ChildSlot<Model>,
     pub style_ctx: StyleContext,
@@ -77,6 +88,7 @@ impl<Model: ApplicationModel + 'static> UserInterface<Model> {
     }
 
     pub fn mouse_leave(&mut self, state: &mut Model, event: &MouseEvent) {}
+    pub fn keyboard_event(&mut self, state: &Model, event: &KeyboardInput) {}
     pub fn layout(&mut self, constraints: &BoxConstraints, state: &Model) {
         let size = self.root.layout(constraints, state);
         self.root.set_size(&size);

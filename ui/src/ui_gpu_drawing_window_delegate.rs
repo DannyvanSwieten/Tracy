@@ -126,7 +126,7 @@ impl<'a, Model: ApplicationModel + 'static> WindowDelegate<Model>
                 ash_window::create_surface(
                     self.device.gpu().vulkan().library(),
                     self.device.gpu().vulkan().vk_instance(),
-                    window,
+                    &window,
                     None,
                 )
                 .expect("Surface creation failed")
@@ -253,4 +253,16 @@ impl<'a, Model: ApplicationModel + 'static> WindowDelegate<Model>
             ui.swapchain.swap(&semaphore, index);
         }
     }
+
+    fn close_button_pressed(&mut self, _state: &mut Model) -> bool {
+        true
+    }
+
+    fn keyboard_event(&mut self, state: &mut Model, event: &winit::event::KeyboardInput) {
+        if let Some(ui) = self.ui.as_mut() {
+            ui.user_interface.keyboard_event(state, event)
+        }
+    }
+
+    fn update(&mut self, _state: &mut Model) {}
 }

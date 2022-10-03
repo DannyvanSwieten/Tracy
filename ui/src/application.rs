@@ -159,6 +159,17 @@ impl<Model: ApplicationModel> WindowRegistry<Model> {
         }
     }
 
+    fn keyboard_event(
+        &mut self,
+        id: &WindowId,
+        event: &winit::event::KeyboardInput,
+        state: &mut Model,
+    ) {
+        if let Some(delegate) = self.window_delegates.get_mut(id) {
+            delegate.keyboard_event(state, event)
+        }
+    }
+
     fn close_button_pressed(&mut self, id: &WindowId, state: &mut Model) {
         if let Some(delegate) = self.window_delegates.get_mut(id) {
             if delegate.close_button_pressed(state) {
@@ -456,9 +467,8 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
                 _ => (),
             }
 
-            match control_flow {
-                ControlFlow::Exit => d.application_will_quit(&mut self, &event_loop),
-                _ => (),
+            if let ControlFlow::Exit = *control_flow {
+                d.application_will_quit(&mut self, &event_loop)
             }
         });
     }
