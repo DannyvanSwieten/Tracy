@@ -714,4 +714,8 @@ impl Canvas2D for SkiaGpuCanvas2D {
             .canvas()
             .draw_text_blob(blob, *pos, paint);
     }
+
+    fn draw_paragraph(&mut self, pos: &Point, paragraph: &skia_safe::textlayout::Paragraph) {
+        paragraph.paint(self.surfaces[self.current_image_index].canvas(), *pos);
+    }
 }

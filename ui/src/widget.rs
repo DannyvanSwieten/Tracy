@@ -57,7 +57,12 @@ pub trait Widget<Model: ApplicationModel> {
     fn mouse_entered(&mut self, event: &MouseEvent, model: &mut Model);
     fn mouse_left(&mut self, event: &MouseEvent, model: &mut Model);
 
-    fn keyboard_event(&mut self, event: &KeyboardInput, model: &mut Model) {}
+    fn keyboard_event(&mut self, event: &KeyboardInput, model: &mut Model) -> bool {
+        false
+    }
+    fn character_received(&mut self, character: char, model: &mut Model) -> bool {
+        false
+    }
 }
 
 pub struct ChildSlot<Model> {
@@ -120,6 +125,10 @@ impl<Model: ApplicationModel> Widget<Model> for ChildSlot<Model> {
         canvas.translate(self.position());
         self.widget.paint(theme, canvas, self.size(), model);
         canvas.restore();
+    }
+
+    fn flex(&self) -> f32 {
+        self.widget.flex()
     }
 
     fn mouse_down(
@@ -194,12 +203,12 @@ impl<Model: ApplicationModel> Widget<Model> for ChildSlot<Model> {
         }
     }
 
-    fn flex(&self) -> f32 {
-        self.widget.flex()
+    fn keyboard_event(&mut self, event: &KeyboardInput, model: &mut Model) -> bool {
+        self.widget.keyboard_event(event, model)
     }
 
-    fn keyboard_event(&mut self, event: &KeyboardInput, model: &mut Model) {
-        self.widget.keyboard_event(event, model)
+    fn character_received(&mut self, character: char, model: &mut Model) -> bool {
+        self.widget.character_received(character, model)
     }
 }
 
@@ -326,8 +335,16 @@ impl<Model: ApplicationModel> Widget<Model> for Container<Model> {
         self.child.mouse_left(event, model)
     }
 
-    fn keyboard_event(&mut self, event: &KeyboardInput, model: &mut Model) {
+    fn keyboard_event(&mut self, event: &KeyboardInput, model: &mut Model) -> bool {
         self.child.keyboard_event(event, model)
+    }
+
+    fn flex(&self) -> f32 {
+        0f32
+    }
+
+    fn character_received(&mut self, character: char, model: &mut Model) -> bool {
+        self.child.character_received(character, model)
     }
 }
 
@@ -409,7 +426,7 @@ impl<Model: ApplicationModel> Widget<Model> for Center<Model> {
         self.child.mouse_left(event, model)
     }
 
-    fn keyboard_event(&mut self, event: &KeyboardInput, model: &mut Model) {
+    fn keyboard_event(&mut self, event: &KeyboardInput, model: &mut Model) -> bool {
         self.child.keyboard_event(event, model)
     }
 }
@@ -471,7 +488,7 @@ impl<Model: ApplicationModel> Widget<Model> for SizedBox<Model> {
         self.child.mouse_left(event, model)
     }
 
-    fn keyboard_event(&mut self, event: &KeyboardInput, model: &mut Model) {
+    fn keyboard_event(&mut self, event: &KeyboardInput, model: &mut Model) -> bool {
         self.child.keyboard_event(event, model)
     }
 }
@@ -524,7 +541,7 @@ impl<Model: ApplicationModel> Widget<Model> for FlexBox<Model> {
         todo!()
     }
 
-    fn keyboard_event(&mut self, event: &KeyboardInput, model: &mut Model) {
+    fn keyboard_event(&mut self, event: &KeyboardInput, model: &mut Model) -> bool {
         self.child.keyboard_event(event, model)
     }
 }

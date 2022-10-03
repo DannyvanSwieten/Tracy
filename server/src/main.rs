@@ -24,6 +24,7 @@ use ui::{
     button::{ButtonStyle, TextButton},
     flex::{Column, Expanded, Row},
     slider::{Slider, Switch},
+    text_editor::TextBox,
     ui_application_delegate::UIApplicationDelegate,
     widget::{Center, Container, SizedBox, Widget},
     Color4f, Size,
@@ -132,7 +133,10 @@ fn main() {
                                                         .push(Expanded::new(
                                                             TextButton::new("Button 3", 20f32)
                                                                 .style(ButtonStyle::Fill),
-                                                        )),
+                                                        ))
+                                                        .push(Expanded::new(TextBox::new(
+                                                            "Placeholder...",
+                                                        ))),
                                                 )
                                                 .with_margin(5f32)
                                                 .with_color(&Color4f::new(0.75, 0.75, 0.75, 1.0)),

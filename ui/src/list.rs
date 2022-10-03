@@ -153,9 +153,13 @@ impl<Model: ApplicationModel> Widget<Model> for List<Model> {
         }
     }
 
-    fn keyboard_event(&mut self, event: &winit::event::KeyboardInput, model: &mut Model) {
+    fn keyboard_event(&mut self, event: &winit::event::KeyboardInput, model: &mut Model) -> bool {
         for child in &mut self.children {
-            child.keyboard_event(event, model)
+            if child.keyboard_event(event, model) {
+                return true;
+            }
         }
+
+        false
     }
 }

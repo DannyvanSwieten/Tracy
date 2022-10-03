@@ -159,6 +159,12 @@ impl<Model: ApplicationModel> WindowRegistry<Model> {
         }
     }
 
+    fn character_received(&mut self, id: &WindowId, character: char, state: &mut Model) {
+        if let Some(delegate) = self.window_delegates.get_mut(id) {
+            delegate.character_received(state, character)
+        }
+    }
+
     fn keyboard_event(
         &mut self,
         id: &WindowId,
@@ -429,6 +435,21 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
 
                     last_mouse_position = position;
                 }
+
+                Event::WindowEvent {
+                    window_id,
+                    event: WindowEvent::ReceivedCharacter(character),
+                } => window_registry.character_received(&window_id, character, &mut s),
+
+                Event::WindowEvent {
+                    window_id,
+                    event:
+                        WindowEvent::KeyboardInput {
+                            device_id,
+                            input,
+                            is_synthetic,
+                        },
+                } => window_registry.keyboard_event(&window_id, &input, &mut s),
 
                 Event::WindowEvent {
                     event:

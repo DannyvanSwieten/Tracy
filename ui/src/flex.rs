@@ -150,10 +150,24 @@ impl<Model: ApplicationModel> Widget<Model> for Row<Model> {
         0f32
     }
 
-    fn keyboard_event(&mut self, event: &winit::event::KeyboardInput, model: &mut Model) {
+    fn keyboard_event(&mut self, event: &winit::event::KeyboardInput, model: &mut Model) -> bool {
         for child in &mut self.children {
-            child.keyboard_event(event, model)
+            if child.keyboard_event(event, model) {
+                return true;
+            }
         }
+
+        false
+    }
+
+    fn character_received(&mut self, character: char, model: &mut Model) -> bool {
+        for child in &mut self.children {
+            if child.character_received(character, model) {
+                return true;
+            }
+        }
+
+        false
     }
 }
 
@@ -298,10 +312,24 @@ impl<Model: ApplicationModel> Widget<Model> for Column<Model> {
         0f32
     }
 
-    fn keyboard_event(&mut self, event: &winit::event::KeyboardInput, model: &mut Model) {
+    fn keyboard_event(&mut self, event: &winit::event::KeyboardInput, model: &mut Model) -> bool {
         for child in &mut self.children {
-            child.keyboard_event(event, model)
+            if child.keyboard_event(event, model) {
+                return true;
+            }
         }
+
+        false
+    }
+
+    fn character_received(&mut self, character: char, model: &mut Model) -> bool {
+        for child in &mut self.children {
+            if child.character_received(character, model) {
+                return true;
+            }
+        }
+
+        false
     }
 }
 
@@ -390,7 +418,11 @@ impl<Model: ApplicationModel> Widget<Model> for Expanded<Model> {
 
     fn mouse_left(&mut self, _event: &MouseEvent, _model: &mut Model) {}
 
-    fn keyboard_event(&mut self, event: &winit::event::KeyboardInput, model: &mut Model) {
+    fn keyboard_event(&mut self, event: &winit::event::KeyboardInput, model: &mut Model) -> bool {
         self.child.keyboard_event(event, model)
+    }
+
+    fn character_received(&mut self, character: char, model: &mut Model) -> bool {
+        self.child.character_received(character, model)
     }
 }

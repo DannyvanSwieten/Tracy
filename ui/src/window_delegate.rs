@@ -21,6 +21,7 @@ pub trait WindowDelegate<Model: ApplicationModel> {
     ) {
     }
     fn keyboard_event(&mut self, _state: &mut Model, _event: &winit::event::KeyboardInput) {}
+    fn character_received(&mut self, _state: &mut Model, _character: char) {}
     fn draw(&mut self, _app: &Application<Model>, _state: &Model) {}
 
     fn update(&mut self, _state: &mut Model) {}

@@ -263,6 +263,11 @@ impl<'a, Model: ApplicationModel + 'static> WindowDelegate<Model>
             ui.user_interface.keyboard_event(state, event)
         }
     }
+    fn character_received(&mut self, state: &mut Model, character: char) {
+        if let Some(ui) = self.ui.as_mut() {
+            ui.user_interface.character_received(state, character)
+        }
+    }
 
     fn update(&mut self, _state: &mut Model) {}
 }

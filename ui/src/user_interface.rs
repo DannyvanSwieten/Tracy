@@ -88,7 +88,12 @@ impl<Model: ApplicationModel + 'static> UserInterface<Model> {
     }
 
     pub fn mouse_leave(&mut self, state: &mut Model, event: &MouseEvent) {}
-    pub fn keyboard_event(&mut self, state: &Model, event: &KeyboardInput) {}
+    pub fn keyboard_event(&mut self, state: &mut Model, event: &KeyboardInput) {
+        self.root.keyboard_event(event, state);
+    }
+    pub fn character_received(&mut self, state: &mut Model, character: char) {
+        self.root.character_received(character, state);
+    }
     pub fn layout(&mut self, constraints: &BoxConstraints, state: &Model) {
         let size = self.root.layout(constraints, state);
         self.root.set_size(&size);
