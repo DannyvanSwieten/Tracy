@@ -4,7 +4,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use renderer::context::RtxContext;
-use renderer::gpu_scene::{GpuTexture, Mesh};
+use renderer::gpu_scene::{GpuTexture};
+use renderer::mesh::Mesh;
 use vk_utils::device_context::DeviceContext;
 use vk_utils::queue::CommandQueue;
 

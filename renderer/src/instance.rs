@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use glm::{vec4, Mat4, Mat4x3, Vec3};
+use glm::{Mat4};
 
 use crate::geometry::GeometryInstance;
+use crate::mesh::Mesh;
 use crate::resource::Resource;
-use crate::{gpu_scene::Mesh, material::Material};
+use crate::{material::Material};
 
 pub struct Instance {
     transform: Mat4,

@@ -6,12 +6,7 @@ use crate::{
     resource::{GpuResource, Resource},
 };
 use glm::{vec2, vec3, vec4};
-#[derive(Clone, Copy)]
-pub struct Camera {
-    pub fov: f32,
-    pub z_near: f32,
-    pub z_far: f32,
-}
+
 #[repr(C)]
 #[derive(Clone)]
 pub struct TextureImageData {

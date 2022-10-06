@@ -7,8 +7,9 @@ use crate::descriptor_sets::{
     MESH_BUFFERS_LOCATION, OUTPUT_IMAGE_LOCATION,
 };
 use crate::geometry::TopLevelAccelerationStructure;
-use crate::gpu_scene::{Frame, MeshAddress, Scene};
+use crate::gpu_scene::{Frame, Scene};
 use crate::material::GpuMaterial;
+use crate::mesh::MeshAddress;
 use ash::extensions::khr::{
     AccelerationStructure, DeferredHostOperations, RayTracingPipeline, Swapchain,
 };

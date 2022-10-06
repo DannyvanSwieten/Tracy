@@ -2,8 +2,7 @@ use std::rc::Rc;
 
 use renderer::{
     context::RtxContext,
-    geometry::{Normal, Position, Tangent, Texcoord},
-    gpu_scene::Mesh,
+    geometry::{Normal, Position, Tangent, Texcoord}, mesh::Mesh,
 };
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 

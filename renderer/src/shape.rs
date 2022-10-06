@@ -1,7 +1,7 @@
 use glm::{Mat4, Vec3};
 
 use crate::{
-    geometry::Position, gpu_scene::Mesh, instance::Instance, material::Material, resource::Resource,
+     instance::Instance, material::Material, resource::Resource, mesh::Mesh,
 };
 use std::sync::Arc;
 

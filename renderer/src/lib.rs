@@ -9,3 +9,6 @@ pub mod instance;
 pub mod material;
 pub mod resource;
 pub mod shape;
+pub mod camera;
+pub mod mesh;
+pub mod ctx;
