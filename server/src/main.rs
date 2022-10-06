@@ -135,7 +135,7 @@ fn main() {
                                                                 .style(ButtonStyle::Fill),
                                                         ))
                                                         .push(Expanded::new(TextBox::new(
-                                                            "Placeholder...",
+                                                            "Text editor...",
                                                         ))),
                                                 )
                                                 .with_margin(5f32)

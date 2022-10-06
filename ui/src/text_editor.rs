@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use skia_safe::{
     font::Edging,
     shaper::{BiDiRunIterator, TextBlobBuilderRunHandler},
@@ -11,6 +13,7 @@ use crate::{application_model::ApplicationModel, widget::Widget};
 struct EditorState {
     text: String,
     caret_position: usize,
+    selection: Range<usize>,
 }
 
 pub struct TextBox {
@@ -33,15 +36,15 @@ impl<Model: ApplicationModel> Widget<Model> for TextBox {
     fn layout(&mut self, constraints: &crate::constraints::BoxConstraints, model: &Model) -> Size {
         let mut font_collection = FontCollection::new();
         font_collection.set_default_font_manager(FontMgr::new(), None);
-        let paragraph_style = ParagraphStyle::new();
-        let mut paragraph_builder = ParagraphBuilder::new(&paragraph_style, font_collection);
+        let mut paragraph_builder = ParagraphBuilder::new(&self.style, font_collection);
         let mut ts = TextStyle::new();
+        ts.set_font_size(18f32);
         ts.set_foreground_color(Paint::default());
         paragraph_builder.push_style(&ts);
         paragraph_builder.add_text(&self.placeholder);
         let mut paragraph = paragraph_builder.build();
-        paragraph.layout(constraints.max_width().unwrap());
-        Size::new(paragraph.max_width(), paragraph.height())
+        paragraph.layout(constraints.max_width().unwrap() - 4f32);
+        Size::new(constraints.max_width().unwrap(), paragraph.height())
     }
 
     fn paint(
@@ -53,9 +56,9 @@ impl<Model: ApplicationModel> Widget<Model> for TextBox {
     ) {
         let mut font_collection = FontCollection::new();
         font_collection.set_default_font_manager(FontMgr::new(), None);
-        let paragraph_style = ParagraphStyle::new();
-        let mut paragraph_builder = ParagraphBuilder::new(&paragraph_style, font_collection);
+        let mut paragraph_builder = ParagraphBuilder::new(&self.style, font_collection);
         let mut ts = TextStyle::new();
+        ts.set_font_size(18f32);
         if self.state.text.len() > 0 {
             ts.set_foreground_color(Paint::default());
             paragraph_builder.push_style(&ts);
@@ -67,15 +70,29 @@ impl<Model: ApplicationModel> Widget<Model> for TextBox {
         }
 
         let mut paragraph = paragraph_builder.build();
-        paragraph.layout(rect.width);
+        paragraph.layout(rect.width - 4f32);
+        let selection_boxes = paragraph.get_rects_for_range(
+            self.state.selection.clone(),
+            skia_safe::textlayout::RectHeightStyle::IncludeLineSpacingBottom,
+            skia_safe::textlayout::RectWidthStyle::Tight,
+        );
+
+        let mut selected_rect = Rect::default();
+        for textbox in &selection_boxes {
+            selected_rect.join(textbox.rect)
+        }
 
         let mut border_paint = Paint::default();
         border_paint.set_color(Color::from_rgb(255, 255, 255));
         canvas.draw_rect(&Rect::from_size(*rect), &border_paint);
+        if selected_rect.width() > 0f32 {
+            border_paint.set_color(Color::from_rgb(0, 0, 255));
+            canvas.draw_rect(&selected_rect, &border_paint);
+        }
         border_paint.set_stroke(true);
         border_paint.set_color(Color::from_rgb(0, 0, 0));
         canvas.draw_rect(&Rect::from_size(*rect), &border_paint);
-        canvas.draw_paragraph(&Point::new(0f32, 0f32), &paragraph)
+        canvas.draw_paragraph(&Point::new(2f32, 0f32), &paragraph)
     }
 
     fn mouse_up(
@@ -92,7 +109,6 @@ impl<Model: ApplicationModel> Widget<Model> for TextBox {
         properties: &crate::widget::Properties,
         model: &mut Model,
     ) {
-        todo!()
     }
 
     fn mouse_moved(&mut self, event: &crate::window_event::MouseEvent, model: &mut Model) {}
