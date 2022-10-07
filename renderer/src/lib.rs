@@ -14,6 +14,6 @@ pub mod material;
 pub mod material_resource;
 pub mod mesh;
 pub mod mesh_resource;
-pub mod resources;
+pub mod cpu_resource_cache;
 pub mod shape;
 pub mod uid_object;

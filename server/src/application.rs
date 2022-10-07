@@ -6,7 +6,7 @@ use futures::lock::Mutex;
 use renderer::gpu_path_tracer::Renderer;
 use renderer::gpu_resource_cache::GpuResourceCache;
 use renderer::gpu_scene::{Frame, Scene};
-use renderer::resources::Resources;
+use renderer::cpu_resource_cache::Resources;
 use std::rc::Rc;
 use std::sync::Arc;
 use vk_utils::device_context::DeviceContext;

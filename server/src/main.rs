@@ -13,7 +13,7 @@ use ash::extensions::{ext::DebugUtils, khr::Surface};
 use load_scene::load_scene_gltf;
 use nalgebra_glm::{vec3, Mat4};
 use renderer::{
-    gpu_path_tracer::Renderer, gpu_resource_cache::GpuResourceCache, resources::Resources,
+    gpu_path_tracer::Renderer, gpu_resource_cache::GpuResourceCache, cpu_resource_cache::Resources,
 };
 use ui::{
     application::{Application, WindowRequest},

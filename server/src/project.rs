@@ -1,7 +1,7 @@
 use std::{env::temp_dir, fs::File, io::BufReader, path::Path};
 
 use directories::UserDirs;
-use renderer::{image_resource::TextureImageData, resources::Resources};
+use renderer::{image_resource::TextureImageData, cpu_resource_cache::Resources};
 
 use crate::scene_graph::SceneGraph;
 

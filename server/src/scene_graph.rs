@@ -5,7 +5,7 @@ use nalgebra_glm::{vec3, Mat4x4};
 use renderer::{
     rtx_extensions::RtxExtensions, gpu_resource::CpuResource, gpu_resource_cache::GpuResourceCache,
     gpu_scene::Scene, material_resource::Material, mesh_resource::MeshResource,
-    resources::Resources, shape::Shape,
+    cpu_resource_cache::Resources, shape::Shape,
 };
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use nalgebra_glm::{vec2, vec3, vec4, Mat4};
 use renderer::{
     geometry::Position, gpu_resource::CpuResource, image_resource::TextureImageData,
-    material_resource::Material, mesh_resource::MeshResource, resources::Resources,
+    material_resource::Material, mesh_resource::MeshResource, cpu_resource_cache::Resources,
 };
 
 use crate::scene_graph::SceneGraph;
