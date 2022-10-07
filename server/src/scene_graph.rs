@@ -1,15 +1,12 @@
 use std::{rc::Rc, sync::Arc};
 
-use crate::{
-    material_resource::Material,
-    mesh_resource::MeshResource,
-    resource::Resource,
-    resources::{GpuResourceCache, Resources},
-};
-
 use super::instancer::Instancer;
 use nalgebra_glm::{vec3, Mat4x4};
-use renderer::{context::RtxContext, gpu_scene::Scene, shape::Shape};
+use renderer::{
+    context::RtxExtensions, gpu_resource::CpuResource, gpu_resource_cache::GpuResourceCache,
+    gpu_scene::Scene, material_resource::Material, mesh_resource::MeshResource,
+    resources::Resources, shape::Shape,
+};
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
 pub struct DefaultInstancer {}
@@ -24,8 +21,8 @@ pub struct Entity {
     name: String,
     local_transform: Mat4x4,
     global_transform: Mat4x4,
-    mesh: Option<Arc<Resource<MeshResource>>>,
-    material: Option<Arc<Resource<Material>>>,
+    mesh: Option<Arc<CpuResource<MeshResource>>>,
+    material: Option<Arc<CpuResource<Material>>>,
     children: Vec<usize>,
 }
 
@@ -77,11 +74,11 @@ impl Entity {
         self
     }
 
-    pub fn with_mesh(&mut self, mesh: Arc<Resource<MeshResource>>) -> &mut Self {
+    pub fn with_mesh(&mut self, mesh: Arc<CpuResource<MeshResource>>) -> &mut Self {
         self.mesh = Some(mesh);
         self
     }
-    pub fn with_material(&mut self, material: Arc<Resource<Material>>) -> &mut Self {
+    pub fn with_material(&mut self, material: Arc<CpuResource<Material>>) -> &mut Self {
         self.material = Some(material);
         self
     }
@@ -100,7 +97,7 @@ impl Entity {
         &self.name
     }
 
-    pub fn mesh(&self) -> &Option<Arc<Resource<MeshResource>>> {
+    pub fn mesh(&self) -> &Option<Arc<CpuResource<MeshResource>>> {
         &self.mesh
     }
 
@@ -215,7 +212,7 @@ impl SceneGraph {
         cpu_cache: &Resources,
         parent_transform: Mat4x4,
         device: Rc<DeviceContext>,
-        rtx: &RtxContext,
+        rtx: &RtxExtensions,
         queue: Rc<CommandQueue>,
     ) -> Scene {
         let mut scene = Scene::default();

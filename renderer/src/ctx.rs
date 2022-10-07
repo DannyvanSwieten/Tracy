@@ -4,7 +4,7 @@ use ash::vk::{GeometryInstanceFlagsKHR, QueueFlags};
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
 use crate::{
-    context::RtxContext,
+    context::RtxExtensions,
     geometry::{GeometryInstance, Normal, Position, Tangent, Texcoord},
     material::Material,
     mesh::{Mesh, MeshAddress},
@@ -17,7 +17,7 @@ struct InstanceProperties {
 
 pub struct RenderContext {
     device: Rc<DeviceContext>,
-    rtx: RtxContext,
+    rtx: RtxExtensions,
     queue: Rc<CommandQueue>,
     meshes: Vec<Mesh>,
     mesh_addresses: Vec<MeshAddress>,
@@ -30,7 +30,7 @@ impl RenderContext {
     pub fn new_with_shared_device(device: Rc<DeviceContext>) -> Self {
         Self {
             device: device.clone(),
-            rtx: RtxContext::new(&device),
+            rtx: RtxExtensions::new(&device),
             queue: Rc::new(CommandQueue::new(device, QueueFlags::GRAPHICS)),
             meshes: Vec::new(),
             mesh_addresses: Vec::new(),

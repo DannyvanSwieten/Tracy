@@ -1,13 +1,13 @@
 use std::{rc::Rc, sync::Arc};
 
+use crate::context::RtxExtensions;
 use nalgebra_glm::{vec4, Vec4};
-use renderer::context::RtxContext;
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
 use crate::{
+    gpu_resource::{CpuResource, GpuResource},
+    gpu_resource_cache::GpuResourceCache,
     image_resource::TextureImageData,
-    resource::{GpuResource, Resource},
-    resources::GpuResourceCache,
 };
 
 pub struct MaterialResource {
@@ -24,10 +24,10 @@ pub struct Material {
     pub metallic: f32,
     pub sheen: f32,
     pub clear_coat: f32,
-    pub albedo_map: Option<Arc<Resource<TextureImageData>>>,
-    pub normal_map: Option<Arc<Resource<TextureImageData>>>,
-    pub metallic_roughness_map: Option<Arc<Resource<TextureImageData>>>,
-    pub emission_map: Option<Arc<Resource<TextureImageData>>>,
+    pub albedo_map: Option<Arc<CpuResource<TextureImageData>>>,
+    pub normal_map: Option<Arc<CpuResource<TextureImageData>>>,
+    pub metallic_roughness_map: Option<Arc<CpuResource<TextureImageData>>>,
+    pub emission_map: Option<Arc<CpuResource<TextureImageData>>>,
 }
 
 impl Default for Material {
@@ -57,16 +57,16 @@ impl Material {
 }
 
 impl GpuResource for Material {
-    type Item = renderer::material::Material;
+    type Item = crate::material::Material;
 
     fn prepare(
         &self,
         _: Rc<DeviceContext>,
-        _: &RtxContext,
+        _: &RtxExtensions,
         _: Rc<CommandQueue>,
         cache: &GpuResourceCache,
     ) -> Self::Item {
-        let mut mat = renderer::material::Material::new(
+        let mut mat = crate::material::Material::new(
             self.base_color,
             self.emission,
             self.roughness,

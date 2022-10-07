@@ -1,9 +1,14 @@
 use std::rc::Rc;
 
-use ash::vk::{MemoryPropertyFlags, BufferUsageFlags};
-use vk_utils::{buffer_resource::BufferResource, device_context::DeviceContext, queue::CommandQueue};
+use ash::vk::{BufferUsageFlags, MemoryPropertyFlags};
+use vk_utils::{
+    buffer_resource::BufferResource, device_context::DeviceContext, queue::CommandQueue,
+};
 
-use crate::{geometry::{BottomLevelAccelerationStructure, Position, Normal, Tangent, Texcoord}, context::RtxContext};
+use crate::{
+    context::RtxExtensions,
+    geometry::{BottomLevelAccelerationStructure, Normal, Position, Tangent, Texcoord},
+};
 
 pub struct Mesh {
     pub index_buffer: BufferResource,
@@ -17,7 +22,7 @@ pub struct Mesh {
 impl Mesh {
     pub fn new(
         device: Rc<DeviceContext>,
-        rtx: &RtxContext,
+        rtx: &RtxExtensions,
         queue: Rc<CommandQueue>,
         indices: &[u32],
         positions: &[Position],

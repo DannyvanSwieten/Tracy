@@ -1,11 +1,10 @@
 use std::sync::Arc;
 
 use nalgebra_glm::{vec2, vec3};
-use renderer::geometry::{Normal, Position, Tangent, Texcoord};
-
-use crate::{resource::Resource, resources::Resources};
-
-use super::mesh_resource::MeshResource;
+use renderer::{
+    geometry::{Normal, Position, Tangent, Texcoord},
+    mesh_resource::MeshResource,
+};
 
 pub struct SurfaceBuilder {
     mesh_builder: MeshBuilder,

@@ -1,9 +1,8 @@
 use std::{any::TypeId, ops::Deref, rc::Rc, sync::Arc};
 
-use renderer::context::RtxContext;
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
-use crate::resources::GpuResourceCache;
+use crate::{asset::GpuObject, context::RtxExtensions, gpu_resource_cache::GpuResourceCache};
 
 pub trait GpuResource {
     type Item;
@@ -11,13 +10,13 @@ pub trait GpuResource {
     fn prepare(
         &self,
         device: Rc<DeviceContext>,
-        rtx: &RtxContext,
+        rtx: &RtxExtensions,
         queue: Rc<CommandQueue>,
         cache: &GpuResourceCache,
     ) -> Self::Item;
 }
 
-pub struct Resource<T>
+pub struct CpuResource<T>
 where
     T: GpuResource,
 {
@@ -28,7 +27,7 @@ where
     type_id: TypeId,
 }
 
-impl<T: GpuResource> Deref for Resource<T> {
+impl<T: GpuResource> Deref for CpuResource<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -36,7 +35,7 @@ impl<T: GpuResource> Deref for Resource<T> {
     }
 }
 
-impl<T: GpuResource + 'static> Resource<T> {
+impl<T: GpuResource + 'static> CpuResource<T> {
     pub fn new(uid: usize, origin: &str, name: &str, data: T) -> Self {
         Self {
             uid,
@@ -70,11 +69,11 @@ impl<T: GpuResource + 'static> Resource<T> {
     pub fn prepare(
         &self,
         device: Rc<DeviceContext>,
-        rtx: &RtxContext,
+        rtx: &RtxExtensions,
         queue: Rc<CommandQueue>,
         cache: &GpuResourceCache,
-    ) -> Arc<renderer::resource::Resource<T::Item>> {
-        Arc::new(renderer::resource::Resource::new(
+    ) -> Arc<GpuObject<T::Item>> {
+        Arc::new(GpuObject::new(
             self.uid,
             self.item.prepare(device, rtx, queue, cache),
         ))

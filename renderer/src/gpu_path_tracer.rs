@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::context::RtxContext;
+use crate::context::RtxExtensions;
 use crate::descriptor_sets::{
     RTXDescriptorSets, ACCELERATION_STRUCTURE_LOCATION, ACCUMULATION_IMAGE_LOCATION,
     CAMERA_BUFFER_LOCATION, MATERIAL_BUFFER_ADDRESS_LOCATION, MATERIAL_TEXTURE_LOCATION,
@@ -48,7 +48,7 @@ struct CameraData {
 
 pub struct Renderer {
     pub device: Rc<DeviceContext>,
-    pub rtx: RtxContext,
+    pub rtx: RtxExtensions,
     pipeline: Pipeline,
     queue: Rc<CommandQueue>,
     accumulation_image: Rc<Image2DResource>,
@@ -366,7 +366,7 @@ impl Renderer {
 
 impl Renderer {
     pub fn new(device: Rc<DeviceContext>, width: u32, height: u32) -> Self {
-        let rtx = RtxContext::new(&device);
+        let rtx = RtxExtensions::new(&device);
         let queue = Rc::new(CommandQueue::new(device.clone(), QueueFlags::GRAPHICS));
         let descriptor_sets = RTXDescriptorSets::new(&device);
         let sampler = unsafe {

@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::context::RtxContext;
+use crate::context::RtxExtensions;
 use ash::vk::{
     AccelerationStructureBuildGeometryInfoKHR, AccelerationStructureBuildRangeInfoKHR,
     AccelerationStructureBuildTypeKHR, AccelerationStructureCreateInfoKHR,
@@ -58,7 +58,7 @@ impl GeometryInstance {
 
 pub struct BottomLevelAccelerationStructure {
     _device: Rc<DeviceContext>,
-    rtx: RtxContext,
+    rtx: RtxExtensions,
     _acceleration_structure_buffer: BufferResource,
     _acceleration_structure_scratch_buffer: BufferResource,
     acceleration_structure: AccelerationStructureKHR,
@@ -72,7 +72,7 @@ impl BottomLevelAccelerationStructure {
 impl BottomLevelAccelerationStructure {
     pub fn new(
         device: Rc<DeviceContext>,
-        rtx: &RtxContext,
+        rtx: &RtxExtensions,
         queue: Rc<CommandQueue>,
         vertex_buffer: &BufferResource,
         _vertex_count: u32,
@@ -199,7 +199,7 @@ impl Drop for BottomLevelAccelerationStructure {
 
 pub struct TopLevelAccelerationStructure {
     _device: Device,
-    rtx: RtxContext,
+    rtx: RtxExtensions,
     pub acceleration_structure: AccelerationStructureKHR,
     _instance_buffer: BufferResource,
     _acceleration_structure_buffer: BufferResource,
@@ -218,7 +218,7 @@ impl Drop for TopLevelAccelerationStructure {
 impl TopLevelAccelerationStructure {
     pub fn new(
         device: Rc<DeviceContext>,
-        rtx: &RtxContext,
+        rtx: &RtxExtensions,
         queue: Rc<CommandQueue>,
         instances: &[GeometryInstance],
     ) -> Self {

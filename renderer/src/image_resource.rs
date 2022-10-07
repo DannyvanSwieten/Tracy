@@ -1,29 +1,22 @@
 use std::rc::Rc;
 
-use renderer::{context::RtxContext, gpu_scene::GpuTexture};
+use crate::{context::RtxExtensions, gpu_scene::GpuTexture};
 use vk_utils::{
     buffer_resource::BufferResource, command_buffer::CommandBuffer, device_context::DeviceContext,
     image2d_resource::Image2DResource, image_resource::ImageResource, queue::CommandQueue,
 };
 
-use crate::{resource::GpuResource, resources::GpuResourceCache};
+use crate::{gpu_resource::GpuResource, gpu_resource_cache::GpuResourceCache};
 
 pub struct TextureImageData {
     pub format: ash::vk::Format,
     pub width: u32,
     pub height: u32,
     pub pixels: Vec<u8>,
-    pub thumbnail: Option<image::DynamicImage>,
 }
 
 impl TextureImageData {
-    pub fn new(
-        format: ash::vk::Format,
-        width: u32,
-        height: u32,
-        pixels: &[u8],
-        thumbnail: Option<image::DynamicImage>,
-    ) -> Self {
+    pub fn new(format: ash::vk::Format, width: u32, height: u32, pixels: &[u8]) -> Self {
         if format == ash::vk::Format::R8G8B8_UNORM {
             let mut new_pixels = Vec::new();
             for i in (0..pixels.len()).step_by(3) {
@@ -37,7 +30,6 @@ impl TextureImageData {
                 width,
                 height,
                 pixels: new_pixels,
-                thumbnail,
             }
         } else {
             Self {
@@ -45,7 +37,6 @@ impl TextureImageData {
                 width,
                 height,
                 pixels: pixels.to_vec(),
-                thumbnail,
             }
         }
     }
@@ -57,7 +48,7 @@ impl GpuResource for TextureImageData {
     fn prepare(
         &self,
         device: Rc<DeviceContext>,
-        _: &RtxContext,
+        _: &RtxExtensions,
         queue: Rc<CommandQueue>,
         _: &GpuResourceCache,
     ) -> Self::Item {

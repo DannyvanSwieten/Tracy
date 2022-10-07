@@ -1,8 +1,9 @@
 use std::{env::temp_dir, fs::File, io::BufReader, path::Path};
 
 use directories::UserDirs;
+use renderer::{image_resource::TextureImageData, resources::Resources};
 
-use crate::{image_resource::TextureImageData, resources::Resources, scene_graph::SceneGraph};
+use crate::scene_graph::SceneGraph;
 
 pub struct Project {
     pub folder: String,
@@ -71,7 +72,6 @@ impl Project {
                                     image.width(),
                                     image.height(),
                                     image.as_bytes(),
-                                    Some(image.thumbnail(64, 64)),
                                 ),
                             )
                             .uid(),

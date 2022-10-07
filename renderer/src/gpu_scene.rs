@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::context::RtxContext;
+use crate::context::RtxExtensions;
 use crate::geometry::{
     BottomLevelAccelerationStructure, Normal, Position, Tangent, Texcoord,
     TopLevelAccelerationStructure,

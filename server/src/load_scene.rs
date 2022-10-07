@@ -2,19 +2,17 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use nalgebra_glm::{vec2, vec3, vec4, Mat4};
-use renderer::geometry::Position;
+use renderer::{
+    geometry::Position, gpu_resource::CpuResource, image_resource::TextureImageData,
+    material_resource::Material, mesh_resource::MeshResource, resources::Resources,
+};
 
-use crate::image_resource::TextureImageData;
-use crate::material_resource::Material;
-use crate::mesh_resource::MeshResource;
-use crate::resource::Resource;
-use crate::resources::Resources;
 use crate::scene_graph::SceneGraph;
 
 pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Vec<SceneGraph>> {
     let (document, buffers, images) = gltf::import(path)?;
 
-    let mut image_map: HashMap<usize, Arc<Resource<TextureImageData>>> = HashMap::new();
+    let mut image_map: HashMap<usize, Arc<CpuResource<TextureImageData>>> = HashMap::new();
 
     for texture in document.textures() {
         let image_source = &texture.source();
@@ -38,7 +36,7 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
                 resources.add_texture(
                     &(path.to_string() + "#" + &image_source.index().to_string()),
                     image_source.name().unwrap_or("Untitled"),
-                    TextureImageData::new(format, image.width, image.height, &image.pixels, None),
+                    TextureImageData::new(format, image.width, image.height, &image.pixels),
                 ),
             );
         }

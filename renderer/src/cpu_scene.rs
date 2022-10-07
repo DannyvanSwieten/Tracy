@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     geometry::*,
     gpu_scene::GpuTexture,
-    resource::{GpuResource, Resource},
+    resource::{CpuResource, GpuResource},
 };
 use glm::{vec2, vec3, vec4};
 
@@ -49,7 +49,7 @@ impl GpuResource for TextureImageData {
     fn prepare(
         &self,
         device: &vk_utils::device_context::DeviceContext,
-        rtx: &crate::context::RtxContext,
+        rtx: &crate::context::RtxExtensions,
     ) -> Self::Item {
         todo!()
     }
@@ -62,10 +62,10 @@ pub struct Material {
     pub emission: glm::Vec4,
     pub roughness: f32,
     pub metalness: f32,
-    pub albedo_map: Option<Arc<Resource<TextureImageData>>>,
-    pub normal_map: Option<Arc<Resource<TextureImageData>>>,
-    pub metallic_roughness_map: Option<Arc<Resource<TextureImageData>>>,
-    pub emission_map: Option<Arc<Resource<TextureImageData>>>,
+    pub albedo_map: Option<Arc<CpuResource<TextureImageData>>>,
+    pub normal_map: Option<Arc<CpuResource<TextureImageData>>>,
+    pub metallic_roughness_map: Option<Arc<CpuResource<TextureImageData>>>,
+    pub emission_map: Option<Arc<CpuResource<TextureImageData>>>,
 }
 
 impl Default for Material {
@@ -98,7 +98,7 @@ impl GpuResource for Material {
     fn prepare(
         &self,
         device: &vk_utils::device_context::DeviceContext,
-        rtx: &crate::context::RtxContext,
+        rtx: &crate::context::RtxExtensions,
     ) -> Self::Item {
         todo!()
     }

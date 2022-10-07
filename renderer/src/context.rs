@@ -58,14 +58,14 @@ impl Context {
 }
 
 #[derive(Clone)]
-pub struct RtxContext {
+pub struct RtxExtensions {
     acceleration_structure_ext: AccelerationStructure,
     ray_tracing_pipeline_ext: RayTracingPipeline,
     memory_properties: PhysicalDeviceMemoryProperties2,
     pipeline_properties: PhysicalDeviceRayTracingPipelinePropertiesKHR,
 }
 
-impl RtxContext {
+impl RtxExtensions {
     pub fn new(device: &DeviceContext) -> Self {
         let mut physical_device_memory_properties = PhysicalDeviceMemoryProperties2::default();
         unsafe {

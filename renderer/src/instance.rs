@@ -1,21 +1,21 @@
 use std::sync::Arc;
 
-use glm::{Mat4};
+use glm::Mat4;
 
+use crate::asset::GpuObject;
 use crate::geometry::GeometryInstance;
+use crate::material::Material;
 use crate::mesh::Mesh;
-use crate::resource::Resource;
-use crate::{material::Material};
 
 pub struct Instance {
     transform: Mat4,
-    mesh: Arc<Resource<Mesh>>,
-    material: Arc<Resource<Material>>,
+    mesh: Arc<GpuObject<Mesh>>,
+    material: Arc<GpuObject<Material>>,
 }
 impl Instance {
     pub fn new(
-        mesh: Arc<Resource<Mesh>>,
-        material: Arc<Resource<Material>>,
+        mesh: Arc<GpuObject<Mesh>>,
+        material: Arc<GpuObject<Material>>,
         transform: &Mat4,
     ) -> Self {
         Self {

@@ -1,14 +1,9 @@
 pub mod application;
 pub mod image_renderer;
-pub mod image_resource;
 pub mod instancer;
 pub mod load_scene;
-pub mod material_resource;
-pub mod mesh_resource;
 pub mod parameter;
 pub mod project;
-pub mod resource;
-pub mod resources;
 pub mod scene_graph;
 pub mod schema;
 pub mod server;
@@ -17,7 +12,9 @@ pub mod simple_shapes;
 use ash::extensions::{ext::DebugUtils, khr::Surface};
 use load_scene::load_scene_gltf;
 use nalgebra_glm::{vec3, Mat4};
-use renderer::gpu_path_tracer::Renderer;
+use renderer::{
+    gpu_path_tracer::Renderer, gpu_resource_cache::GpuResourceCache, resources::Resources,
+};
 use ui::{
     application::{Application, WindowRequest},
     application_model::ApplicationModel,
@@ -33,8 +30,6 @@ use vk_utils::vulkan::Vulkan;
 
 use futures::lock::Mutex;
 use std::{rc::Rc, sync::Arc};
-
-use crate::resources::{GpuResourceCache, Resources};
 
 type ServerContext = Arc<Mutex<application::Model>>;
 fn main() {

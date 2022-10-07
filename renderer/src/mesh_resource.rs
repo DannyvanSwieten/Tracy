@@ -1,12 +1,13 @@
 use std::rc::Rc;
 
-use renderer::{
-    context::RtxContext,
-    geometry::{Normal, Position, Tangent, Texcoord}, mesh::Mesh,
+use crate::{
+    context::RtxExtensions,
+    geometry::{Normal, Position, Tangent, Texcoord},
+    mesh::Mesh,
 };
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
-use crate::{resource::GpuResource, resources::GpuResourceCache};
+use crate::{gpu_resource::GpuResource, gpu_resource_cache::GpuResourceCache};
 
 pub struct MeshResource {
     pub indices: Vec<u32>,
@@ -40,7 +41,7 @@ impl GpuResource for MeshResource {
     fn prepare(
         &self,
         device: Rc<DeviceContext>,
-        rtx: &RtxContext,
+        rtx: &RtxExtensions,
         queue: Rc<CommandQueue>,
         _: &GpuResourceCache,
     ) -> Self::Item {
