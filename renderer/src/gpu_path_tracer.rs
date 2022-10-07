@@ -1,6 +1,5 @@
 use std::rc::Rc;
 
-use crate::rtx_extensions::RtxExtensions;
 use crate::descriptor_sets::{
     RTXDescriptorSets, ACCELERATION_STRUCTURE_LOCATION, ACCUMULATION_IMAGE_LOCATION,
     CAMERA_BUFFER_LOCATION, MATERIAL_BUFFER_ADDRESS_LOCATION, MATERIAL_TEXTURE_LOCATION,
@@ -10,6 +9,7 @@ use crate::geometry::TopLevelAccelerationStructure;
 use crate::gpu_scene::{Frame, Scene};
 use crate::material::GpuMaterial;
 use crate::mesh::MeshAddress;
+use crate::rtx_extensions::RtxExtensions;
 use ash::extensions::khr::{
     AccelerationStructure, DeferredHostOperations, RayTracingPipeline, Swapchain,
 };
@@ -42,8 +42,8 @@ use ash::vk::{
 };
 
 struct CameraData {
-    view_inverse: glm::Mat4,
-    projection_inverse: glm::Mat4,
+    _view_inverse: glm::Mat4,
+    _projection_inverse: glm::Mat4,
 }
 
 pub struct Renderer {
@@ -443,7 +443,7 @@ impl Renderer {
             &self.camera_target,
             &glm::vec3(0., 1., 0.),
         );
-        let view_inverse = glm::inverse(&view_matrix);
+        let _view_inverse = glm::inverse(&view_matrix);
 
         let projection_matrix = glm::perspective_rh(
             self.output_width as f32 / self.output_height as f32,
@@ -452,10 +452,10 @@ impl Renderer {
             1000.,
         );
 
-        let projection_inverse = glm::inverse(&projection_matrix);
+        let _projection_inverse = glm::inverse(&projection_matrix);
         let cam_data = CameraData {
-            view_inverse,
-            projection_inverse,
+            _view_inverse,
+            _projection_inverse,
         };
         let mut camera_buffer = BufferResource::new(
             device,

@@ -1,19 +1,13 @@
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use vk_utils::device_context::DeviceContext;
-use vk_utils::queue::CommandQueue;
-
-use crate::rtx_extensions::RtxExtensions;
 use crate::gpu_resource::CpuResource;
-use crate::gpu_scene::GpuTexture;
+
 use crate::image_resource::TextureImageData;
 use crate::material_resource::Material;
-use crate::mesh::Mesh;
-use crate::mesh_resource::{self, MeshResource};
-use crate::uid_object::UidObject;
+
+use crate::mesh_resource::MeshResource;
 
 static GLOBAL_CPU_RESOURCE_ID: AtomicUsize = AtomicUsize::new(0);
 

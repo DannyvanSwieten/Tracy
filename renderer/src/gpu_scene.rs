@@ -1,19 +1,12 @@
-use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::rtx_extensions::RtxExtensions;
-use crate::geometry::{
-    BottomLevelAccelerationStructure, Normal, Position, Tangent, Texcoord,
-    TopLevelAccelerationStructure,
-};
+use crate::geometry::TopLevelAccelerationStructure;
 use crate::shape::Shape;
 
 use vk_utils::buffer_resource::BufferResource;
-use vk_utils::device_context::DeviceContext;
 use vk_utils::image2d_resource::Image2DResource;
 
-use ash::vk::{BufferUsageFlags, DescriptorSet, MemoryPropertyFlags};
-use vk_utils::queue::CommandQueue;
+use ash::vk::DescriptorSet;
 
 pub struct GpuTexture {
     pub image: Image2DResource,
