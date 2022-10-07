@@ -1,4 +1,4 @@
-use glm::{Mat4, Vec3};
+use glm::Mat4;
 
 use crate::{instance::Instance, material::Material, mesh::Mesh, uid_object::UidObject};
 use std::sync::Arc;
