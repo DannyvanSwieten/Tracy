@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{context::RtxExtensions, gpu_scene::GpuTexture};
+use crate::{rtx_extensions::RtxExtensions, gpu_scene::GpuTexture};
 use vk_utils::{
     buffer_resource::BufferResource, command_buffer::CommandBuffer, device_context::DeviceContext,
     image2d_resource::Image2DResource, image_resource::ImageResource, queue::CommandQueue,

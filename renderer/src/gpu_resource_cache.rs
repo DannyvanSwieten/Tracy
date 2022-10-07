@@ -3,7 +3,7 @@ use std::{collections::HashMap, rc::Rc, sync::Arc};
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
 use crate::{
-    context::RtxExtensions, gpu_resource::CpuResource, gpu_scene::GpuTexture,
+    rtx_extensions::RtxExtensions, gpu_resource::CpuResource, gpu_scene::GpuTexture,
     image_resource::TextureImageData, material::Material, mesh::Mesh, mesh_resource::MeshResource,
     uid_object::UidObject,
 };

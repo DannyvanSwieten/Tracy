@@ -1,5 +1,5 @@
 extern crate nalgebra_glm as glm;
-pub mod context;
+pub mod rtx_extensions;
 pub mod geometry;
 pub mod gpu_path_tracer;
 pub use ash::vk;

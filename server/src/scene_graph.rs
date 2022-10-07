@@ -3,7 +3,7 @@ use std::{rc::Rc, sync::Arc};
 use super::instancer::Instancer;
 use nalgebra_glm::{vec3, Mat4x4};
 use renderer::{
-    context::RtxExtensions, gpu_resource::CpuResource, gpu_resource_cache::GpuResourceCache,
+    rtx_extensions::RtxExtensions, gpu_resource::CpuResource, gpu_resource_cache::GpuResourceCache,
     gpu_scene::Scene, material_resource::Material, mesh_resource::MeshResource,
     resources::Resources, shape::Shape,
 };

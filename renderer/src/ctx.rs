@@ -4,7 +4,7 @@ use ash::vk::{GeometryInstanceFlagsKHR, QueueFlags};
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
 use crate::{
-    context::RtxExtensions,
+    rtx_extensions::RtxExtensions,
     geometry::{GeometryInstance, Normal, Position, Tangent, Texcoord},
     material::Material,
     mesh::{Mesh, MeshAddress},

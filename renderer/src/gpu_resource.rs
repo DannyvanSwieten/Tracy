@@ -2,7 +2,7 @@ use std::{any::TypeId, ops::Deref, rc::Rc, sync::Arc};
 
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
-use crate::{context::RtxExtensions, gpu_resource_cache::GpuResourceCache, uid_object::UidObject};
+use crate::{rtx_extensions::RtxExtensions, gpu_resource_cache::GpuResourceCache, uid_object::UidObject};
 
 pub trait GpuResource {
     type Item;

@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::context::RtxExtensions;
+use crate::rtx_extensions::RtxExtensions;
 use crate::descriptor_sets::{
     RTXDescriptorSets, ACCELERATION_STRUCTURE_LOCATION, ACCUMULATION_IMAGE_LOCATION,
     CAMERA_BUFFER_LOCATION, MATERIAL_BUFFER_ADDRESS_LOCATION, MATERIAL_TEXTURE_LOCATION,

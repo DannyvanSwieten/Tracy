@@ -6,7 +6,7 @@ use vk_utils::{
 };
 
 use crate::{
-    context::RtxExtensions,
+    rtx_extensions::RtxExtensions,
     geometry::{BottomLevelAccelerationStructure, Normal, Position, Tangent, Texcoord},
 };
 

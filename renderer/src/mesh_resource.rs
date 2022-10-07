@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use crate::{
-    context::RtxExtensions,
+    rtx_extensions::RtxExtensions,
     geometry::{Normal, Position, Tangent, Texcoord},
     mesh::Mesh,
 };

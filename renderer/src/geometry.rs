@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::context::RtxExtensions;
+use crate::rtx_extensions::RtxExtensions;
 use ash::vk::{
     AccelerationStructureBuildGeometryInfoKHR, AccelerationStructureBuildRangeInfoKHR,
     AccelerationStructureBuildTypeKHR, AccelerationStructureCreateInfoKHR,

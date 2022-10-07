@@ -6,7 +6,7 @@ use std::sync::Arc;
 use vk_utils::device_context::DeviceContext;
 use vk_utils::queue::CommandQueue;
 
-use crate::context::RtxExtensions;
+use crate::rtx_extensions::RtxExtensions;
 use crate::gpu_resource::CpuResource;
 use crate::gpu_scene::GpuTexture;
 use crate::image_resource::TextureImageData;
