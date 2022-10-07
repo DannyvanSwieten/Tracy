@@ -1,12 +1,12 @@
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone)]
-pub struct GpuObject<T> {
+pub struct UidObject<T> {
     id: usize,
     data: T,
 }
 
-impl<T> GpuObject<T> {
+impl<T> UidObject<T> {
     pub fn new(id: usize, data: T) -> Self {
         Self { id, data }
     }
@@ -20,7 +20,7 @@ impl<T> GpuObject<T> {
     }
 }
 
-impl<T> Deref for GpuObject<T> {
+impl<T> Deref for UidObject<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -28,7 +28,7 @@ impl<T> Deref for GpuObject<T> {
     }
 }
 
-impl<T> DerefMut for GpuObject<T> {
+impl<T> DerefMut for UidObject<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.data
     }

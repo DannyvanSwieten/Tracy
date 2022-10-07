@@ -6,7 +6,6 @@ use std::sync::Arc;
 use vk_utils::device_context::DeviceContext;
 use vk_utils::queue::CommandQueue;
 
-use crate::asset::GpuObject;
 use crate::context::RtxExtensions;
 use crate::gpu_resource::CpuResource;
 use crate::gpu_scene::GpuTexture;
@@ -14,6 +13,7 @@ use crate::image_resource::TextureImageData;
 use crate::material_resource::Material;
 use crate::mesh::Mesh;
 use crate::mesh_resource::{self, MeshResource};
+use crate::uid_object::UidObject;
 
 static GLOBAL_CPU_RESOURCE_ID: AtomicUsize = AtomicUsize::new(0);
 

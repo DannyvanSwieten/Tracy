@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use glm::vec4;
 
-use crate::asset::GpuObject;
 use crate::gpu_scene::GpuTexture;
+use crate::uid_object::UidObject;
 
 pub struct Material {
     pub base_color: glm::Vec4,
@@ -12,10 +12,10 @@ pub struct Material {
     pub metallic: f32,
     pub sheen: f32,
     pub clear_coat: f32,
-    pub base_color_texture: Option<Arc<GpuObject<GpuTexture>>>,
-    pub metallic_roughness_texture: Option<Arc<GpuObject<GpuTexture>>>,
-    pub normal_texture: Option<Arc<GpuObject<GpuTexture>>>,
-    pub emission_texture: Option<Arc<GpuObject<GpuTexture>>>,
+    pub base_color_texture: Option<Arc<UidObject<GpuTexture>>>,
+    pub metallic_roughness_texture: Option<Arc<UidObject<GpuTexture>>>,
+    pub normal_texture: Option<Arc<UidObject<GpuTexture>>>,
+    pub emission_texture: Option<Arc<UidObject<GpuTexture>>>,
 }
 
 impl Material {
@@ -41,22 +41,22 @@ impl Material {
         }
     }
 
-    pub fn with_base_color_texture(mut self, texture: Arc<GpuObject<GpuTexture>>) -> Self {
+    pub fn with_base_color_texture(mut self, texture: Arc<UidObject<GpuTexture>>) -> Self {
         self.base_color_texture = Some(texture);
         self
     }
 
-    pub fn with_normal_texture(mut self, texture: Arc<GpuObject<GpuTexture>>) -> Self {
+    pub fn with_normal_texture(mut self, texture: Arc<UidObject<GpuTexture>>) -> Self {
         self.normal_texture = Some(texture);
         self
     }
 
-    pub fn with_metallic_roughness_texture(mut self, texture: Arc<GpuObject<GpuTexture>>) -> Self {
+    pub fn with_metallic_roughness_texture(mut self, texture: Arc<UidObject<GpuTexture>>) -> Self {
         self.metallic_roughness_texture = Some(texture);
         self
     }
 
-    pub fn with_emission_texture(mut self, texture: Arc<GpuObject<GpuTexture>>) -> Self {
+    pub fn with_emission_texture(mut self, texture: Arc<UidObject<GpuTexture>>) -> Self {
         self.emission_texture = Some(texture);
         self
     }

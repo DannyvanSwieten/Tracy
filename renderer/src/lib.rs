@@ -3,7 +3,7 @@ pub mod context;
 pub mod geometry;
 pub mod gpu_path_tracer;
 pub use ash::vk;
-pub mod asset;
+pub mod uid_object;
 pub mod camera;
 pub mod ctx;
 pub mod descriptor_sets;
