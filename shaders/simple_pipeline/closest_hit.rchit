@@ -10,7 +10,7 @@
 
 #include "ray_payload.glsl"
 #include "material.glsl"
-#include "scatter.glsl"
+#include "bsdf.glsl"
 #include "random.glsl"
 
 struct BufferAddresses {
@@ -115,12 +115,13 @@ void main()
 
     float pdf = 0.0;
     vec3 wi = vec3(0.0);
-    vec3 wo = -gl_WorldRayDirectionEXT;
+    vec3 wo = normalize(-gl_WorldRayDirectionEXT);
     vec3 base_color = material.base_color.rgb;
     if(material.maps[0] != -1)
     {
         base_color *= texture(images[material.maps[0]], uv).rgb;
     }
+    base_color = pow(base_color, vec3(2.2));
     float metal = material.properties[1];
     float roughness = material.properties[0];
     if(material.maps[1] != -1)
@@ -130,51 +131,21 @@ void main()
         roughness *= mr.y;
     }
 
-    // Shadow Ray
-    uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
-    float tmin = 0.1;
-    float tmax = 1000.0;
-    ray.hit = true;
-    vec3 L = normalize(vec3(-1, 1, 1));
+    vec3 random = random_pcg3d(uvec3(gl_LaunchIDEXT.xy, ray.seed));
+    vec3 nextFactor;
+    vec3 nextDir = sampleMicrofacetBRDF(wo, N, base_color, metal, 0.5, roughness, 0.0, 1.5, random, nextFactor);
     vec3 P = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
-    traceRayEXT(topLevelAS, 
-              rayFlags, 
-              0xff, 
-              0 /*sbtRecordOffset*/, 
-              0 /*sbtRecordStride*/,
-              0 /*missIndex*/, 
-              P + N * .05, tmin, 
-              L, tmax, 
-              0 /*payload index*/);
-    float anisotropy = 0.0;
-    vec3 X = vec3(0.0);
-    vec3 Y = vec3(0.0);
-    direction_of_anisotropicity(N, X, Y);
-    ray.direct = vec3(0);
-    // Evaluate direct lighting
-    if(!ray.hit)
-    {
-        ray.direct = evaluate_disney_bsdf(L, wo, N, X, Y, base_color, roughness, metal, anisotropy) * max(0.0, dot(L, N)) * vec3(0.992, 0.72, 0.075) * 5;
-    }
-
-    // Evaluate indirect lighting
-    vec3 color_according_to_disney = sample_disney_bsdf(Xi, wi, wo, N, X, Y, base_color, roughness, metal, anisotropy, pdf);
 
     ray.hit = true;
-    vec3 c = color_according_to_disney;
-    if(pdf > 0.01 && dot(c, c) > 0.01)
-        c /= pdf;
-    else
-        c = vec3(1);
-
-    ray.color = vec4(c, 1);
+    ray.color = vec4(max(nextFactor, 0), 1);
     ray.emission = material.emission;
     if(material.maps[3] != -1)
     {
-        ray.emission *= texture(images[material.maps[3]], uv);
+        ray.emission = texture(images[material.maps[3]], uv);
     }
 
-    c += ray.emission.rgb * ray.emission.a;
-    ray.w_out = wi;
+    ray.color.rgb += ray.emission.rgb * ray.emission.a;
+    ray.direct = vec3(0);
+    ray.w_out = nextDir;
     ray.point = P;
 }

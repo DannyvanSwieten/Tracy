@@ -13,7 +13,8 @@ use ash::extensions::{ext::DebugUtils, khr::Surface};
 use load_scene::load_scene_gltf;
 use nalgebra_glm::{vec3, Mat4};
 use renderer::{
-    gpu_path_tracer::Renderer, gpu_resource_cache::GpuResourceCache, cpu_resource_cache::Resources,
+    cpu_resource_cache::Resources, gpu_path_tracer::Renderer, gpu_resource_cache::GpuResourceCache,
+    material_resource::Material,
 };
 use ui::{
     application::{Application, WindowRequest},
@@ -52,11 +53,6 @@ fn main() {
             ],
         );
         let gpu = &vulkan.hardware_devices_with_queue_support(ash::vk::QueueFlags::GRAPHICS)[0];
-        let extensions = gpu.device_extensions();
-        for extension in extensions {
-            let v = extension.extension_name.iter().map(|i| *i as u8).collect();
-            println!("{}", String::from_utf8(v).unwrap());
-        }
         let context = if cfg!(unix) {
             Rc::new(Renderer::create_suitable_device_mac(gpu))
         } else {
@@ -67,7 +63,10 @@ fn main() {
         let image_width = args[3].parse::<u32>().expect("Invalid width argument");
         let image_height = args[4].parse::<u32>().expect("Invalid height argument");
         let mut renderer = Renderer::new(context.clone(), image_width, image_height);
+        renderer.set_camera_position(0f32, 100f32, 5f32);
+        renderer.set_camera_target(10.0, 120f32, 0f32);
         let mut cpu_cache = Resources::default();
+        cpu_cache.set_default_material(Material::new(&nalgebra_glm::Vec4::new(1.0, 1.0, 1.0, 1.0)));
         let mut gpu_cache = GpuResourceCache::default();
 
         let mut scenes = load_scene_gltf(&args[2], &mut cpu_cache).unwrap();
@@ -81,7 +80,9 @@ fn main() {
         );
         let frame = renderer.build_frame(&gpu_scene);
 
-        renderer.render_frame(&frame, 16);
+        for _ in 0..64 {
+            renderer.render_frame(&frame, 4);
+        }
 
         let buffer = renderer.download_image();
         let data = buffer.copy_data::<u8>();

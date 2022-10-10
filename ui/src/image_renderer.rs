@@ -226,8 +226,8 @@ impl ImageRenderer {
         let sampler_info = ash::vk::SamplerCreateInfo::builder()
             .min_filter(ash::vk::Filter::LINEAR)
             .mag_filter(ash::vk::Filter::LINEAR)
-            .address_mode_u(ash::vk::SamplerAddressMode::CLAMP_TO_EDGE)
-            .address_mode_v(ash::vk::SamplerAddressMode::CLAMP_TO_EDGE)
+            .address_mode_u(ash::vk::SamplerAddressMode::REPEAT)
+            .address_mode_v(ash::vk::SamplerAddressMode::REPEAT)
             .build();
 
         let sampler = unsafe {

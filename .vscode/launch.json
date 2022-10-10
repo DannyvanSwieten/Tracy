@@ -22,18 +22,18 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/target/debug/tracey.exe",
-            // "args": [
-            //     "--file",
-            //     "${workspaceFolder}/assets/Sponza/glTF/Sponza.gltf",
-            //     "1280",
-            //     "720"
-            // ],
             "args": [
-                "--ui_application",
-                "localhost:7000",
+                "--file",
+                "${workspaceFolder}/assets/Sponza/glTF/Sponza.gltf",
                 "1280",
                 "720"
             ],
+            // "args": [
+            //     "--ui_application",
+            //     "localhost:7000",
+            //     "1280",
+            //     "720"
+            // ],
             "stopOnEntry": false,
             "cwd": "${workspaceFolder}",
             "console": "externalTerminal"
@@ -48,8 +48,8 @@
             //     "1920", "1080"
             // ],
             "args": [
-                "--server",
-                "localhost:7000",
+                "--file",
+                "${workspaceFolder}/assets/Sponza/glTF/Sponza.gltf",
                 "1280",
                 "720"
             ],

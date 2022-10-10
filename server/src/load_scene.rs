@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use nalgebra_glm::{vec2, vec3, vec4, Mat4};
 use renderer::{
-    geometry::Position, gpu_resource::CpuResource, image_resource::TextureImageData,
-    material_resource::Material, mesh_resource::MeshResource, cpu_resource_cache::Resources,
+    cpu_resource_cache::Resources, geometry::Position, gpu_resource::CpuResource,
+    image_resource::TextureImageData, material_resource::Material, mesh_resource::MeshResource,
 };
 
 use crate::scene_graph::SceneGraph;
@@ -12,7 +12,15 @@ use crate::scene_graph::SceneGraph;
 pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Vec<SceneGraph>> {
     let (document, buffers, images) = gltf::import(path)?;
 
+    // maps GLTF image index to imported ImageResource
     let mut image_map: HashMap<usize, Arc<CpuResource<TextureImageData>>> = HashMap::new();
+    // maps GLTF mesh index to imported MeshResource
+    let mut mesh_map: HashMap<usize, Vec<(usize, Arc<CpuResource<MeshResource>>)>> = HashMap::new();
+    // maps GLTF material index to imported MaterialResource
+    let mut material_map: HashMap<usize, Arc<CpuResource<Material>>> = HashMap::new();
+
+    let primitive_material_map: HashMap<usize, HashMap<usize, Arc<CpuResource<Material>>>> =
+        HashMap::new();
 
     for texture in document.textures() {
         let image_source = &texture.source();
@@ -41,9 +49,6 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
             );
         }
     }
-
-    let mut mesh_map: HashMap<usize, Vec<usize>> = HashMap::new();
-    let mut material_map: HashMap<usize, usize> = HashMap::new();
     let mut primitive_material_map: HashMap<usize, usize> = HashMap::new();
 
     for material in document.materials() {
@@ -97,7 +102,7 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
             material.index().unwrap(),
             resources
                 .add_material("", material.name().unwrap_or("Untitled"), mat)
-                .uid(),
+                .clone(),
         );
     }
 
@@ -141,25 +146,16 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
                         vec![vec2(0.0, 0.0); vertices.len()]
                     };
 
-                if let Some(material_id) = primitive.material().index() {
-                    primitive_material_map.insert(primitive.index(), material_id);
-
+                (
+                    primitive.material().index().unwrap(),
                     resources
                         .add_mesh(
                             "",
                             mesh.name().unwrap_or("Untitled"),
                             MeshResource::new(indices, vertices, normals, tangents, tex_coords),
                         )
-                        .uid()
-                } else {
-                    resources
-                        .add_mesh(
-                            "",
-                            mesh.name().unwrap_or("Untitled"),
-                            MeshResource::new(indices, vertices, normals, tangents, tex_coords),
-                        )
-                        .uid()
-                }
+                        .clone(),
+                )
             })
             .collect();
 
@@ -198,54 +194,36 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
             scene_graph.node_mut(node_id).with_child(child.index());
         }
     }
-
     for node in document.nodes() {
         if let Some(mesh) = node.mesh() {
-            let node_id = node.index();
             let primitives = mesh_map.get(&mesh.index()).unwrap();
             if primitives.len() > 1 {
-                for primitive in primitives {
+                for (material_id, primitive) in primitives {
                     let child_id = scene_graph.create_node();
                     scene_graph
                         .node_mut(child_id)
-                        .with_mesh(resources.get_mesh_unchecked(*primitive));
-
-                    let material = if let Some(material_id) = primitive_material_map.get(primitive)
-                    {
-                        let id = material_map.get(material_id).unwrap();
-                        resources.get_material_unchecked(*id)
-                    } else {
-                        resources.default_material()
-                    };
-
-                    scene_graph
-                        .node_mut(node_id)
-                        .with_material(material)
-                        .with_child(child_id);
+                        .with_mesh(primitive.clone())
+                        .with_material(material_map.get(material_id).unwrap().clone());
                 }
-            } else {
-                scene_graph
-                    .node_mut(node_id)
-                    .with_mesh(resources.get_mesh_unchecked(primitives[0]));
             }
         }
     }
 
-    for (key, primitives) in &mesh_map {
-        if primitives.len() > 1 {
-            let ids = scene_graph.nodes_with_mesh_id(*key);
-            for id in ids {
-                scene_graph.expand_node(resources, id, &primitives);
-            }
-        } else {
-            let ids = scene_graph.nodes_with_mesh_id(*key);
-            for id in ids {
-                scene_graph
-                    .node_mut(id)
-                    .with_mesh(resources.get_mesh_unchecked(primitives[0]));
-            }
-        }
-    }
+    // for (key, primitives) in &mesh_map {
+    //     if primitives.len() > 1 {
+    //         let ids = scene_graph.nodes_with_mesh_id(*key);
+    //         for id in ids {
+    //             scene_graph.expand_node(resources, id, &primitives);
+    //         }
+    //     } else {
+    //         let ids = scene_graph.nodes_with_mesh_id(*key);
+    //         for id in ids {
+    //             scene_graph
+    //                 .node_mut(id)
+    //                 .with_mesh(resources.get_mesh_unchecked(primitives[0]));
+    //         }
+    //     }
+    // }
 
     Ok(vec![scene_graph])
 }

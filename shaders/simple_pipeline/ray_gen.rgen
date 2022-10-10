@@ -38,15 +38,14 @@ void main()
     imageStore(accumulation_image, ivec2(gl_LaunchIDEXT.xy), vec4(acc, 1));
   }
 
-  uint rayFlags = gl_RayFlagsOpaqueEXT;
+  uint rayFlags = gl_RayFlagsNoneEXT;
   float tmin = 0.001;
-  float tmax = 1000.0;
-
-  uint pixelSeed = rand_seed(rand_seed(gl_LaunchIDEXT.x, gl_LaunchIDEXT.y), Batch.current_batch);
-  ray.seed = pixelSeed;
+  float tmax = 10000.0;
 
   for(int s = 0; s < Batch.spp; ++s)
   {       
+    uint pixelSeed = rand_seed(rand_seed(gl_LaunchIDEXT.x, gl_LaunchIDEXT.y), Batch.current_batch * Batch.spp + s);
+    ray.seed = pixelSeed;
     const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + vec2(rand_float(pixelSeed), rand_float(pixelSeed));
     const vec2 inUV = pixelCenter / vec2(gl_LaunchSizeEXT.xy);
     vec2 d = inUV * 2.0 - 1.0;
@@ -87,7 +86,7 @@ void main()
     acc += color;
   }
 
-  vec4 l = imageLoad(accumulation_image, ivec2(gl_LaunchIDEXT.xy));
+  vec3 l = imageLoad(accumulation_image, ivec2(gl_LaunchIDEXT.xy)).rgb;
   vec3 pixel = l.rgb + acc;
   imageStore(accumulation_image, ivec2(gl_LaunchIDEXT.xy), vec4(pixel, 1));
 
