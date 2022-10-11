@@ -24,7 +24,7 @@
             "program": "${workspaceFolder}/target/debug/tracey.exe",
             "args": [
                 "--file",
-                "${workspaceFolder}/assets/Sponza/glTF/Sponza.gltf",
+                "${workspaceFolder}/assets/Duck/glTF/Duck.gltf",
                 "1280",
                 "720"
             ],

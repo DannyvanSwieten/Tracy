@@ -2,7 +2,6 @@ pub mod application;
 pub mod image_renderer;
 pub mod instancer;
 pub mod load_scene;
-pub mod parameter;
 pub mod project;
 pub mod scene_graph;
 pub mod schema;

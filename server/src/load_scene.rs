@@ -14,13 +14,10 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
 
     // maps GLTF image index to imported ImageResource
     let mut image_map: HashMap<usize, Arc<CpuResource<TextureImageData>>> = HashMap::new();
-    // maps GLTF mesh index to imported MeshResource
+    // maps GLTF mesh index to (gltf material index, imported MeshResource)
     let mut mesh_map: HashMap<usize, Vec<(usize, Arc<CpuResource<MeshResource>>)>> = HashMap::new();
     // maps GLTF material index to imported MaterialResource
     let mut material_map: HashMap<usize, Arc<CpuResource<Material>>> = HashMap::new();
-
-    let primitive_material_map: HashMap<usize, HashMap<usize, Arc<CpuResource<Material>>>> =
-        HashMap::new();
 
     for texture in document.textures() {
         let image_source = &texture.source();
@@ -49,7 +46,6 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
             );
         }
     }
-    let mut primitive_material_map: HashMap<usize, usize> = HashMap::new();
 
     for material in document.materials() {
         let m = material.pbr_metallic_roughness();
@@ -162,23 +158,10 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
         mesh_map.insert(mesh.index(), imported_meshes);
     }
 
-    // for camera in document.cameras() {
-    //     match camera.projection() {
-    //         gltf::camera::Projection::Perspective(cam) => {
-    //             new_scene.add_camera(&renderer::cpu_scene::Camera {
-    //                 fov: cam.yfov(),
-    //                 z_near: cam.znear(),
-    //                 z_far: cam.zfar().unwrap_or(1000.0),
-    //             });
-    //         }
-    //         _ => (),
-    //     }
-    // }
-
-    let mut scene_graph = SceneGraph::new("");
+    let mut scene_graph = SceneGraph::new(path);
 
     for node in document.nodes() {
-        let node_id = scene_graph.create_node();
+        let root_node_id = scene_graph.create_node();
 
         let transform = node.transform().matrix();
         let mut glm_matrix = Mat4::default();
@@ -188,23 +171,24 @@ pub fn load_scene_gltf(path: &str, resources: &mut Resources) -> gltf::Result<Ve
             column[2] = transform[idx][2];
             column[3] = transform[idx][3];
         }
-        scene_graph.node_mut(node_id).with_transform(glm_matrix);
+        scene_graph
+            .node_mut(root_node_id)
+            .with_transform(glm_matrix);
 
         for child in node.children() {
-            scene_graph.node_mut(node_id).with_child(child.index());
+            scene_graph.node_mut(root_node_id).with_child(child.index());
         }
     }
+    
     for node in document.nodes() {
         if let Some(mesh) = node.mesh() {
             let primitives = mesh_map.get(&mesh.index()).unwrap();
-            if primitives.len() > 1 {
-                for (material_id, primitive) in primitives {
-                    let child_id = scene_graph.create_node();
-                    scene_graph
-                        .node_mut(child_id)
-                        .with_mesh(primitive.clone())
-                        .with_material(material_map.get(material_id).unwrap().clone());
-                }
+            for (material_id, primitive) in primitives {
+                let child_id = scene_graph.create_node();
+                scene_graph
+                    .node_mut(child_id)
+                    .with_mesh(primitive.clone())
+                    .with_material(material_map.get(material_id).unwrap().clone());
             }
         }
     }
