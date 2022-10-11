@@ -3,17 +3,17 @@ use std::{collections::HashMap, rc::Rc, sync::Arc};
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
 use crate::{
-    rtx_extensions::RtxExtensions, gpu_resource::CpuResource, gpu_scene::GpuTexture,
-    image_resource::TextureImageData, material::Material, mesh::Mesh, mesh_resource::MeshResource,
-    uid_object::UidObject,
+    gpu_resource::CpuResource, gpu_scene::GpuTexture, image_resource::TextureImageData,
+    material::Material, mesh::Mesh, mesh_resource::MeshResource, rtx_extensions::RtxExtensions,
+    uid_object::Handle,
 };
 
 #[derive(Default)]
 pub struct GpuResourceCache {
-    pub meshes: HashMap<usize, Arc<UidObject<Mesh>>>,
-    pub textures: HashMap<usize, Arc<UidObject<GpuTexture>>>,
-    pub samplers: HashMap<usize, Arc<UidObject<ash::vk::Sampler>>>,
-    pub materials: HashMap<usize, Arc<UidObject<Material>>>,
+    pub meshes: HashMap<usize, Arc<Handle<Mesh>>>,
+    pub textures: HashMap<usize, Arc<Handle<GpuTexture>>>,
+    pub samplers: HashMap<usize, Arc<Handle<ash::vk::Sampler>>>,
+    pub materials: HashMap<usize, Arc<Handle<Material>>>,
 }
 
 impl GpuResourceCache {
@@ -23,7 +23,7 @@ impl GpuResourceCache {
         rtx: &RtxExtensions,
         queue: Rc<CommandQueue>,
         mesh: &Arc<CpuResource<MeshResource>>,
-    ) -> Arc<UidObject<Mesh>> {
+    ) -> Arc<Handle<Mesh>> {
         let prepared = self.meshes.get(&mesh.uid());
         if prepared.is_none() {
             self.meshes
@@ -38,7 +38,7 @@ impl GpuResourceCache {
         rtx: &RtxExtensions,
         queue: Rc<CommandQueue>,
         material: &Arc<CpuResource<crate::material_resource::Material>>,
-    ) -> Arc<UidObject<Material>> {
+    ) -> Arc<Handle<Material>> {
         let prepared = self.materials.get(&material.uid());
         if prepared.is_none() {
             if let Some(base_color) = &material.albedo_map {
@@ -70,7 +70,7 @@ impl GpuResourceCache {
         rtx: &RtxExtensions,
         queue: Rc<CommandQueue>,
         texture: &Arc<CpuResource<TextureImageData>>,
-    ) -> Arc<UidObject<GpuTexture>> {
+    ) -> Arc<Handle<GpuTexture>> {
         let prepared = self.textures.get(&texture.uid());
         if prepared.is_none() {
             self.textures
@@ -80,11 +80,11 @@ impl GpuResourceCache {
         self.textures.get(&texture.uid()).unwrap().clone()
     }
 
-    pub fn texture(&self, uid: usize) -> Option<&Arc<UidObject<GpuTexture>>> {
+    pub fn texture(&self, uid: usize) -> Option<&Arc<Handle<GpuTexture>>> {
         self.textures.get(&uid)
     }
 
-    pub fn material(&self, uid: usize) -> Option<&Arc<UidObject<crate::material::Material>>> {
+    pub fn material(&self, uid: usize) -> Option<&Arc<Handle<crate::material::Material>>> {
         self.materials.get(&uid)
     }
 }

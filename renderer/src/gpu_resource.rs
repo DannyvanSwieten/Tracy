@@ -2,7 +2,9 @@ use std::{any::TypeId, ops::Deref, rc::Rc, sync::Arc};
 
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
-use crate::{rtx_extensions::RtxExtensions, gpu_resource_cache::GpuResourceCache, uid_object::UidObject};
+use crate::{
+    gpu_resource_cache::GpuResourceCache, rtx_extensions::RtxExtensions, uid_object::Handle,
+};
 
 pub trait GpuResource {
     type Item;
@@ -72,8 +74,8 @@ impl<T: GpuResource + 'static> CpuResource<T> {
         rtx: &RtxExtensions,
         queue: Rc<CommandQueue>,
         cache: &GpuResourceCache,
-    ) -> Arc<UidObject<T::Item>> {
-        Arc::new(UidObject::new(
+    ) -> Arc<Handle<T::Item>> {
+        Arc::new(Handle::new(
             self.uid,
             self.item.prepare(device, rtx, queue, cache),
         ))

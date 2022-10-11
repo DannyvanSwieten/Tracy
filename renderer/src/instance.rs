@@ -5,19 +5,15 @@ use glm::Mat4;
 use crate::geometry::GeometryInstance;
 use crate::material::Material;
 use crate::mesh::Mesh;
-use crate::uid_object::UidObject;
+use crate::uid_object::Handle;
 
 pub struct Instance {
     transform: Mat4,
-    mesh: Arc<UidObject<Mesh>>,
-    material: Arc<UidObject<Material>>,
+    mesh: Arc<Handle<Mesh>>,
+    material: Arc<Handle<Material>>,
 }
 impl Instance {
-    pub fn new(
-        mesh: Arc<UidObject<Mesh>>,
-        material: Arc<UidObject<Material>>,
-        transform: &Mat4,
-    ) -> Self {
+    pub fn new(mesh: Arc<Handle<Mesh>>, material: Arc<Handle<Material>>, transform: &Mat4) -> Self {
         Self {
             material,
             mesh,

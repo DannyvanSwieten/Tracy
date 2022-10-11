@@ -1,12 +1,12 @@
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone)]
-pub struct UidObject<T> {
+pub struct Handle<T> {
     id: usize,
     data: T,
 }
 
-impl<T> UidObject<T> {
+impl<T> Handle<T> {
     pub fn new(id: usize, data: T) -> Self {
         Self { id, data }
     }
@@ -20,7 +20,7 @@ impl<T> UidObject<T> {
     }
 }
 
-impl<T> Deref for UidObject<T> {
+impl<T> Deref for Handle<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -28,7 +28,7 @@ impl<T> Deref for UidObject<T> {
     }
 }
 
-impl<T> DerefMut for UidObject<T> {
+impl<T> DerefMut for Handle<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.data
     }
