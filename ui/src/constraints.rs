@@ -45,17 +45,8 @@ impl BoxConstraints {
     }
 
     pub fn shrunk(&self, dw: f32, dh: f32) -> Self {
-        let width = if let Some(width) = self.max_width {
-            Some(width - dw)
-        } else {
-            None
-        };
-
-        let height = if let Some(height) = self.max_height {
-            Some(height - dh)
-        } else {
-            None
-        };
+        let width = self.max_width.map(|width| width - dw);
+        let height = self.max_height.map(|height| height - dh);
 
         Self {
             min_width: self.min_width,

@@ -6,6 +6,7 @@ use crate::style::StyleContext;
 use crate::widget::*;
 use crate::window_event::MouseEvent;
 use skia_safe::{Point, Size};
+use std::path::Path;
 use winit::{event::KeyboardInput, window::WindowId};
 
 pub struct WindowContext {
@@ -35,13 +36,12 @@ impl<Model: ApplicationModel + 'static> UserInterface<Model> {
         }
     }
 
-    pub fn file_dropped(&mut self, state: &mut Model, path: &std::path::PathBuf, position: &Point) {
+    pub fn file_dropped(&mut self, state: &mut Model, path: &Path, position: &Point) {
         // self.actions
         //     .push(self.root.file_dropped(state, path, position))
     }
 
-    pub fn file_hovered(&mut self, state: &mut Model, path: &std::path::PathBuf, position: &Point) {
-    }
+    pub fn file_hovered(&mut self, state: &mut Model, path: &Path, position: &Point) {}
 
     fn build_popup(&mut self, request: PopupRequest<Model>, position: &Point) {}
 

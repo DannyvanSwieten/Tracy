@@ -75,7 +75,7 @@ impl<Model: ApplicationModel> ApplicationDelegate<Model> for UIApplicationDelega
         let device_extensions = vec![ash::extensions::khr::Swapchain::name()];
         let device = {
             if let Some(cb) = self.device_builder.as_mut() {
-                Rc::new(cb(&gpu, device_extensions))
+                Rc::new(cb(gpu, device_extensions))
             } else {
                 Rc::new(gpu.device_context(&device_extensions, |builder| builder))
             }
@@ -109,7 +109,7 @@ impl<Model: ApplicationModel> ApplicationDelegate<Model> for UIApplicationDelega
     ) {
         let window = window_registry.create_window(
             target,
-            &request.title.unwrap_or("Untitled".to_string()),
+            &request.title.unwrap_or_else(|| "Untitled".to_string()),
             request.width,
             request.height,
         );

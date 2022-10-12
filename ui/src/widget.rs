@@ -37,6 +37,7 @@ pub struct Properties {
     pub size: Size,
 }
 
+#[allow(unused_variables)]
 pub trait Widget<Model: ApplicationModel> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size;
     fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model);
@@ -46,8 +47,8 @@ pub trait Widget<Model: ApplicationModel> {
     fn mouse_down(
         &mut self,
         event: &MouseEvent,
-        _: &Properties,
-        _: &mut Application<Model>,
+        properties: &Properties,
+        application: &mut Application<Model>,
         model: &mut Model,
     ) {
     }
@@ -152,12 +153,10 @@ impl<Model: ApplicationModel> Widget<Model> for ChildSlot<Model> {
         if self.hit_test(event.local_position()) {
             let new_event = event.to_local(self.position());
             self.widget.mouse_up(&new_event, app, model);
-        } else {
-            if self.has_mouse {
-                self.has_mouse = false;
-                let new_event = event.to_local(self.position());
-                self.widget.mouse_left(&new_event, model);
-            }
+        } else if self.has_mouse {
+            self.has_mouse = false;
+            let new_event = event.to_local(self.position());
+            self.widget.mouse_left(&new_event, model);
         }
     }
 
@@ -174,7 +173,7 @@ impl<Model: ApplicationModel> Widget<Model> for ChildSlot<Model> {
 
             if !self.has_mouse {
                 self.has_mouse = true;
-                self.mouse_entered(&event, model);
+                self.mouse_entered(event, model);
             }
 
             self.widget.mouse_moved(&new_event, model);
@@ -182,7 +181,7 @@ impl<Model: ApplicationModel> Widget<Model> for ChildSlot<Model> {
             let new_event = event.to_local(self.position());
             if self.has_mouse {
                 self.has_mouse = false;
-                self.widget.mouse_left(&event, model);
+                self.widget.mouse_left(event, model);
             }
 
             self.widget.mouse_moved(&new_event, model);
@@ -898,7 +897,7 @@ pub struct PopupMenu {
 
 struct PopupMenuWidget {
     active: bool,
-    children: Vec<Box<PopupMenuWidget>>,
+    children: Vec<PopupMenuWidget>,
 }
 
 impl PopupMenuWidget {
@@ -960,7 +959,7 @@ impl PopupMenu {
     }
 
     fn has_sub_menu_items(&self) -> bool {
-        self.items.len() != 0
+        !self.items.is_empty()
     }
 }
 
