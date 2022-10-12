@@ -132,11 +132,11 @@ impl Vulkan {
                 .enumerate_physical_devices()
                 .expect("Physical device error")
                 .iter()
-                .map(|pdevice| {
+                .filter_map(|pdevice| {
                     self.instance
                         .get_physical_device_queue_family_properties(*pdevice)
                         .iter()
-                        .filter_map(|ref info| {
+                        .filter_map(|info| {
                             if info.queue_flags.contains(flags) {
                                 Some(Gpu::new(self, pdevice))
                             } else {
@@ -145,7 +145,6 @@ impl Vulkan {
                         })
                         .next()
                 })
-                .filter_map(|v| v)
                 .collect::<Vec<Gpu>>()
         }
     }

@@ -63,7 +63,7 @@ impl BufferResource {
                     element_size,
                 );
 
-                data_index = data_index + element_size;
+                data_index += element_size;
                 let ranges = [*MappedMemoryRange::builder()
                     .memory(self.memory)
                     .offset(i)
