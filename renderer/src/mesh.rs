@@ -6,8 +6,8 @@ use vk_utils::{
 };
 
 use crate::{
-    rtx_extensions::RtxExtensions,
     geometry::{BottomLevelAccelerationStructure, Normal, Position, Tangent, Texcoord},
+    rtx_extensions::RtxExtensions,
 };
 
 pub struct Mesh {

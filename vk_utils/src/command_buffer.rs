@@ -10,7 +10,6 @@ use ash::vk::{
 
 use crate::buffer_resource::BufferResource;
 use crate::device_context::DeviceContext;
-use crate::image2d_resource::Image2DResource;
 use crate::image_resource::ImageResource;
 use crate::queue::CommandQueue;
 use crate::wait_handle::WaitHandle;

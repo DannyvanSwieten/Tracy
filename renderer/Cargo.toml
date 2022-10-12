@@ -10,3 +10,4 @@ vk_utils = {path = "../vk_utils"}
 ash = "*"
 byteorder = "*"
 nalgebra-glm = "*"
+slotmap = "*"

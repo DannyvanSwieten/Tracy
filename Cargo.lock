@@ -2040,6 +2040,7 @@ dependencies = [
  "ash",
  "byteorder",
  "nalgebra-glm",
+ "slotmap",
  "vk_utils",
 ]
 

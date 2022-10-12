@@ -1,9 +1,9 @@
 use std::rc::Rc;
 
 use crate::{
-    rtx_extensions::RtxExtensions,
     geometry::{Normal, Position, Tangent, Texcoord},
     mesh::Mesh,
+    rtx_extensions::RtxExtensions,
 };
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
