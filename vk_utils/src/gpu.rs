@@ -38,7 +38,7 @@ impl Gpu {
                 vulkan: vulkan.clone(),
                 features,
                 properties,
-                physical_device: physical_device.clone(),
+                physical_device: *physical_device,
                 queue_family_properties: vulkan
                     .vk_instance()
                     .get_physical_device_queue_family_properties(*physical_device),

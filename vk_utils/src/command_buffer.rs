@@ -29,8 +29,8 @@ impl CommandBuffer {
             .command_pool(queue.pool());
         let handle = unsafe { device.handle().allocate_command_buffers(&info) };
         let mut me = Self {
-            device: device.clone(),
-            queue: queue.clone(),
+            device,
+            queue,
             handle: handle.expect("Command buffer allocation failed"),
             submit_info: [SubmitInfo::default()],
             begin_info: CommandBufferBeginInfo::default(),
@@ -53,7 +53,7 @@ impl CommandBuffer {
 
             match success {
                 Ok(_) => (),
-                Err(error) => assert!(false),
+                Err(_) => panic!(),
             }
         }
     }
@@ -71,7 +71,7 @@ impl CommandBuffer {
 
             match success {
                 Ok(_) => (),
-                Err(error) => assert!(false),
+                Err(_) => panic!(),
             }
         }
     }

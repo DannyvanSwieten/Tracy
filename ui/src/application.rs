@@ -9,7 +9,7 @@ use vk_utils::vulkan::Vulkan;
 
 use super::application_model::ApplicationModel;
 use std::ffi::{CStr, CString};
-use std::path::PathBuf;
+use std::path::Path;
 
 use winit::{
     event::{Event, WindowEvent},
@@ -93,7 +93,7 @@ pub trait ApplicationDelegate<Model: ApplicationModel> {
         ControlFlow::Wait
     }
 
-    fn file_dropped(&mut self, _: &winit::window::WindowId, _: &PathBuf) -> ControlFlow {
+    fn file_dropped(&mut self, _: &winit::window::WindowId, _: &Path) -> ControlFlow {
         ControlFlow::Wait
     }
 }
@@ -254,7 +254,7 @@ impl<Model: ApplicationModel> WindowRegistry<Model> {
         &mut self,
         id: &WindowId,
         state: &mut Model,
-        file: &PathBuf,
+        file: &Path,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) {
         if let Some(delegate) = self.window_delegates.get_mut(id) {
@@ -266,7 +266,7 @@ impl<Model: ApplicationModel> WindowRegistry<Model> {
         &mut self,
         id: &WindowId,
         state: &mut Model,
-        file: &PathBuf,
+        file: &Path,
         position: &winit::dpi::PhysicalPosition<f64>,
     ) {
         if let Some(delegate) = self.window_delegates.get_mut(id) {
@@ -346,7 +346,7 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
             }
 
             while let Some(request) = self.pending_window_requests.pop_front() {
-                d.window_requested(&mut self, &mut s, event_loop, &mut window_registry, request)
+                d.window_requested(&self, &mut s, event_loop, &mut window_registry, request)
             }
             *control_flow = winit::event_loop::ControlFlow::Poll;
             match e {
@@ -408,7 +408,7 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
                         WindowEvent::CursorMoved {
                             device_id,
                             position,
-                            modifiers,
+                            ..
                         },
                     window_id,
                 } => {
@@ -422,7 +422,7 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
                         window_registry.mouse_moved(&mut s, &window_id, &position)
                     }
 
-                    if last_file_drop.len() > 0 {
+                    if !last_file_drop.is_empty() {
                         window_registry.file_dropped(
                             &window_id,
                             &mut s,
@@ -457,7 +457,7 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
                             device_id,
                             state,
                             button,
-                            modifiers,
+                            ..
                         },
                     window_id,
                 } => match state {
@@ -481,15 +481,15 @@ impl<Model: ApplicationModel + 'static> Application<Model> {
                     }
                 },
                 Event::MainEventsCleared => {
-                    d.application_will_update(&self, &mut s, &mut window_registry, &event_loop);
+                    d.application_will_update(&self, &mut s, &mut window_registry, event_loop);
                     window_registry.update(&mut s);
-                    window_registry.draw(&mut self, &mut s);
+                    window_registry.draw(&self, &mut s);
                 }
                 _ => (),
             }
 
             if let ControlFlow::Exit = *control_flow {
-                d.application_will_quit(&mut self, &event_loop)
+                d.application_will_quit(&mut self, event_loop)
             }
         });
     }

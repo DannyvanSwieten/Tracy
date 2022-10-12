@@ -17,7 +17,7 @@ use vk_utils::wait_handle::WaitHandle;
 use super::user_interface::UserInterface;
 use super::window_event::MouseEvent;
 
-use std::rc::Rc;
+use std::{path::Path, rc::Rc};
 
 struct UI<Model: ApplicationModel> {
     canvas: SkiaGpuCanvas2D,
@@ -36,14 +36,14 @@ pub struct UIGpuDrawingWindowDelegate<Model: ApplicationModel> {
     sub_optimal_swapchain: bool,
 }
 
-impl<'a, Model: ApplicationModel + 'static> UIGpuDrawingWindowDelegate<Model> {
+impl<Model: ApplicationModel + 'static> UIGpuDrawingWindowDelegate<Model> {
     pub fn new<F>(device: Rc<DeviceContext>, builder: F) -> Self
     where
         F: Fn(&Model) -> Box<dyn Widget<Model>> + 'static,
     {
         let queue = Rc::new(CommandQueue::new(device.clone(), QueueFlags::GRAPHICS));
         Self {
-            device: device.clone(),
+            device,
             queue,
             renderpass: None,
             ui: None,
@@ -74,7 +74,7 @@ impl<'a, Model: ApplicationModel + 'static> UIGpuDrawingWindowDelegate<Model> {
     }
 }
 
-impl<'a, Model: ApplicationModel + 'static> WindowDelegate<Model>
+impl<Model: ApplicationModel + 'static> WindowDelegate<Model>
     for UIGpuDrawingWindowDelegate<Model>
 {
     fn mouse_moved(&mut self, state: &mut Model, x: f32, y: f32) {
@@ -175,14 +175,14 @@ impl<'a, Model: ApplicationModel + 'static> WindowDelegate<Model>
         });
     }
 
-    fn file_dropped(&mut self, state: &mut Model, path: &std::path::PathBuf, x: f32, y: f32) {
+    fn file_dropped(&mut self, state: &mut Model, path: &Path, x: f32, y: f32) {
         if let Some(ui) = self.ui.as_mut() {
             ui.user_interface
                 .file_dropped(state, path, &skia_safe::Point::new(x, y))
         }
     }
 
-    fn file_hovered(&mut self, state: &mut Model, path: &std::path::PathBuf, x: f32, y: f32) {
+    fn file_hovered(&mut self, state: &mut Model, path: &Path, x: f32, y: f32) {
         if let Some(ui) = self.ui.as_mut() {
             ui.user_interface
                 .file_hovered(state, path, &skia_safe::Point::new(x, y))

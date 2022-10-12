@@ -137,17 +137,9 @@ pub struct GraphicsPipeline {
 
 impl GraphicsPipeline {
     pub fn new(device: Rc<DeviceContext>, state: &GraphicsPipelineState) -> Self {
-        let dynamic_state = state
-            .dynamic_state
-            .unwrap_or(PipelineDynamicStateCreateInfo::default());
-
-        let rasterizer_state = state
-            .rasterization_state
-            .unwrap_or(PipelineRasterizationStateCreateInfo::default());
-
-        let blend_state = state
-            .blend_state
-            .unwrap_or(PipelineColorBlendStateCreateInfo::default());
+        let dynamic_state = state.dynamic_state.unwrap_or_default();
+        let rasterizer_state = state.rasterization_state.unwrap_or_default();
+        let blend_state = state.blend_state.unwrap_or_default();
 
         let info = GraphicsPipelineCreateInfo::builder()
             .dynamic_state(&dynamic_state)

@@ -371,8 +371,10 @@ impl<Model: ApplicationModel> Widget<Model> for Expanded<Model> {
     // If for example you add it to a row it will expand in the horizontal direction. Therefor you should provide a height.
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
         let size = Size::new(
-            self.width.unwrap_or(constraints.max_width().unwrap()),
-            self.height.unwrap_or(constraints.max_height().unwrap()),
+            self.width
+                .unwrap_or_else(|| constraints.max_width().unwrap()),
+            self.height
+                .unwrap_or_else(|| constraints.max_height().unwrap()),
         );
 
         let child_size = self.child.layout(
