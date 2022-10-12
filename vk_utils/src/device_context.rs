@@ -39,7 +39,7 @@ impl DeviceContext {
                     .unwrap();
                 Self {
                     gpu: gpu.clone(),
-                    handle: device_context.clone(),
+                    handle: device_context,
                 }
             }
         } else {

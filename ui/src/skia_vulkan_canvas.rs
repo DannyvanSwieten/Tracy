@@ -49,55 +49,55 @@ fn get_layout(layout: ash::vk::ImageLayout) -> skia_safe::gpu::vk::ImageLayout {
         ash::vk::ImageLayout::UNDEFINED => skia_safe::gpu::vk::ImageLayout::UNDEFINED,
         ash::vk::ImageLayout::GENERAL => skia_safe::gpu::vk::ImageLayout::GENERAL,
         ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL => {
-            return skia_safe::gpu::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
+            skia_safe::gpu::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL
         }
         ash::vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL => {
-            return skia_safe::gpu::vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            skia_safe::gpu::vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL
         }
         ash::vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL => {
-            return skia_safe::gpu::vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+            skia_safe::gpu::vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL
         }
         ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL => {
-            return skia_safe::gpu::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+            skia_safe::gpu::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
         }
         ash::vk::ImageLayout::TRANSFER_SRC_OPTIMAL => {
-            return skia_safe::gpu::vk::ImageLayout::TRANSFER_SRC_OPTIMAL;
+            skia_safe::gpu::vk::ImageLayout::TRANSFER_SRC_OPTIMAL
         }
         ash::vk::ImageLayout::TRANSFER_DST_OPTIMAL => {
-            return skia_safe::gpu::vk::ImageLayout::TRANSFER_DST_OPTIMAL;
+            skia_safe::gpu::vk::ImageLayout::TRANSFER_DST_OPTIMAL
         }
         ash::vk::ImageLayout::PREINITIALIZED => skia_safe::gpu::vk::ImageLayout::PREINITIALIZED,
         ash::vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL => {
-            return skia_safe::gpu::vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL;
+            skia_safe::gpu::vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL
         }
         ash::vk::ImageLayout::DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL => {
-            return skia_safe::gpu::vk::ImageLayout::DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
+            skia_safe::gpu::vk::ImageLayout::DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL
         }
         ash::vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL => {
-            return skia_safe::gpu::vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL;
+            skia_safe::gpu::vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL
         }
         ash::vk::ImageLayout::DEPTH_READ_ONLY_OPTIMAL => {
-            return skia_safe::gpu::vk::ImageLayout::DEPTH_READ_ONLY_OPTIMAL;
+            skia_safe::gpu::vk::ImageLayout::DEPTH_READ_ONLY_OPTIMAL
         }
         ash::vk::ImageLayout::STENCIL_ATTACHMENT_OPTIMAL => {
-            return skia_safe::gpu::vk::ImageLayout::STENCIL_ATTACHMENT_OPTIMAL;
+            skia_safe::gpu::vk::ImageLayout::STENCIL_ATTACHMENT_OPTIMAL
         }
         ash::vk::ImageLayout::STENCIL_READ_ONLY_OPTIMAL => {
-            return skia_safe::gpu::vk::ImageLayout::STENCIL_READ_ONLY_OPTIMAL;
+            skia_safe::gpu::vk::ImageLayout::STENCIL_READ_ONLY_OPTIMAL
         }
         ash::vk::ImageLayout::PRESENT_SRC_KHR => vk::ImageLayout::PRESENT_SRC_KHR,
         ash::vk::ImageLayout::SHARED_PRESENT_KHR => vk::ImageLayout::SHARED_PRESENT_KHR,
         ash::vk::ImageLayout::SHADING_RATE_OPTIMAL_NV => {
-            return skia_safe::gpu::vk::ImageLayout::SHADING_RATE_OPTIMAL_NV;
+            skia_safe::gpu::vk::ImageLayout::SHADING_RATE_OPTIMAL_NV
         }
         ash::vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT => {
-            return skia_safe::gpu::vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT;
+            skia_safe::gpu::vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT
         }
         ash::vk::ImageLayout::READ_ONLY_OPTIMAL_KHR => {
-            return skia_safe::gpu::vk::ImageLayout::READ_ONLY_OPTIMAL_KHR;
+            skia_safe::gpu::vk::ImageLayout::READ_ONLY_OPTIMAL_KHR
         }
         ash::vk::ImageLayout::ATTACHMENT_OPTIMAL_KHR => {
-            return skia_safe::gpu::vk::ImageLayout::ATTACHMENT_OPTIMAL_KHR;
+            skia_safe::gpu::vk::ImageLayout::ATTACHMENT_OPTIMAL_KHR
         }
         _ => skia_safe::gpu::vk::ImageLayout::UNDEFINED,
     }
@@ -468,7 +468,7 @@ impl SkiaGpuCanvas2D {
         let entry = device.gpu().vulkan().library();
         let instance = device.gpu().vulkan().vk_instance();
         let get_proc = move |of| unsafe {
-            if let Some(f) = get_procedure(&entry, instance, of) {
+            if let Some(f) = get_procedure(entry, instance, of) {
                 f as *const std::ffi::c_void
             } else {
                 std::ptr::null()
@@ -599,7 +599,7 @@ impl Canvas2D for SkiaGpuCanvas2D {
     }
 
     fn draw_string(&mut self, rect: &Rect, text: &str, font: &Font, paint: &Paint) {
-        let blob = skia_safe::TextBlob::from_str(text.to_string(), font);
+        let blob = skia_safe::TextBlob::from_str(text, font);
         if let Some(b) = blob {
             let text_bounds = b.bounds();
             let p = rect.center() - text_bounds.center();

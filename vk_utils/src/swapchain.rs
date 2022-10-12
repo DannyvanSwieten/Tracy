@@ -51,7 +51,7 @@ impl Swapchain {
                 device.gpu().vk_physical_device(),
                 device.handle(),
                 &surface_loader,
-                surface.clone(),
+                surface,
                 &swapchain_loader,
                 old_swapchain_handle,
                 queue.clone(),
@@ -145,7 +145,7 @@ impl Swapchain {
 
         Self {
             device: device.clone(),
-            queue: queue.clone(),
+            queue,
             surface,
             handle: swapchain,
             swapchain_loader,
@@ -190,14 +190,14 @@ impl Swapchain {
                         self.framebuffers[index as usize],
                         self.present_semaphores[index as usize],
                     );
-                    self.current_index = self.current_index + 1;
-                    self.current_index = self.current_index % self.image_count() as u32;
-                    return Ok(result);
+                    self.current_index += 1;
+                    self.current_index %= self.image_count() as u32;
+                    Ok(result)
                 }
 
-                Err(code) => return Err(code),
+                Err(code) => Err(code),
             }
-        };
+        }
     }
 
     pub fn logical_width(&self) -> u32 {
@@ -258,11 +258,7 @@ impl Swapchain {
                 .swapchain_loader
                 .queue_present(self.queue.handle(), &present_info);
 
-            if r.is_err() {
-                true
-            } else {
-                false
-            }
+            r.is_err()
         }
     }
 }

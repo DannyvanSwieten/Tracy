@@ -58,7 +58,7 @@ impl RenderPass {
         };
 
         Self {
-            device: device.clone(),
+            device,
             attachment_descriptions,
             attachment_refs,
             subpass_dependencies,
@@ -69,7 +69,7 @@ impl RenderPass {
 
     pub fn new(device: Rc<DeviceContext>) -> Self {
         Self {
-            device: device.clone(),
+            device,
             attachment_refs: Vec::new(),
             attachment_descriptions: Vec::new(),
             subpass_dependencies: Vec::new(),
@@ -85,7 +85,7 @@ impl RenderPass {
         final_layout: ImageLayout,
     ) -> Self {
         let attachment_descriptions = vec![ash::vk::AttachmentDescription {
-            format: format,
+            format,
             samples: ash::vk::SampleCountFlags::TYPE_1,
             load_op: ash::vk::AttachmentLoadOp::LOAD,
             store_op: ash::vk::AttachmentStoreOp::STORE,
@@ -125,7 +125,7 @@ impl RenderPass {
         };
 
         Self {
-            device: device.clone(),
+            device,
             attachment_descriptions,
             attachment_refs,
             subpass_dependencies,

@@ -59,7 +59,7 @@ impl<Model: ApplicationModel> Widget<Model> for TextBox {
         let mut paragraph_builder = ParagraphBuilder::new(&self.style, font_collection);
         let mut ts = TextStyle::new();
         ts.set_font_size(18f32);
-        if self.state.text.len() > 0 {
+        if !self.state.text.is_empty() {
             ts.set_foreground_color(Paint::default());
             paragraph_builder.push_style(&ts);
             paragraph_builder.add_text(&self.state.text);

@@ -60,11 +60,10 @@ impl<Model: ApplicationModel + 'static> Slider<Model> {
 impl<Model: ApplicationModel> Widget<Model> for Slider<Model> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
         // Boldly unwrapping here. If you have not given constraints to a slider then we don't know how big it should be.
-        let my_size = Size::new(
+        Size::new(
             constraints.max_width().unwrap(),
             constraints.max_height().unwrap(),
-        );
-        my_size
+        )
     }
 
     fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, rect: &Size, _: &Model) {
@@ -101,16 +100,13 @@ impl<Model: ApplicationModel> Widget<Model> for Slider<Model> {
             &fill_paint,
         );
 
-        match self.state {
-            SliderState::Active => {
-                fill_paint.set_alpha_f(0.25);
-                canvas.draw_circle(
-                    &Point::new(self.last_position, rect.center_y()),
-                    active_thumb_size,
-                    &fill_paint,
-                );
-            }
-            _ => (),
+        if let SliderState::Active = self.state {
+            fill_paint.set_alpha_f(0.25);
+            canvas.draw_circle(
+                &Point::new(self.last_position, rect.center_y()),
+                active_thumb_size,
+                &fill_paint,
+            );
         }
 
         // self.thumb.paint(theme, canvas, &rect.size(), model)
@@ -184,12 +180,10 @@ impl<Model: ApplicationModel + 'static> Switch<Model> {
 impl<Model: ApplicationModel> Widget<Model> for Switch<Model> {
     fn layout(&mut self, constraints: &BoxConstraints, model: &Model) -> Size {
         // Boldly unwrapping here. If you have not given constraints to a switch then we don't know how big it should be.
-        let my_size = Size::new(
+        Size::new(
             constraints.max_width().unwrap(),
             constraints.max_height().unwrap(),
-        );
-
-        my_size
+        )
     }
 
     fn paint(&self, theme: &Theme, canvas: &mut dyn Canvas2D, rect: &Size, model: &Model) {
@@ -229,16 +223,14 @@ impl<Model: ApplicationModel> Widget<Model> for Switch<Model> {
             thumb_size,
             &fill_paint,
         );
-        match self.state {
-            SliderState::Active => {
-                fill_paint.set_alpha_f(0.25);
-                canvas.draw_circle(
-                    &Point::new(thumb_position, rect.center_y()),
-                    active_thumb_size,
-                    &fill_paint,
-                );
-            }
-            _ => (),
+
+        if let SliderState::Active = self.state {
+            fill_paint.set_alpha_f(0.25);
+            canvas.draw_circle(
+                &Point::new(thumb_position, rect.center_y()),
+                active_thumb_size,
+                &fill_paint,
+            );
         }
     }
 

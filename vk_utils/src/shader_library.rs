@@ -10,7 +10,7 @@ use std::fs::File;
 use crate::device_context::DeviceContext;
 
 pub fn load_spirv(path: &str) -> Vec<u32> {
-    let file = File::open(path).expect(&(String::from("File not found at: ") + &path.to_string()));
+    let file = File::open(path).expect(&(String::from("File not found at: ") + path));
     let meta = std::fs::metadata(path).expect("No metadata found for file");
     let mut buf_reader = std::io::BufReader::new(file);
 
@@ -89,6 +89,6 @@ impl ShaderLibrary {
     }
 
     pub fn get_unchecked(&self, id: &str) -> &ShaderLibraryEntry {
-        &self.entries.get(&String::from(id)).unwrap()
+        self.entries.get(&String::from(id)).unwrap()
     }
 }
