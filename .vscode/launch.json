@@ -10,8 +10,8 @@
             "name": "Launch Debug MacOS",
             "program": "${workspaceFolder}/target/debug/tracey",
             "args": [
-                "--ui_application",
-                "localhost:7000",
+                "--file",
+                "${workspaceFolder}/assets/Duck/glTF/Duck.gltf",
                 "1280",
                 "720"
             ],
@@ -28,12 +28,6 @@
                 "1280",
                 "720"
             ],
-            // "args": [
-            //     "--ui_application",
-            //     "localhost:7000",
-            //     "1280",
-            //     "720"
-            // ],
             "stopOnEntry": false,
             "cwd": "${workspaceFolder}",
             "console": "externalTerminal"
@@ -43,10 +37,6 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/target/release/tracey.exe",
-            // "args": ["--file",
-            //     "${workspaceFolder}/assets/Sponza/glTF/Sponza.gltf",
-            //     "1920", "1080"
-            // ],
             "args": [
                 "--file",
                 "${workspaceFolder}/assets/Sponza/glTF/Sponza.gltf",
@@ -57,12 +47,5 @@
             "cwd": "${workspaceFolder}",
             "console": "externalTerminal"
         },
-        {
-            "type": "pwa-chrome",
-            "request": "launch",
-            "name": "Launch Chrome against localhost",
-            "url": "http://localhost:3000",
-            "webRoot": "${workspaceFolder}"
-        }
     ]
 }

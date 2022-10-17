@@ -15,17 +15,7 @@ use renderer::{
     cpu_resource_cache::Resources, gpu_path_tracer::Renderer, gpu_resource_cache::GpuResourceCache,
     material_resource::Material,
 };
-use ui::{
-    application::{Application, WindowRequest},
-    application_model::ApplicationModel,
-    button::{ButtonStyle, TextButton},
-    flex::{Column, Expanded, Row},
-    slider::{Slider, Switch},
-    text_editor::TextBox,
-    ui_application_delegate::UIApplicationDelegate,
-    widget::{Center, Container, SizedBox, Widget},
-    Color4f, Size,
-};
+
 use vk_utils::vulkan::Vulkan;
 
 use futures::lock::Mutex;
@@ -93,85 +83,5 @@ fn main() {
             image::ColorType::Rgba8,
         )
         .expect("Image Write failed");
-    } else if mode == "--ui_application".to_string() {
-        let application = Application::<State>::new("My App");
-        application.run(
-            UIApplicationDelegate::new().on_start(|app, model| {
-                let request = WindowRequest {
-                    width: 800,
-                    height: 600,
-                    title: Some("Window 1".to_string()),
-                    builder: Box::new(|_state| {
-                        Box::new(Container::new(
-                            Column::new()
-                                .push(Expanded::new(
-                                    Container::new(Row::new())
-                                        .with_color(&Color4f::new(0.75, 0.75, 0.75, 1.0)),
-                                ))
-                                .push(
-                                    Expanded::new(
-                                        Row::new()
-                                            .with_spacing(5f32)
-                                            .push(Expanded::new(
-                                                Container::new(
-                                                    Column::new()
-                                                        .with_spacing(5f32)
-                                                        .push(Expanded::new(Switch::new()))
-                                                        .push(Expanded::new(Slider::new()))
-                                                        .push(Expanded::new(TextButton::new(
-                                                            "Button", 20f32,
-                                                        )))
-                                                        .push(Expanded::new(
-                                                            TextButton::new("Button 2", 20f32)
-                                                                .style(ButtonStyle::Outline),
-                                                        ))
-                                                        .push(Expanded::new(
-                                                            TextButton::new("Button 3", 20f32)
-                                                                .style(ButtonStyle::Fill),
-                                                        ))
-                                                        .push(Expanded::new(TextBox::new(
-                                                            "Text editor...",
-                                                        ))),
-                                                )
-                                                .with_margin(5f32)
-                                                .with_color(&Color4f::new(0.75, 0.75, 0.75, 1.0)),
-                                            ))
-                                            .push(
-                                                Expanded::new(
-                                                    Container::new(Row::new()).with_color(
-                                                        &Color4f::new(0.75, 0.75, 0.75, 1.0),
-                                                    ),
-                                                )
-                                                .with_flex(4.0),
-                                            )
-                                            .push(Expanded::new(
-                                                Container::new(Row::new()).with_color(
-                                                    &Color4f::new(0.75, 0.75, 0.75, 1.0),
-                                                ),
-                                            )),
-                                    )
-                                    .with_flex(2.0),
-                                )
-                                .push(Expanded::new(
-                                    Container::new(Row::new())
-                                        .with_color(&Color4f::new(0.75, 0.75, 0.75, 1.0)),
-                                ))
-                                .with_spacing(5f32),
-                        ))
-                    }),
-                };
-                app.ui_window_request(request);
-            }),
-            State {},
-        )
-    }
-}
-
-pub struct State {}
-impl ApplicationModel for State {
-    type MessageType = i32;
-
-    fn handle_message(&mut self, msg: Self::MessageType) {
-        println!("Message handled: {}", msg)
     }
 }

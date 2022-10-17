@@ -6,7 +6,7 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-vk_utils = {path = "../vk_utils"}
+vk_utils = {git = "https://github.com/DannyvanSwieten/vk_utils.git"}
 ash = "*"
 byteorder = "*"
 nalgebra-glm = "*"

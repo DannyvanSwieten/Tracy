@@ -6,8 +6,7 @@ edition = "2021"
 
 [dependencies]
 renderer = {path = "../renderer"}
-vk_utils = {path = "../vk_utils"}
-ui = {path = "../ui"}
+vk_utils = {git = "https://github.com/DannyvanSwieten/vk_utils.git"}
 ash = "*"
 image = "*"
 nalgebra-glm = "*"

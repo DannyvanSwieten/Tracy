@@ -39,7 +39,7 @@ impl Mesh {
                 | BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
         );
 
-        index_buffer.upload(&indices);
+        index_buffer.upload(indices);
 
         let mut vertex_buffer = BufferResource::new(
             device.clone(),
