@@ -1,7 +1,7 @@
 use std::{rc::Rc, sync::Arc};
 
-use crate::rtx_extensions::RtxExtensions;
-use nalgebra_glm::{vec4, Vec4};
+use crate::{math::Vec4, rtx_extensions::RtxExtensions};
+use cgmath::vec4;
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
 use crate::{

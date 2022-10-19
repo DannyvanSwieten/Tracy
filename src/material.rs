@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
-use glm::vec4;
+use cgmath::vec4;
 
 use crate::gpu_scene::GpuTexture;
+use crate::math::Vec4;
 use crate::uid_object::Handle;
 
 pub struct Material {
-    pub base_color: glm::Vec4,
-    pub emission: glm::Vec4,
+    pub base_color: Vec4,
+    pub emission: Vec4,
     pub roughness: f32,
     pub metallic: f32,
     pub sheen: f32,
@@ -20,8 +21,8 @@ pub struct Material {
 
 impl Material {
     pub fn new(
-        base_color: glm::Vec4,
-        emission: glm::Vec4,
+        base_color: Vec4,
+        emission: Vec4,
         roughness: f32,
         metallic: f32,
         sheen: f32,
@@ -66,7 +67,7 @@ impl Default for Material {
     fn default() -> Self {
         Self {
             base_color: vec4(1., 1., 1., 1.),
-            emission: glm::Vec4::default(),
+            emission: Vec4::new(0.0, 0.0, 0.0, 0.0),
             roughness: 1.0,
             metallic: 0.0,
             sheen: 0.0,
@@ -80,8 +81,8 @@ impl Default for Material {
 }
 #[repr(C)]
 pub(crate) struct GpuMaterial {
-    pub _base_color: glm::Vec4,
-    pub _emission: glm::Vec4,
+    pub _base_color: Vec4,
+    pub _emission: Vec4,
     pub _roughness: f32,
     pub _metallic: f32,
     pub _sheen: f32,

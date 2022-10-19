@@ -1,6 +1,4 @@
-use glm::Mat4;
-
-use crate::{instance::Instance, material::Material, mesh::Mesh, uid_object::Handle};
+use crate::{instance::Instance, material::Material, math::Mat4, mesh::Mesh, uid_object::Handle};
 use std::sync::Arc;
 
 pub struct Shape {

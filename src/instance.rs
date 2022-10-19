@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
-use glm::Mat4;
+use cgmath::Matrix;
 
 use crate::geometry::GeometryInstance;
 use crate::material::Material;
+use crate::math::Mat4;
 use crate::mesh::Mesh;
 use crate::uid_object::Handle;
 
@@ -40,7 +41,7 @@ impl Instance {
             0,
             ash::vk::GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE,
             self.mesh.blas.address(),
-            self.transform.transpose().remove_column(3),
+            self.transform.transpose(),
         )
     }
 }

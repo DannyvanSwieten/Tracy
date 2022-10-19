@@ -11,7 +11,7 @@ use crate::{gpu_resource::GpuResource, gpu_resource_cache::GpuResourceCache};
 
 pub struct MeshResource {
     pub indices: Vec<u32>,
-    pub positions: Vec<Position>,
+    pub vertices: Vec<Position>,
     pub normals: Vec<Normal>,
     pub tangents: Vec<Tangent>,
     pub tex_coords: Vec<Texcoord>,
@@ -20,14 +20,14 @@ pub struct MeshResource {
 impl MeshResource {
     pub fn new(
         indices: Vec<u32>,
-        positions: Vec<Position>,
+        vertices: Vec<Position>,
         normals: Vec<Normal>,
         tangents: Vec<Tangent>,
         tex_coords: Vec<Texcoord>,
     ) -> Self {
         Self {
             indices,
-            positions,
+            vertices,
             normals,
             tangents,
             tex_coords,
@@ -51,7 +51,7 @@ impl GpuResource for MeshResource {
             rtx,
             queue.clone(),
             &self.indices,
-            &self.positions,
+            &self.vertices,
             &self.normals,
             &self.tangents,
             &self.tex_coords,
