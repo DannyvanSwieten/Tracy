@@ -1,4 +1,6 @@
+use ash::vk::GeometryInstanceFlagsKHR;
 use ash::vk::QueueFlags;
+use cgmath::SquareMatrix;
 use slotmap::DefaultKey;
 use slotmap::SlotMap;
 use std::collections::HashMap;
@@ -10,15 +12,23 @@ use vk_utils::image2d_resource::Image2DResource;
 use vk_utils::image_resource::ImageResource;
 use vk_utils::queue::CommandQueue;
 
+use crate::geometry::GeometryInstance;
 use crate::gpu_scene::GpuTexture;
 use crate::image_resource::TextureImageData;
+use crate::math::Mat4;
 use crate::math::Vec4;
 use crate::mesh::Mesh;
+use crate::mesh::MeshAddress;
 use crate::mesh_resource::MeshResource;
 use crate::rtx_extensions::RtxExtensions;
+use crate::scene::Scene;
 
-type Handle = DefaultKey;
+pub type Handle = DefaultKey;
 type Map<V> = SlotMap<Handle, V>;
+
+pub struct Frame {
+    gpu_instances: Vec<GeometryInstance>,
+}
 
 pub struct Ctx {
     device: Rc<DeviceContext>,
@@ -26,12 +36,37 @@ pub struct Ctx {
     queue: Rc<CommandQueue>,
     textures: Map<GpuTexture>,
     meshes: Map<Mesh>,
+    instances: Map<MeshInstance>,
+    default_material: Handle,
     materials: Map<Material2>,
-    instances: HashMap<Handle, Map<MeshInstance>>,
 }
 
-struct MeshInstance {
+pub struct MeshInstance {
     mesh: Handle,
+    material: Handle,
+    transform: Mat4,
+}
+
+impl MeshInstance {
+    fn new(mesh: Handle, material: Handle) -> Self {
+        Self {
+            mesh,
+            material,
+            transform: Mat4::identity(),
+        }
+    }
+
+    pub fn mesh(&self) -> Handle {
+        self.mesh
+    }
+
+    pub fn material(&self) -> Handle {
+        self.material
+    }
+
+    pub fn transform(&self) -> &Mat4 {
+        &self.transform
+    }
 }
 pub struct Material2 {
     pub base_color: Vec4,
@@ -67,19 +102,28 @@ impl Ctx {
     pub fn new(device: Rc<DeviceContext>) -> Self {
         let rtx = RtxExtensions::new(&device);
         let queue = Rc::new(CommandQueue::new(device.clone(), QueueFlags::GRAPHICS));
-        Self {
+        let mut instance = Self {
             device: device.clone(),
             rtx,
             textures: Map::new(),
             meshes: Map::new(),
+            instances: Map::new(),
+            default_material: Handle::default(),
             materials: Map::new(),
-            instances: HashMap::new(),
             queue,
-        }
+        };
+
+        let default_material = instance.create_material();
+        instance.default_material = default_material;
+        instance
     }
 
     pub fn create_material(&mut self) -> Handle {
         self.materials.insert(Material2::new())
+    }
+
+    pub fn material_mut(&mut self, material: Handle) -> Option<&mut Material2> {
+        self.materials.get_mut(material)
     }
 
     pub fn create_mesh(&mut self, mesh: &MeshResource) -> Handle {
@@ -95,7 +139,6 @@ impl Ctx {
         );
 
         let key = self.meshes.insert(m);
-        self.instances.insert(key, Map::new());
         key
     }
 
@@ -151,17 +194,35 @@ impl Ctx {
         self.textures.insert(GpuTexture { image, image_view });
     }
 
-    pub fn create_instance(&mut self, mesh: &Handle) -> Handle {
-        if let Some(instances) = self.instances.get_mut(mesh) {
-            instances.insert(MeshInstance { mesh: *mesh })
-        } else {
-            panic!()
+    pub fn create_instance(&mut self, mesh: Handle) -> Handle {
+        self.instances
+            .insert(MeshInstance::new(mesh, self.default_material))
+    }
+
+    pub fn build_frame(&self, scene: &Scene) -> Frame {
+        let mut geometry_map = HashMap::new();
+        let mut geometries = Vec::new();
+        for (index, (key, geometry)) in self.meshes.iter().enumerate() {
+            geometry_map.insert(key, index);
+            geometries.push((geometry, MeshAddress::new(geometry)));
         }
+
+        let mut gpu_instances = Vec::new();
+        for (instance_id, key) in scene.instances().iter().enumerate() {
+            if let Some(instance) = self.instances.get(*key) {
+                let geometry_index = *geometry_map.get(key).unwrap();
+                let (mesh, addresses) = &geometries[geometry_index];
+                gpu_instances.push(GeometryInstance::new(
+                    instance_id as u32,
+                    0xff,
+                    0,
+                    GeometryInstanceFlagsKHR::FORCE_OPAQUE,
+                    mesh.blas.address(),
+                    instance.transform(),
+                ));
+            }
+        }
+
+        Frame { gpu_instances }
     }
 }
-
-pub struct Actor {
-    instance: Handle,
-}
-
-impl Actor {}

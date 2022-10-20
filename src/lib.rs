@@ -16,5 +16,6 @@ pub mod material_resource;
 pub mod math;
 pub mod mesh;
 pub mod mesh_resource;
+pub mod scene;
 pub mod shape;
 pub mod uid_object;

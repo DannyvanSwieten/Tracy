@@ -46,7 +46,7 @@ impl GeometryInstance {
         hit_group_offset: u32,
         _flags: GeometryInstanceFlagsKHR,
         acceleration_structure_handle: u64,
-        transform: Mat4,
+        transform: &Mat4,
     ) -> Self {
         let id_and_mask = ((mask as u32) << 24) | instance_id;
         let hit_group_offset_and_flags = ((1 as u32) << 24) | hit_group_offset;

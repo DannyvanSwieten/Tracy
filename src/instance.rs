@@ -41,7 +41,7 @@ impl Instance {
             0,
             ash::vk::GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE,
             self.mesh.blas.address(),
-            self.transform.transpose(),
+            &self.transform.transpose(),
         )
     }
 }
