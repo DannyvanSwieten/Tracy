@@ -202,16 +202,32 @@ impl Ctx {
     pub fn build_frame(&self, scene: &Scene) -> Frame {
         let mut geometry_map = HashMap::new();
         let mut geometries = Vec::new();
+        let mut geometry_addresses = Vec::new();
         for (index, (key, geometry)) in self.meshes.iter().enumerate() {
             geometry_map.insert(key, index);
-            geometries.push((geometry, MeshAddress::new(geometry)));
+            geometries.push(geometry);
+            geometry_addresses.push(MeshAddress::new(geometry));
+        }
+
+        let mut texture_map = HashMap::new();
+        let mut textures = Vec::new();
+        for (index, (key, texture)) in self.textures.iter().enumerate() {
+            texture_map.insert(key, index);
+            textures.push(texture);
+        }
+
+        let mut material_map = HashMap::new();
+        let mut materials = Vec::new();
+        for (index, (key, material)) in self.materials.iter().enumerate() {
+            material_map.insert(key, index);
+            materials.push(material);
         }
 
         let mut gpu_instances = Vec::new();
         for (instance_id, key) in scene.instances().iter().enumerate() {
             if let Some(instance) = self.instances.get(*key) {
                 let geometry_index = *geometry_map.get(key).unwrap();
-                let (mesh, addresses) = &geometries[geometry_index];
+                let mesh = &geometries[geometry_index];
                 gpu_instances.push(GeometryInstance::new(
                     instance_id as u32,
                     0xff,
