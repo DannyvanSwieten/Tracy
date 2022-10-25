@@ -1,5 +1,11 @@
+use ash::vk::BufferUsageFlags;
 use ash::vk::GeometryInstanceFlagsKHR;
+use ash::vk::ImageLayout;
+use ash::vk::ImageView;
+use ash::vk::MemoryPropertyFlags;
+use ash::vk::PipelineBindPoint;
 use ash::vk::QueueFlags;
+use ash::vk::ShaderStageFlags;
 use cgmath::SquareMatrix;
 use slotmap::DefaultKey;
 use slotmap::SlotMap;
@@ -12,28 +18,74 @@ use vk_utils::image2d_resource::Image2DResource;
 use vk_utils::image_resource::ImageResource;
 use vk_utils::queue::CommandQueue;
 
+use crate::camera::Camera;
+use crate::descriptor_sets::FrameDescriptors;
+use crate::framebuffer::FrameBuffer;
 use crate::geometry::GeometryInstance;
+use crate::geometry::TopLevelAccelerationStructure;
 use crate::gpu_scene::GpuTexture;
 use crate::image_resource::TextureImageData;
+use crate::material::GpuMaterial;
 use crate::math::Mat4;
 use crate::math::Vec4;
 use crate::mesh::Mesh;
 use crate::mesh::MeshAddress;
 use crate::mesh_resource::MeshResource;
 use crate::rtx_extensions::RtxExtensions;
+use crate::rtx_pipeline::RtxPipeline;
 use crate::scene::Scene;
 
 pub type Handle = DefaultKey;
 type Map<V> = SlotMap<Handle, V>;
 
-pub struct Frame {
-    gpu_instances: Vec<GeometryInstance>,
+pub struct FrameResources {
+    pub cpu_resources: CpuResources,
+    pub gpu_resources: GpuResources,
+    descriptors: Rc<FrameDescriptors>,
+}
+
+pub struct CpuResources {
+    pub gpu_materials: Vec<GpuMaterial>,
+    pub gpu_instances: Vec<GeometryInstance>,
+    pub instance_properties: Vec<InstanceProperties>,
+    pub geometry_addresses: Vec<MeshAddress>,
+    pub camera: Camera,
+}
+
+impl CpuResources {
+    fn material_size(&self) -> u64 {
+        std::mem::size_of::<GpuMaterial>() as u64 * self.gpu_materials.len() as u64
+    }
+
+    fn instance_property_size(&self) -> u64 {
+        std::mem::size_of::<InstanceProperties>() as u64 * self.instance_properties.len() as u64
+    }
+
+    fn geometry_addresses_size(&self) -> u64 {
+        std::mem::size_of::<MeshAddress>() as u64 * self.geometry_addresses.len() as u64
+    }
+}
+pub struct GpuResources {
+    pub image_views: Vec<ImageView>,
+    pub acceleration_structure: TopLevelAccelerationStructure,
+    pub instance_property_buffer: BufferResource,
+    pub material_buffer: BufferResource,
+    pub geometry_address_buffer: BufferResource,
+    pub buffer_address_buffer: BufferResource,
+    pub camera_buffer: BufferResource,
+    pub output_image_views: [ImageView; 2],
+}
+
+pub struct InstanceProperties {
+    geometry_index: u32,
+    material_index: u32,
 }
 
 pub struct Ctx {
     device: Rc<DeviceContext>,
-    rtx: RtxExtensions,
+    rtx: Rc<RtxExtensions>,
     queue: Rc<CommandQueue>,
+    pipeline: RtxPipeline,
     textures: Map<GpuTexture>,
     meshes: Map<Mesh>,
     instances: Map<MeshInstance>,
@@ -98,13 +150,20 @@ impl Material2 {
     }
 }
 
+impl Default for Material2 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Ctx {
-    pub fn new(device: Rc<DeviceContext>) -> Self {
-        let rtx = RtxExtensions::new(&device);
+    pub fn new(device: Rc<DeviceContext>, max_frames_in_flight: u32) -> Self {
+        let rtx = Rc::new(RtxExtensions::new(&device));
         let queue = Rc::new(CommandQueue::new(device.clone(), QueueFlags::GRAPHICS));
         let mut instance = Self {
             device: device.clone(),
-            rtx,
+            rtx: rtx.clone(),
+            pipeline: RtxPipeline::new(device.clone(), rtx.clone(), max_frames_in_flight),
             textures: Map::new(),
             meshes: Map::new(),
             instances: Map::new(),
@@ -116,6 +175,10 @@ impl Ctx {
         let default_material = instance.create_material();
         instance.default_material = default_material;
         instance
+    }
+
+    pub fn create_framebuffer(&self, width: u32, height: u32) -> FrameBuffer {
+        FrameBuffer::new(self.device.clone(), self.queue.clone(), width, height)
     }
 
     pub fn create_material(&mut self) -> Handle {
@@ -138,8 +201,7 @@ impl Ctx {
             &mesh.tex_coords,
         );
 
-        let key = self.meshes.insert(m);
-        key
+        self.meshes.insert(m)
     }
 
     pub fn create_texture(&mut self, data: &TextureImageData) {
@@ -194,12 +256,100 @@ impl Ctx {
         self.textures.insert(GpuTexture { image, image_view });
     }
 
+    pub fn upload_frame(
+        &self,
+        image_views: Vec<ImageView>,
+        framebuffer: &FrameBuffer,
+        frame: &CpuResources,
+    ) -> GpuResources {
+        let mut material_buffer = BufferResource::new(
+            self.device.clone(),
+            frame.material_size(),
+            MemoryPropertyFlags::DEVICE_LOCAL | MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::STORAGE_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+        );
+
+        material_buffer.upload(&frame.gpu_materials);
+
+        let material_address = material_buffer.device_address();
+
+        let mut instance_property_buffer = BufferResource::new(
+            self.device.clone(),
+            frame.instance_property_size(),
+            MemoryPropertyFlags::DEVICE_LOCAL | MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::STORAGE_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+        );
+
+        instance_property_buffer.upload(&frame.instance_properties);
+        let instance_property_buffer_address = instance_property_buffer.device_address();
+
+        let mut buffer_address_buffer = BufferResource::new(
+            self.device.clone(),
+            16,
+            MemoryPropertyFlags::DEVICE_LOCAL | MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::UNIFORM_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+        );
+
+        buffer_address_buffer.upload(&[material_address, instance_property_buffer_address]);
+
+        let mut geometry_address_buffer = BufferResource::new(
+            self.device.clone(),
+            frame.geometry_addresses_size(),
+            MemoryPropertyFlags::DEVICE_LOCAL | MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::STORAGE_BUFFER,
+        );
+
+        geometry_address_buffer.upload(&frame.geometry_addresses);
+
+        let acceleration_structure = TopLevelAccelerationStructure::new(
+            self.device.clone(),
+            &self.rtx,
+            self.queue.clone(),
+            &frame.gpu_instances,
+        );
+
+        let camera_matrices = [
+            frame.camera.view_matrix(),
+            frame.camera.projection_matrix(framebuffer.aspect_ratio()),
+        ];
+
+        let camera_size = std::mem::size_of::<Mat4>() * camera_matrices.len();
+        let mut camera_buffer = BufferResource::new(
+            self.device.clone(),
+            camera_size as u64,
+            MemoryPropertyFlags::DEVICE_LOCAL | MemoryPropertyFlags::HOST_VISIBLE,
+            BufferUsageFlags::UNIFORM_BUFFER,
+        );
+
+        camera_buffer.upload(&camera_matrices);
+
+        let output_image_views = [
+            framebuffer.final_image_view,
+            framebuffer.accumulation_image_view,
+        ];
+
+        GpuResources {
+            acceleration_structure,
+            material_buffer,
+            geometry_address_buffer,
+            instance_property_buffer,
+            image_views,
+            buffer_address_buffer,
+            camera_buffer,
+            output_image_views,
+        }
+    }
+
     pub fn create_instance(&mut self, mesh: Handle) -> Handle {
         self.instances
             .insert(MeshInstance::new(mesh, self.default_material))
     }
 
-    pub fn build_frame(&self, scene: &Scene) -> Frame {
+    pub fn build_frame_resources(
+        &mut self,
+        framebuffer: &FrameBuffer,
+        scene: &Scene,
+    ) -> FrameResources {
         let mut geometry_map = HashMap::new();
         let mut geometries = Vec::new();
         let mut geometry_addresses = Vec::new();
@@ -211,19 +361,59 @@ impl Ctx {
 
         let mut texture_map = HashMap::new();
         let mut textures = Vec::new();
+        let mut material_image_views = Vec::new();
         for (index, (key, texture)) in self.textures.iter().enumerate() {
             texture_map.insert(key, index);
             textures.push(texture);
+            material_image_views.push(texture.image_view);
         }
 
         let mut material_map = HashMap::new();
         let mut materials = Vec::new();
+        let mut gpu_materials = Vec::new();
         for (index, (key, material)) in self.materials.iter().enumerate() {
             material_map.insert(key, index);
             materials.push(material);
+            let base_color_id = if let Some(texture_id) = material.base_color_texture {
+                *texture_map.get(&texture_id).unwrap() as i32
+            } else {
+                -1
+            };
+
+            let emission_id = if let Some(texture_id) = material.emission_texture {
+                *texture_map.get(&texture_id).unwrap() as i32
+            } else {
+                -1
+            };
+
+            let metal_roughness_id = if let Some(texture_id) = material.metallic_roughness_texture {
+                *texture_map.get(&texture_id).unwrap() as i32
+            } else {
+                -1
+            };
+
+            let normal_id = if let Some(texture_id) = material.normal_texture {
+                *texture_map.get(&texture_id).unwrap() as i32
+            } else {
+                -1
+            };
+
+            gpu_materials.push(GpuMaterial {
+                _base_color: material.base_color,
+                _emission: material.emission,
+                _roughness: material.roughness,
+                _metallic: material.metallic,
+                _clear_coat: material.clear_coat,
+                _sheen: material.sheen,
+                _base_color_texture: base_color_id,
+                _emission_texture: emission_id,
+                _metallic_roughness_texture: metal_roughness_id,
+                _normal_texture: normal_id,
+            });
         }
 
         let mut gpu_instances = Vec::new();
+        let mut instance_properties = Vec::new();
         for (instance_id, key) in scene.instances().iter().enumerate() {
             if let Some(instance) = self.instances.get(*key) {
                 let geometry_index = *geometry_map.get(key).unwrap();
@@ -236,9 +426,86 @@ impl Ctx {
                     mesh.blas.address(),
                     instance.transform(),
                 ));
+
+                instance_properties.push(InstanceProperties {
+                    geometry_index: geometry_index as u32,
+                    material_index: *material_map.get(&instance.material()).unwrap() as u32,
+                });
             }
         }
 
-        Frame { gpu_instances }
+        let cpu_resources = CpuResources {
+            gpu_materials,
+            gpu_instances,
+            geometry_addresses,
+            instance_properties,
+            camera: *scene.camera(),
+        };
+
+        let gpu_resources = self.upload_frame(material_image_views, framebuffer, &cpu_resources);
+        let descriptors = self.pipeline.descriptor_sets.next(&gpu_resources);
+
+        FrameResources {
+            cpu_resources,
+            gpu_resources,
+            descriptors,
+        }
+    }
+
+    pub fn render_frame(&self, framebuffer: &mut FrameBuffer, frame: &FrameResources) {
+        let mut command_buffer = CommandBuffer::new(self.device.clone(), self.queue.clone());
+        command_buffer.begin();
+        if framebuffer.final_image.layout() != ImageLayout::GENERAL {
+            command_buffer
+                .image_resource_transition(&mut framebuffer.final_image, ImageLayout::GENERAL);
+        }
+        if framebuffer.accumulation_image.layout() != ImageLayout::GENERAL {
+            command_buffer.image_resource_transition(
+                &mut framebuffer.accumulation_image,
+                ImageLayout::GENERAL,
+            );
+        }
+        command_buffer.bind_descriptor_sets(
+            &self.pipeline.descriptor_sets.pipeline_layout,
+            PipelineBindPoint::RAY_TRACING_KHR,
+            &frame.descriptors.sets,
+        );
+        command_buffer.bind_pipeline(PipelineBindPoint::RAY_TRACING_KHR, &self.pipeline.pipeline);
+        unsafe {
+            command_buffer.record_handle(|handle| {
+                self.device.handle().cmd_bind_pipeline(
+                    handle,
+                    PipelineBindPoint::RAY_TRACING_KHR,
+                    self.pipeline.pipeline,
+                );
+                let constants: Vec<u8> = [8, 0]
+                    .iter()
+                    .flat_map(|val| {
+                        let i: u32 = *val;
+                        i.to_le_bytes()
+                    })
+                    .collect();
+                self.device.handle().cmd_push_constants(
+                    handle,
+                    self.pipeline.descriptor_sets.pipeline_layout,
+                    ShaderStageFlags::RAYGEN_KHR,
+                    0,
+                    &constants,
+                );
+                self.rtx.pipeline_ext().cmd_trace_rays(
+                    handle,
+                    &self.pipeline.stride_addresses[0],
+                    &self.pipeline.stride_addresses[1],
+                    &self.pipeline.stride_addresses[2],
+                    &self.pipeline.stride_addresses[3],
+                    framebuffer.width,
+                    framebuffer.height,
+                    1,
+                );
+                handle
+            });
+        }
+
+        command_buffer.submit();
     }
 }

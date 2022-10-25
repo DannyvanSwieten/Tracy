@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::descriptor_sets::{
     RTXDescriptorSets, ACCELERATION_STRUCTURE_LOCATION, ACCUMULATION_IMAGE_LOCATION,
-    CAMERA_BUFFER_LOCATION, MATERIAL_BUFFER_ADDRESS_LOCATION, MATERIAL_TEXTURE_LOCATION,
+    BUFFER_ADDRESS_LOCATION, CAMERA_BUFFER_LOCATION, MATERIAL_TEXTURE_LOCATION,
     MESH_BUFFERS_LOCATION, OUTPUT_IMAGE_LOCATION,
 };
 
@@ -155,11 +155,6 @@ impl Renderer {
             ImageLayout::GENERAL,
         );
 
-        command_buffer.image_resource_transition(
-            Rc::get_mut(&mut self.output_image).unwrap(),
-            ImageLayout::GENERAL,
-        );
-
         command_buffer.bind_descriptor_sets(
             &self.descriptor_sets.pipeline_layout,
             PipelineBindPoint::RAY_TRACING_KHR,
@@ -177,8 +172,7 @@ impl Renderer {
                     .iter()
                     .flat_map(|val| {
                         let i: u32 = *val;
-                        let bytes = i.to_le_bytes();
-                        bytes
+                        i.to_le_bytes()
                     })
                     .collect();
                 self.device.handle().cmd_push_constants(
@@ -219,7 +213,7 @@ impl Renderer {
         self.output_image.clone()
     }
 
-    pub fn build_frame(&self, scene: &Scene) -> Frame {
+    pub fn build_frame(&mut self, scene: &Scene) -> Frame {
         let mut mesh_addresses = Vec::new();
         let mut materials = Vec::new();
         let mut image_writes = Vec::new();
@@ -328,8 +322,8 @@ impl Renderer {
             &instances,
         );
 
-        let descriptor_sets = self.descriptor_sets.descriptor_sets(&self.device);
-        if image_writes.len() > 0 {
+        let descriptor_sets = &self.descriptor_sets.frame_descriptors[0].sets;
+        if !image_writes.is_empty() {
             let writes = [*WriteDescriptorSet::builder()
                 .dst_set(descriptor_sets[MATERIAL_TEXTURE_LOCATION.0 as usize])
                 .dst_binding(MATERIAL_TEXTURE_LOCATION.1)
@@ -343,20 +337,20 @@ impl Renderer {
         Self::update_acceleration_structure_descriptors(
             &self.device,
             &acceleration_structure,
-            &descriptor_sets,
+            descriptor_sets,
         );
 
         let camera_buffer = self.build_camera_buffer(self.device.clone());
-        Self::update_material_descriptor(&self.device, &descriptor_sets, &material_address_buffer);
-        Self::update_mesh_address_descriptor(&self.device, &descriptor_sets, &mesh_address_buffer);
-        Self::update_camera_descriptors(&self.device, &camera_buffer, &descriptor_sets);
-        self.update_image_descriptors(&self.device, &descriptor_sets);
+        Self::update_material_descriptor(&self.device, descriptor_sets, &material_address_buffer);
+        Self::update_mesh_address_descriptor(&self.device, descriptor_sets, &mesh_address_buffer);
+        Self::update_camera_descriptors(&self.device, &camera_buffer, descriptor_sets);
+        self.update_image_descriptors(&self.device, descriptor_sets);
 
         Frame {
             material_buffer,
             material_address_buffer,
             mesh_address_buffer,
-            descriptor_sets,
+            descriptor_sets: descriptor_sets.clone(),
             acceleration_structure,
             camera_buffer,
         }
@@ -367,7 +361,7 @@ impl Renderer {
     pub fn new(device: Rc<DeviceContext>, width: u32, height: u32) -> Self {
         let rtx = RtxExtensions::new(&device);
         let queue = Rc::new(CommandQueue::new(device.clone(), QueueFlags::GRAPHICS));
-        let descriptor_sets = RTXDescriptorSets::new(&device);
+        let descriptor_sets = RTXDescriptorSets::new(device.clone(), 3);
         let sampler = unsafe {
             device
                 .handle()
@@ -722,9 +716,7 @@ impl Renderer {
         top_level_acceleration_structure: &TopLevelAccelerationStructure,
         descriptor_sets: &[ash::vk::DescriptorSet],
     ) {
-        let structures = [top_level_acceleration_structure
-            .acceleration_structure
-            .clone()];
+        let structures = [top_level_acceleration_structure.acceleration_structure];
         let mut acc_write = *WriteDescriptorSetAccelerationStructureKHR::builder()
             .acceleration_structures(&structures);
 
@@ -792,8 +784,8 @@ impl Renderer {
 
         let writes = [*WriteDescriptorSet::builder()
             .buffer_info(&uniform_buffer_write)
-            .dst_set(descriptor_sets[MATERIAL_BUFFER_ADDRESS_LOCATION.0 as usize])
-            .dst_binding(MATERIAL_BUFFER_ADDRESS_LOCATION.1)
+            .dst_set(descriptor_sets[BUFFER_ADDRESS_LOCATION.0 as usize])
+            .dst_binding(BUFFER_ADDRESS_LOCATION.1)
             .descriptor_type(DescriptorType::UNIFORM_BUFFER)];
 
         unsafe {

@@ -25,8 +25,8 @@ pub type Texcoord = Vec2;
 
 fn transform_to_array(t: &Mat4) -> [f32; 12] {
     [
-        t[0][0], t[0][1], t[0][2], t[3][0], t[1][0], t[1][1], t[1][2], t[1][0], t[2][0], t[2][1],
-        t[2][2], t[2][3],
+        t[0][0], t[0][1], t[0][2], t[1][0], t[1][1], t[1][2], t[2][0], t[2][1], t[2][2], t[3][0],
+        t[3][1], t[3][2],
     ]
 }
 
@@ -49,9 +49,9 @@ impl GeometryInstance {
         transform: &Mat4,
     ) -> Self {
         let id_and_mask = ((mask as u32) << 24) | instance_id;
-        let hit_group_offset_and_flags = ((1 as u32) << 24) | hit_group_offset;
+        let hit_group_offset_and_flags = ((1_u32) << 24) | hit_group_offset;
         Self {
-            transform: transform_to_array(&transform),
+            transform: transform_to_array(transform),
             id_and_mask,
             hit_group_offset_and_flags,
             acceleration_structure_handle,

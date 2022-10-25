@@ -1,41 +1,35 @@
+use std::rc::Rc;
+
 use ash::vk::{
-    DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet,
-    DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding,
-    DescriptorSetLayoutCreateInfo, DescriptorType, PipelineLayout, PipelineLayoutCreateInfo,
-    PushConstantRange, ShaderStageFlags,
+    DescriptorBufferInfo, DescriptorImageInfo, DescriptorPool, DescriptorPoolCreateInfo,
+    DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayoutBinding,
+    DescriptorSetLayoutCreateInfo, DescriptorType, ImageLayout, ImageView, PipelineLayout,
+    PipelineLayoutCreateInfo, PushConstantRange, ShaderStageFlags, WriteDescriptorSet,
+    WriteDescriptorSetAccelerationStructureKHR,
 };
 
-use vk_utils::device_context::DeviceContext;
+use vk_utils::{buffer_resource::BufferResource, device_context::DeviceContext};
 
-pub const CAMERA_BUFFER_LOCATION: (u32, u32) = (1, 0);
-pub const MATERIAL_BUFFER_ADDRESS_LOCATION: (u32, u32) = (1, 1);
-pub const MATERIAL_TEXTURE_LOCATION: (u32, u32) = (1, 2);
-pub const MESH_BUFFERS_LOCATION: (u32, u32) = (1, 3);
-
+use crate::{ctx::GpuResources, geometry::TopLevelAccelerationStructure};
 pub const ACCELERATION_STRUCTURE_LOCATION: (u32, u32) = (0, 0);
 pub const OUTPUT_IMAGE_LOCATION: (u32, u32) = (0, 1);
 pub const ACCUMULATION_IMAGE_LOCATION: (u32, u32) = (0, 2);
 
+pub const CAMERA_BUFFER_LOCATION: (u32, u32) = (1, 0);
+pub const BUFFER_ADDRESS_LOCATION: (u32, u32) = (1, 1);
+pub const MESH_BUFFERS_LOCATION: (u32, u32) = (1, 2);
+pub const MATERIAL_TEXTURE_LOCATION: (u32, u32) = (1, 3);
+
 pub struct RTXDescriptorSets {
-    pub descriptor_set_layouts: Vec<DescriptorSetLayout>,
+    pub max_sets: u32,
+    pub next_set: u32,
     pub descriptor_pool: DescriptorPool,
     pub pipeline_layout: PipelineLayout,
+    pub frame_descriptors: Vec<Rc<FrameDescriptors>>,
 }
 
 impl RTXDescriptorSets {
-    pub fn descriptor_sets(&self, device: &DeviceContext) -> Vec<DescriptorSet> {
-        let descriptor_set_create_info = DescriptorSetAllocateInfo::builder()
-            .set_layouts(&self.descriptor_set_layouts)
-            .descriptor_pool(self.descriptor_pool);
-        unsafe {
-            device
-                .handle()
-                .allocate_descriptor_sets(&descriptor_set_create_info)
-                .expect("Descriptor set allocation failed")
-        }
-    }
-
-    pub fn new(device: &DeviceContext) -> Self {
+    pub fn new(device: Rc<DeviceContext>, max_sets: u32) -> Self {
         unsafe {
             let set_0_bindings = [
                 // acceleration structure
@@ -69,18 +63,18 @@ impl RTXDescriptorSets {
                 *DescriptorSetLayoutBinding::builder()
                     .descriptor_count(1)
                     .descriptor_type(DescriptorType::UNIFORM_BUFFER)
-                    .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR | ShaderStageFlags::RAYGEN_KHR)
-                    .binding(MATERIAL_BUFFER_ADDRESS_LOCATION.1),
-                *DescriptorSetLayoutBinding::builder()
-                    .descriptor_count(1024)
-                    .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
                     .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
-                    .binding(MATERIAL_TEXTURE_LOCATION.1),
+                    .binding(BUFFER_ADDRESS_LOCATION.1),
                 *DescriptorSetLayoutBinding::builder()
                     .descriptor_count(1)
                     .descriptor_type(DescriptorType::STORAGE_BUFFER)
                     .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
                     .binding(MESH_BUFFERS_LOCATION.1),
+                *DescriptorSetLayoutBinding::builder()
+                    .descriptor_count(1024)
+                    .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
+                    .binding(MATERIAL_TEXTURE_LOCATION.1),
             ];
 
             let set_1 = *DescriptorSetLayoutCreateInfo::builder().bindings(&set_1_bindings);
@@ -136,18 +130,189 @@ impl RTXDescriptorSets {
                 },
             ];
             let descriptor_pool_create_info = DescriptorPoolCreateInfo::builder()
-                .max_sets(32)
+                .max_sets(max_sets * 2)
                 .pool_sizes(&sizes);
             let descriptor_pool = device
                 .handle()
                 .create_descriptor_pool(&descriptor_pool_create_info, None)
                 .expect("Descriptor pool creation failed");
 
+            let descriptor_set_create_info = DescriptorSetAllocateInfo::builder()
+                .set_layouts(&descriptor_set_layouts)
+                .descriptor_pool(descriptor_pool);
+
+            let frame_descriptors = (0..max_sets)
+                .into_iter()
+                .map(|_| {
+                    device
+                        .handle()
+                        .allocate_descriptor_sets(&descriptor_set_create_info)
+                        .expect("Descriptor set allocation failed")
+                })
+                .map(|sets| {
+                    Rc::new(FrameDescriptors {
+                        device: device.clone(),
+                        sets,
+                    })
+                })
+                .collect();
+
             Self {
-                descriptor_set_layouts,
+                max_sets,
+                next_set: 0,
                 pipeline_layout,
                 descriptor_pool,
+                frame_descriptors,
             }
+        }
+    }
+
+    pub fn next(&mut self, resources: &GpuResources) -> Rc<FrameDescriptors> {
+        let next = self.next_set;
+        self.next_set += 1;
+        self.next_set %= self.max_sets;
+        Rc::get_mut(&mut self.frame_descriptors[next as usize])
+            .unwrap()
+            .update(resources);
+        self.frame_descriptors[next as usize].clone()
+    }
+}
+
+pub struct FrameDescriptors {
+    pub device: Rc<DeviceContext>,
+    pub sets: Vec<DescriptorSet>,
+}
+
+impl FrameDescriptors {
+    pub fn new(device: Rc<DeviceContext>, sets: Vec<DescriptorSet>) -> Self {
+        Self { sets, device }
+    }
+
+    pub fn update(&mut self, resources: &GpuResources) {
+        self.update_acceleration_structure(&resources.acceleration_structure);
+        self.update_images(&resources.image_views);
+        self.update_buffer_address_buffer(&resources.buffer_address_buffer);
+        self.update_geometry_address_buffer(&resources.geometry_address_buffer);
+        self.update_camera_buffer(&resources.camera_buffer);
+        self.update_output_images(&resources.output_image_views);
+    }
+
+    fn update_acceleration_structure(&self, acc_structure: &TopLevelAccelerationStructure) {
+        let structures = [acc_structure.acceleration_structure];
+        let mut acc_write = *WriteDescriptorSetAccelerationStructureKHR::builder()
+            .acceleration_structures(&structures);
+
+        let mut writes = [*WriteDescriptorSet::builder()
+            .push_next(&mut acc_write)
+            .dst_set(self.sets[ACCELERATION_STRUCTURE_LOCATION.0 as usize])
+            .dst_binding(ACCELERATION_STRUCTURE_LOCATION.1)
+            .descriptor_type(DescriptorType::ACCELERATION_STRUCTURE_KHR)];
+
+        writes[0].descriptor_count = 1;
+
+        unsafe {
+            self.device.handle().update_descriptor_sets(&writes, &[]);
+        }
+    }
+
+    fn update_images(&self, images: &[ImageView]) {
+        let image_infos: Vec<[DescriptorImageInfo; 1]> = images
+            .iter()
+            .map(|view| {
+                [*DescriptorImageInfo::builder()
+                    .image_view(*view)
+                    .image_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]
+                // .sampler(self.sampler)
+            })
+            .collect();
+
+        let writes: Vec<WriteDescriptorSet> = image_infos
+            .iter()
+            .map(|info| {
+                *WriteDescriptorSet::builder()
+                    .image_info(info)
+                    .dst_set(self.sets[MATERIAL_TEXTURE_LOCATION.0 as usize])
+                    .dst_binding(MATERIAL_TEXTURE_LOCATION.1)
+                    .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
+            })
+            .collect();
+
+        unsafe {
+            self.device.handle().update_descriptor_sets(&writes, &[]);
+        }
+    }
+
+    fn update_buffer_address_buffer(&self, buffer: &BufferResource) {
+        let info = [*DescriptorBufferInfo::builder()
+            .buffer(buffer.buffer)
+            .range(buffer.content_size())];
+
+        let writes = [*WriteDescriptorSet::builder()
+            .buffer_info(&info)
+            .dst_set(self.sets[BUFFER_ADDRESS_LOCATION.0 as usize])
+            .dst_binding(BUFFER_ADDRESS_LOCATION.1)
+            .descriptor_type(DescriptorType::UNIFORM_BUFFER)];
+
+        unsafe {
+            self.device.handle().update_descriptor_sets(&writes, &[]);
+        }
+    }
+
+    fn update_geometry_address_buffer(&self, buffer: &BufferResource) {
+        let info = [*DescriptorBufferInfo::builder()
+            .buffer(buffer.buffer)
+            .range(buffer.content_size())];
+
+        let writes = [*WriteDescriptorSet::builder()
+            .buffer_info(&info)
+            .dst_set(self.sets[MESH_BUFFERS_LOCATION.0 as usize])
+            .dst_binding(MESH_BUFFERS_LOCATION.1)
+            .descriptor_type(DescriptorType::STORAGE_BUFFER)];
+
+        unsafe {
+            self.device.handle().update_descriptor_sets(&writes, &[]);
+        }
+    }
+
+    fn update_camera_buffer(&self, buffer: &BufferResource) {
+        let info = [*DescriptorBufferInfo::builder()
+            .buffer(buffer.buffer)
+            .range(buffer.content_size())];
+
+        let writes = [*WriteDescriptorSet::builder()
+            .buffer_info(&info)
+            .dst_set(self.sets[CAMERA_BUFFER_LOCATION.0 as usize])
+            .dst_binding(CAMERA_BUFFER_LOCATION.1)
+            .descriptor_type(DescriptorType::UNIFORM_BUFFER)];
+
+        unsafe {
+            self.device.handle().update_descriptor_sets(&writes, &[]);
+        }
+    }
+
+    fn update_output_images(&self, image_views: &[ImageView; 2]) {
+        let image_writes = [*DescriptorImageInfo::builder()
+            .image_view(image_views[0])
+            .image_layout(ImageLayout::GENERAL)];
+        let accumulation_image_writes = [*DescriptorImageInfo::builder()
+            .image_view(image_views[1])
+            .image_layout(ImageLayout::GENERAL)];
+
+        let writes = [
+            *WriteDescriptorSet::builder()
+                .image_info(&image_writes)
+                .dst_set(self.sets[OUTPUT_IMAGE_LOCATION.0 as usize])
+                .dst_binding(OUTPUT_IMAGE_LOCATION.1)
+                .descriptor_type(DescriptorType::STORAGE_IMAGE),
+            *WriteDescriptorSet::builder()
+                .image_info(&accumulation_image_writes)
+                .dst_set(self.sets[ACCUMULATION_IMAGE_LOCATION.0 as usize])
+                .dst_binding(ACCUMULATION_IMAGE_LOCATION.1)
+                .descriptor_type(DescriptorType::STORAGE_IMAGE),
+        ];
+
+        unsafe {
+            self.device.handle().update_descriptor_sets(&writes, &[]);
         }
     }
 }

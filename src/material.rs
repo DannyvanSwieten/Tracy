@@ -80,7 +80,7 @@ impl Default for Material {
     }
 }
 #[repr(C)]
-pub(crate) struct GpuMaterial {
+pub struct GpuMaterial {
     pub _base_color: Vec4,
     pub _emission: Vec4,
     pub _roughness: f32,

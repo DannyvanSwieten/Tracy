@@ -21,18 +21,23 @@ struct BufferAddresses {
     uint64_t texcoord_address;
 };
 
+struct InstanceProperties{
+    uint32_t geometry_id;
+    uint32_t material_id;
+};
+
 layout(set = 0, binding = 0) uniform accelerationStructureEXT topLevelAS;
 
 hitAttributeEXT vec2 attribs;
 layout(location = 0) rayPayloadInEXT RayPayload ray;
 
-layout(set = 1, binding = 1) uniform MaterialAddressBuffer {
+layout(set = 1, binding = 1) uniform BufferAddressBuffer {
     uint64_t material_address;
+    uint64_t instance_properties_address;
 };
 
-layout(set = 1, binding = 2) uniform sampler2D images[1024];
-layout(set = 1, binding = 3, scalar) buffer AddressBuffer { BufferAddresses addresses[]; } meshes;
-
+layout(set = 1, binding = 2, scalar) buffer AddressBuffer { BufferAddresses addresses[]; } meshes;
+layout(set = 1, binding = 3) uniform sampler2D images[1024];
 
 void direction_of_anisotropicity(vec3 N, out vec3 tangent, out vec3 binormal){
     tangent = cross(N, vec3(1.,0.,1.));
@@ -46,10 +51,13 @@ layout(buffer_reference, scalar) readonly buffer Tangents { vec3 data[]; };
 layout(buffer_reference, scalar) readonly buffer Indices { int32_t data[]; };
 layout(buffer_reference, scalar) readonly buffer TextureCoordinates { vec2 data[]; };
 layout(buffer_reference, scalar) readonly buffer Materials { Material data[]; };
+layout(buffer_reference, scalar) readonly buffer InstanceIds { InstanceProperties data[]; };
 
 void main()
 {
-    BufferAddresses mesh = meshes.addresses[gl_InstanceCustomIndexEXT];
+    InstanceIds ids = InstanceIds(instance_properties_address);
+    InstanceProperties properties = ids.data[gl_InstanceCustomIndexEXT];
+    BufferAddresses mesh = meshes.addresses[properties.geometry_id];
 
     Materials materials = Materials(material_address);
     Normals normals = Normals(mesh.normal_address);
@@ -90,7 +98,7 @@ void main()
     vec2 Xi = vec2(rand_float(ray.seed), rand_float(ray.seed));
 
     int instance_id = gl_InstanceCustomIndexEXT;
-    Material material = materials.data[instance_id];
+    Material material = materials.data[properties.material_id];
 
     const vec3 t0 = gl_ObjectToWorldEXT * vec4(tangents.data[i0], 0);
     const vec3 t1 = gl_ObjectToWorldEXT * vec4(tangents.data[i1], 0);
@@ -145,6 +153,7 @@ void main()
     }
 
     ray.color.rgb += ray.emission.rgb * ray.emission.a;
+    ray.color.rgb = vec3(1);
     ray.direct = vec3(0);
     ray.w_out = nextDir;
     ray.point = P;
