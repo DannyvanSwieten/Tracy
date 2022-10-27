@@ -1,4 +1,4 @@
-use cgmath::{perspective, Rad, SquareMatrix};
+use cgmath::{perspective, Deg, Rad, SquareMatrix};
 
 use crate::math::{Mat4, Real, Vec3};
 
@@ -33,6 +33,8 @@ impl Camera {
     }
 
     pub fn projection_matrix(&self, aspect_ratio: Real) -> Mat4 {
-        perspective(Rad(self.fov), aspect_ratio, self.z_near, self.z_far)
+        perspective(Deg(self.fov), aspect_ratio, self.z_near, self.z_far)
+            .invert()
+            .unwrap()
     }
 }

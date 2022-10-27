@@ -27,6 +27,7 @@ use crate::gpu_scene::GpuTexture;
 use crate::image_resource::TextureImageData;
 use crate::material::GpuMaterial;
 use crate::math::Mat4;
+use crate::math::Vec3;
 use crate::math::Vec4;
 use crate::mesh::Mesh;
 use crate::mesh::MeshAddress;
@@ -119,6 +120,23 @@ impl MeshInstance {
     pub fn transform(&self) -> &Mat4 {
         &self.transform
     }
+
+    pub fn scale(&mut self, scale: &Vec3) -> &mut Self {
+        self.transform = self.transform * Mat4::from_nonuniform_scale(scale.x, scale.y, scale.z);
+        self
+    }
+
+    pub fn translate(&mut self, translation: &Vec3) -> &mut Self {
+        self.transform = self.transform * Mat4::from_translation(*translation);
+        self
+    }
+
+    pub fn rotate(&mut self, rotation: &Vec3) -> &mut Self {
+        self.transform = self.transform * Mat4::from_angle_x(cgmath::Deg(rotation.x));
+        self.transform = self.transform * Mat4::from_angle_y(cgmath::Deg(rotation.y));
+        self.transform = self.transform * Mat4::from_angle_z(cgmath::Deg(rotation.z));
+        self
+    }
 }
 pub struct Material2 {
     pub base_color: Vec4,
@@ -136,9 +154,9 @@ pub struct Material2 {
 impl Material2 {
     pub fn new() -> Self {
         Self {
-            base_color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+            base_color: Vec4::new(0.5, 0.5, 0.5, 1.0),
             emission: Vec4::new(0.0, 0.0, 0.0, 0.0),
-            roughness: 0.5,
+            roughness: 1.0,
             metallic: 0.0,
             sheen: 0.0,
             clear_coat: 0.0,
@@ -163,7 +181,7 @@ impl Ctx {
         let mut instance = Self {
             device: device.clone(),
             rtx: rtx.clone(),
-            pipeline: RtxPipeline::new(device.clone(), rtx.clone(), max_frames_in_flight),
+            pipeline: RtxPipeline::new(device, rtx, max_frames_in_flight),
             textures: Map::new(),
             meshes: Map::new(),
             instances: Map::new(),
@@ -285,7 +303,7 @@ impl Ctx {
 
         let mut buffer_address_buffer = BufferResource::new(
             self.device.clone(),
-            16,
+            std::mem::size_of::<u64>() as u64 * 2,
             MemoryPropertyFlags::DEVICE_LOCAL | MemoryPropertyFlags::HOST_VISIBLE,
             BufferUsageFlags::UNIFORM_BUFFER | BufferUsageFlags::SHADER_DEVICE_ADDRESS,
         );
@@ -343,6 +361,10 @@ impl Ctx {
     pub fn create_instance(&mut self, mesh: Handle) -> Handle {
         self.instances
             .insert(MeshInstance::new(mesh, self.default_material))
+    }
+
+    pub fn instance_mut(&mut self, handle: Handle) -> Option<&mut MeshInstance> {
+        self.instances.get_mut(handle)
     }
 
     pub fn build_frame_resources(
@@ -416,13 +438,13 @@ impl Ctx {
         let mut instance_properties = Vec::new();
         for (instance_id, key) in scene.instances().iter().enumerate() {
             if let Some(instance) = self.instances.get(*key) {
-                let geometry_index = *geometry_map.get(key).unwrap();
+                let geometry_index = *geometry_map.get(&instance.mesh()).unwrap();
                 let mesh = &geometries[geometry_index];
                 gpu_instances.push(GeometryInstance::new(
                     instance_id as u32,
                     0xff,
                     0,
-                    GeometryInstanceFlagsKHR::FORCE_OPAQUE,
+                    GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE,
                     mesh.blas.address(),
                     instance.transform(),
                 ));
@@ -478,7 +500,7 @@ impl Ctx {
                     PipelineBindPoint::RAY_TRACING_KHR,
                     self.pipeline.pipeline,
                 );
-                let constants: Vec<u8> = [8, 0]
+                let constants: Vec<u8> = [64, 0]
                     .iter()
                     .flat_map(|val| {
                         let i: u32 = *val;

@@ -125,6 +125,7 @@ void main()
     vec3 wi = vec3(0.0);
     vec3 wo = normalize(-gl_WorldRayDirectionEXT);
     vec3 base_color = material.base_color.rgb;
+
     if(material.maps[0] != -1)
     {
         base_color *= texture(images[material.maps[0]], uv).rgb;
@@ -153,7 +154,6 @@ void main()
     }
 
     ray.color.rgb += ray.emission.rgb * ray.emission.a;
-    ray.color.rgb = vec3(1);
     ray.direct = vec3(0);
     ray.w_out = nextDir;
     ray.point = P;

@@ -13,6 +13,7 @@ use ash::vk::{
     GeometryInstanceFlagsKHR, GeometryTypeKHR, IndexType, MemoryPropertyFlags,
 };
 use ash::Device;
+use cgmath::Matrix;
 use vk_utils::buffer_resource::BufferResource;
 use vk_utils::command_buffer::CommandBuffer;
 use vk_utils::device_context::DeviceContext;
@@ -24,9 +25,10 @@ pub type Tangent = Vec3;
 pub type Texcoord = Vec2;
 
 fn transform_to_array(t: &Mat4) -> [f32; 12] {
+    let t = t.transpose();
     [
-        t[0][0], t[0][1], t[0][2], t[1][0], t[1][1], t[1][2], t[2][0], t[2][1], t[2][2], t[3][0],
-        t[3][1], t[3][2],
+        t[0][0], t[0][1], t[0][2], t[0][3], t[1][0], t[1][1], t[1][2], t[1][3], t[2][0], t[2][1],
+        t[2][2], t[2][3],
     ]
 }
 

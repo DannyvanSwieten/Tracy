@@ -4,25 +4,22 @@ use ash::extensions::ext::DebugUtils;
 
 use cgmath::{vec2, vec3};
 use renderer::{
-    ctx::Ctx,
-    gpu_path_tracer::Renderer,
-    math::{Vec3, Vec4},
-    mesh_resource::MeshResource,
+    camera::Camera, ctx::Ctx, gpu_path_tracer::Renderer, math::Vec4, mesh_resource::MeshResource,
     scene::Scene,
 };
 use vk_utils::vulkan::Vulkan;
 
 pub fn create_floor() -> MeshResource {
-    let mut vertices = vec![
-        vec3(-1.0, -1.0, 5.0),
-        vec3(1.0, -1.0, 5.0),
-        vec3(0.0, 1.0, 5.0),
+    let vertices = vec![
+        vec3(-10.0, -10.0, 0.0),
+        vec3(10.0, -10.0, 0.0),
+        vec3(0.0, 10.0, 0.0),
     ];
 
     let normals = vec![
-        vec3(0.0, 1.0, 0.0),
-        vec3(0.0, 1.0, 0.0),
-        vec3(0.0, 1.0, 0.0),
+        vec3(0.0, 0.0, 1.0),
+        vec3(0.0, 0.0, 1.0),
+        vec3(0.0, 0.0, 1.0),
     ];
 
     let tangents = vec![
@@ -33,12 +30,7 @@ pub fn create_floor() -> MeshResource {
 
     let tex_coords = vec![vec2(0.0, 1.0), vec2(0.0, 0.0), vec2(1.0, 0.0)];
 
-    let vertices = vertices
-        .iter_mut()
-        .map(|vertex| *vertex * 1000.0 - Vec3::new(0.0, 1.0, 0.0))
-        .collect();
-
-    let indices = vec![0, 1, 2];
+    let indices = vec![0, 2, 1];
 
     MeshResource {
         indices,
@@ -68,12 +60,12 @@ fn main() {
     let mut framebuffer = ctx.create_framebuffer(image_width, image_height);
     let floor = create_floor();
     let floor_mesh = ctx.create_mesh(&floor);
-    let floor_material = ctx.create_material();
     let floor_instance = ctx.create_instance(floor_mesh);
-    if let Some(mat) = ctx.material_mut(floor_material).as_mut() {
-        mat.base_color = Vec4::new(1.0, 0.0, 0.0, 1.0);
-    }
+
     let mut scene = Scene::new();
+    let mut camera = Camera::new(45.0, 0.01, 1000.0);
+    camera.translate(vec3(0.0, 0.0, 5.0));
+    scene.set_camera(camera);
     scene.add_instance(floor_instance);
     let frame = ctx.build_frame_resources(&framebuffer, &scene);
     ctx.render_frame(&mut framebuffer, &frame);

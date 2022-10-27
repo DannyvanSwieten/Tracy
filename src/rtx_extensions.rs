@@ -40,7 +40,7 @@ impl RtxExtensions {
             acceleration_structure_ext,
             ray_tracing_pipeline_ext,
             memory_properties: physical_device_memory_properties,
-            pipeline_properties: pipeline_properties,
+            pipeline_properties,
         }
     }
 

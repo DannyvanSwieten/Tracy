@@ -47,9 +47,9 @@ impl GpuResource for MeshResource {
     ) -> Self::Item {
         // Turn Cpu mesh into Gpu mesh
         Mesh::new(
-            device.clone(),
+            device,
             rtx,
-            queue.clone(),
+            queue,
             &self.indices,
             &self.vertices,
             &self.normals,
