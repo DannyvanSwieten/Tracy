@@ -1,12 +1,12 @@
 use std::rc::Rc;
 
-use crate::{rtx_extensions::RtxExtensions, gpu_scene::GpuTexture};
+use crate::{gpu_scene::GpuTexture, rtx_extensions::RtxExtensions};
 use vk_utils::{
     buffer_resource::BufferResource, command_buffer::CommandBuffer, device_context::DeviceContext,
     image2d_resource::Image2DResource, image_resource::ImageResource, queue::CommandQueue,
 };
 
-use crate::{gpu_resource::GpuResource, gpu_resource_cache::GpuResourceCache};
+use crate::gpu_resource::GpuResource;
 
 pub struct TextureImageData {
     pub format: ash::vk::Format,
@@ -50,7 +50,6 @@ impl GpuResource for TextureImageData {
         device: Rc<DeviceContext>,
         _: &RtxExtensions,
         queue: Rc<CommandQueue>,
-        _: &GpuResourceCache,
     ) -> Self::Item {
         let mut image = Image2DResource::new(
             device.clone(),

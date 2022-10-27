@@ -1,10 +1,17 @@
+use ash::extensions::khr::AccelerationStructure;
+use ash::extensions::khr::DeferredHostOperations;
+use ash::extensions::khr::RayTracingPipeline;
 use ash::vk::BufferUsageFlags;
 use ash::vk::GeometryInstanceFlagsKHR;
 use ash::vk::ImageLayout;
 use ash::vk::ImageView;
+use ash::vk::KhrPortabilitySubsetFn;
 use ash::vk::MemoryPropertyFlags;
+use ash::vk::PhysicalDeviceFeatures2KHR;
 use ash::vk::PipelineBindPoint;
 use ash::vk::QueueFlags;
+use ash::vk::Sampler;
+use ash::vk::SamplerCreateInfo;
 use ash::vk::ShaderStageFlags;
 use cgmath::SquareMatrix;
 use slotmap::DefaultKey;
@@ -14,6 +21,7 @@ use std::rc::Rc;
 use vk_utils::buffer_resource::BufferResource;
 use vk_utils::command_buffer::CommandBuffer;
 use vk_utils::device_context::DeviceContext;
+use vk_utils::gpu::Gpu;
 use vk_utils::image2d_resource::Image2DResource;
 use vk_utils::image_resource::ImageResource;
 use vk_utils::queue::CommandQueue;
@@ -68,6 +76,7 @@ impl CpuResources {
 }
 pub struct GpuResources {
     pub image_views: Vec<ImageView>,
+    pub sampler: Sampler,
     pub acceleration_structure: TopLevelAccelerationStructure,
     pub instance_property_buffer: BufferResource,
     pub material_buffer: BufferResource,
@@ -92,6 +101,7 @@ pub struct Ctx {
     instances: Map<MeshInstance>,
     default_material: Handle,
     materials: Map<Material2>,
+    default_sampler: Sampler,
 }
 
 pub struct MeshInstance {
@@ -111,6 +121,11 @@ impl MeshInstance {
 
     pub fn mesh(&self) -> Handle {
         self.mesh
+    }
+
+    pub fn set_material(&mut self, material: Handle) -> &mut Self {
+        self.material = material;
+        self
     }
 
     pub fn material(&self) -> Handle {
@@ -178,6 +193,13 @@ impl Ctx {
     pub fn new(device: Rc<DeviceContext>, max_frames_in_flight: u32) -> Self {
         let rtx = Rc::new(RtxExtensions::new(&device));
         let queue = Rc::new(CommandQueue::new(device.clone(), QueueFlags::GRAPHICS));
+        let sampler_info = *SamplerCreateInfo::builder();
+        let default_sampler = unsafe {
+            device
+                .handle()
+                .create_sampler(&sampler_info, None)
+                .expect("Sampler creation failed")
+        };
         let mut instance = Self {
             device: device.clone(),
             rtx: rtx.clone(),
@@ -188,11 +210,60 @@ impl Ctx {
             default_material: Handle::default(),
             materials: Map::new(),
             queue,
+            default_sampler,
         };
 
         let default_material = instance.create_material();
         instance.default_material = default_material;
         instance
+    }
+
+    pub fn create_suitable_device_windows(gpu: &Gpu) -> DeviceContext {
+        let extensions = [
+            RayTracingPipeline::name(),
+            AccelerationStructure::name(),
+            DeferredHostOperations::name(),
+        ];
+
+        let mut rt_features = ash::vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::builder()
+            .ray_tracing_pipeline(true);
+        let mut address_features =
+            ash::vk::PhysicalDeviceVulkan12Features::builder().buffer_device_address(true);
+        let mut acc_features = ash::vk::PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
+            .acceleration_structure(true);
+        let mut features2 = ash::vk::PhysicalDeviceFeatures2KHR::default();
+        unsafe {
+            gpu.vulkan()
+                .vk_instance()
+                .get_physical_device_features2(*gpu.vk_physical_device(), &mut features2);
+        }
+
+        gpu.device_context(&extensions, |builder| {
+            builder
+                .push_next(&mut address_features)
+                .push_next(&mut rt_features)
+                .push_next(&mut acc_features)
+                .enabled_features(&features2.features)
+        })
+    }
+
+    pub fn create_suitable_device_mac(gpu: &Gpu) -> DeviceContext {
+        let extensions = [KhrPortabilitySubsetFn::name()];
+
+        let mut address_features =
+            ash::vk::PhysicalDeviceVulkan12Features::builder().buffer_device_address(true);
+        let mut features2 = PhysicalDeviceFeatures2KHR::default();
+        unsafe {
+            gpu.vulkan()
+                .vk_instance()
+                .get_physical_device_features2(*gpu.vk_physical_device(), &mut features2);
+        }
+
+        gpu.device_context(&extensions, |builder| {
+            builder
+                .push_next(&mut address_features)
+                .enabled_features(&features2.features)
+        })
     }
 
     pub fn create_framebuffer(&self, width: u32, height: u32) -> FrameBuffer {
@@ -222,7 +293,7 @@ impl Ctx {
         self.meshes.insert(m)
     }
 
-    pub fn create_texture(&mut self, data: &TextureImageData) {
+    pub fn create_texture(&mut self, data: &TextureImageData) -> Handle {
         let mut image = Image2DResource::new(
             self.device.clone(),
             data.width,
@@ -271,12 +342,13 @@ impl Ctx {
                 .expect("Image view creation failed")
         };
 
-        self.textures.insert(GpuTexture { image, image_view });
+        self.textures.insert(GpuTexture { image, image_view })
     }
 
     pub fn upload_frame(
         &self,
         image_views: Vec<ImageView>,
+        sampler: &Sampler,
         framebuffer: &FrameBuffer,
         frame: &CpuResources,
     ) -> GpuResources {
@@ -355,6 +427,7 @@ impl Ctx {
             buffer_address_buffer,
             camera_buffer,
             output_image_views,
+            sampler: *sampler,
         }
     }
 
@@ -464,7 +537,12 @@ impl Ctx {
             camera: *scene.camera(),
         };
 
-        let gpu_resources = self.upload_frame(material_image_views, framebuffer, &cpu_resources);
+        let gpu_resources = self.upload_frame(
+            material_image_views,
+            &self.default_sampler,
+            framebuffer,
+            &cpu_resources,
+        );
         let descriptors = self.pipeline.descriptor_sets.next(&gpu_resources);
 
         FrameResources {
@@ -474,60 +552,69 @@ impl Ctx {
         }
     }
 
-    pub fn render_frame(&self, framebuffer: &mut FrameBuffer, frame: &FrameResources) {
-        let mut command_buffer = CommandBuffer::new(self.device.clone(), self.queue.clone());
-        command_buffer.begin();
-        if framebuffer.final_image.layout() != ImageLayout::GENERAL {
-            command_buffer
-                .image_resource_transition(&mut framebuffer.final_image, ImageLayout::GENERAL);
-        }
-        if framebuffer.accumulation_image.layout() != ImageLayout::GENERAL {
-            command_buffer.image_resource_transition(
-                &mut framebuffer.accumulation_image,
-                ImageLayout::GENERAL,
+    pub fn render_frame(
+        &self,
+        framebuffer: &mut FrameBuffer,
+        frame: &FrameResources,
+        pass_count: u32,
+        samples_per_pass: u32,
+    ) {
+        for pass in 0..pass_count {
+            let mut command_buffer = CommandBuffer::new(self.device.clone(), self.queue.clone());
+            command_buffer.begin();
+            if framebuffer.final_image.layout() != ImageLayout::GENERAL {
+                command_buffer
+                    .image_resource_transition(&mut framebuffer.final_image, ImageLayout::GENERAL);
+            }
+            if framebuffer.accumulation_image.layout() != ImageLayout::GENERAL {
+                command_buffer.image_resource_transition(
+                    &mut framebuffer.accumulation_image,
+                    ImageLayout::GENERAL,
+                );
+            }
+            command_buffer.bind_descriptor_sets(
+                &self.pipeline.descriptor_sets.pipeline_layout,
+                PipelineBindPoint::RAY_TRACING_KHR,
+                &frame.descriptors.sets,
             );
-        }
-        command_buffer.bind_descriptor_sets(
-            &self.pipeline.descriptor_sets.pipeline_layout,
-            PipelineBindPoint::RAY_TRACING_KHR,
-            &frame.descriptors.sets,
-        );
-        command_buffer.bind_pipeline(PipelineBindPoint::RAY_TRACING_KHR, &self.pipeline.pipeline);
-        unsafe {
-            command_buffer.record_handle(|handle| {
-                self.device.handle().cmd_bind_pipeline(
-                    handle,
-                    PipelineBindPoint::RAY_TRACING_KHR,
-                    self.pipeline.pipeline,
-                );
-                let constants: Vec<u8> = [64, 0]
-                    .iter()
-                    .flat_map(|val| {
-                        let i: u32 = *val;
-                        i.to_le_bytes()
-                    })
-                    .collect();
-                self.device.handle().cmd_push_constants(
-                    handle,
-                    self.pipeline.descriptor_sets.pipeline_layout,
-                    ShaderStageFlags::RAYGEN_KHR,
-                    0,
-                    &constants,
-                );
-                self.rtx.pipeline_ext().cmd_trace_rays(
-                    handle,
-                    &self.pipeline.stride_addresses[0],
-                    &self.pipeline.stride_addresses[1],
-                    &self.pipeline.stride_addresses[2],
-                    &self.pipeline.stride_addresses[3],
-                    framebuffer.width,
-                    framebuffer.height,
-                    1,
-                );
-                handle
-            });
-        }
+            command_buffer
+                .bind_pipeline(PipelineBindPoint::RAY_TRACING_KHR, &self.pipeline.pipeline);
+            unsafe {
+                command_buffer.record_handle(|handle| {
+                    self.device.handle().cmd_bind_pipeline(
+                        handle,
+                        PipelineBindPoint::RAY_TRACING_KHR,
+                        self.pipeline.pipeline,
+                    );
+                    let constants: Vec<u8> = [samples_per_pass, pass]
+                        .iter()
+                        .flat_map(|val| {
+                            let i: u32 = *val;
+                            i.to_le_bytes()
+                        })
+                        .collect();
+                    self.device.handle().cmd_push_constants(
+                        handle,
+                        self.pipeline.descriptor_sets.pipeline_layout,
+                        ShaderStageFlags::RAYGEN_KHR,
+                        0,
+                        &constants,
+                    );
+                    self.rtx.pipeline_ext().cmd_trace_rays(
+                        handle,
+                        &self.pipeline.stride_addresses[0],
+                        &self.pipeline.stride_addresses[1],
+                        &self.pipeline.stride_addresses[2],
+                        &self.pipeline.stride_addresses[3],
+                        framebuffer.width,
+                        framebuffer.height,
+                        1,
+                    );
+                    handle
+                });
+            }
 
-        command_buffer.submit();
+            command_buffer.submit();
+        }
     }
 }

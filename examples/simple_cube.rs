@@ -138,20 +138,8 @@ fn main() {
     scene.set_camera(camera);
     let cube = create_cube();
     let cube_mesh = ctx.create_mesh(&cube);
-
-    for i in -10..10 {
-        let f = i as f32;
-        let cube_instance = ctx.create_instance(cube_mesh);
-        if let Some(instance) = ctx.instance_mut(cube_instance) {
-            let r = f * 10.;
-            instance
-                .translate(&vec3(f, f.sin(), 0.0))
-                .scale(&vec3(0.5, 0.5, 0.5))
-                .rotate(&vec3(r, r, r));
-        }
-
-        scene.add_instance(cube_instance);
-    }
+    let cube_instance = ctx.create_instance(cube_mesh);
+    scene.add_instance(cube_instance);
 
     let floor_instance = ctx.create_instance(cube_mesh);
     if let Some(instance) = ctx.instance_mut(floor_instance) {
@@ -166,7 +154,7 @@ fn main() {
     ctx.render_frame(&mut framebuffer, &frame, 120, 4);
     let image_data = framebuffer.download_output();
     image::save_buffer(
-        "Instanced Cubes.png",
+        "Simple Cube.png",
         &image_data,
         image_width,
         image_height,

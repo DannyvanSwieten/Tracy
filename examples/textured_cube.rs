@@ -6,9 +6,11 @@ use cgmath::vec3;
 use renderer::{
     camera::Camera,
     ctx::Ctx,
+    image_resource::TextureImageData,
     math::{Vec2, Vec3},
     mesh_resource::MeshResource,
     scene::Scene,
+    vk::Format,
 };
 use vk_utils::vulkan::Vulkan;
 
@@ -136,22 +138,28 @@ fn main() {
     let mut camera = Camera::new(45.0, 0.01, 1000.0);
     camera.translate(vec3(0.0, 0.0, -10.0));
     scene.set_camera(camera);
+    let image =
+        image::open("C:\\Users\\danny\\Documents\\code\\tracey\\assets\\checkerboard.png").unwrap();
+    let texture_handle = ctx.create_texture(&TextureImageData::new(
+        Format::R8G8B8A8_UNORM,
+        image.width(),
+        image.height(),
+        image.as_bytes(),
+    ));
+
+    let material_handle = ctx.create_material();
+    if let Some(material) = ctx.material_mut(material_handle) {
+        material.base_color_texture = Some(texture_handle);
+    }
+
     let cube = create_cube();
     let cube_mesh = ctx.create_mesh(&cube);
-
-    for i in -10..10 {
-        let f = i as f32;
-        let cube_instance = ctx.create_instance(cube_mesh);
-        if let Some(instance) = ctx.instance_mut(cube_instance) {
-            let r = f * 10.;
-            instance
-                .translate(&vec3(f, f.sin(), 0.0))
-                .scale(&vec3(0.5, 0.5, 0.5))
-                .rotate(&vec3(r, r, r));
-        }
-
-        scene.add_instance(cube_instance);
+    let cube_instance = ctx.create_instance(cube_mesh);
+    if let Some(instance) = ctx.instance_mut(cube_instance) {
+        instance.set_material(material_handle);
     }
+
+    scene.add_instance(cube_instance);
 
     let floor_instance = ctx.create_instance(cube_mesh);
     if let Some(instance) = ctx.instance_mut(floor_instance) {
@@ -166,7 +174,7 @@ fn main() {
     ctx.render_frame(&mut framebuffer, &frame, 120, 4);
     let image_data = framebuffer.download_output();
     image::save_buffer(
-        "Instanced Cubes.png",
+        "Textured Cube.png",
         &image_data,
         image_width,
         image_height,

@@ -4,7 +4,7 @@ use ash::vk::{
     DescriptorBufferInfo, DescriptorImageInfo, DescriptorPool, DescriptorPoolCreateInfo,
     DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayoutBinding,
     DescriptorSetLayoutCreateInfo, DescriptorType, ImageLayout, ImageView, PipelineLayout,
-    PipelineLayoutCreateInfo, PushConstantRange, ShaderStageFlags, WriteDescriptorSet,
+    PipelineLayoutCreateInfo, PushConstantRange, Sampler, ShaderStageFlags, WriteDescriptorSet,
     WriteDescriptorSetAccelerationStructureKHR,
 };
 
@@ -190,7 +190,7 @@ impl FrameDescriptors {
 
     pub fn update(&mut self, resources: &GpuResources) {
         self.update_acceleration_structure(&resources.acceleration_structure);
-        self.update_images(&resources.image_views);
+        self.update_images(&resources.image_views, &resources.sampler);
         self.update_buffer_address_buffer(&resources.buffer_address_buffer);
         self.update_geometry_address_buffer(&resources.geometry_address_buffer);
         self.update_camera_buffer(&resources.camera_buffer);
@@ -215,14 +215,14 @@ impl FrameDescriptors {
         }
     }
 
-    fn update_images(&self, images: &[ImageView]) {
+    fn update_images(&self, images: &[ImageView], sampler: &Sampler) {
         let image_infos: Vec<[DescriptorImageInfo; 1]> = images
             .iter()
             .map(|view| {
                 [*DescriptorImageInfo::builder()
                     .image_view(*view)
-                    .image_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]
-                // .sampler(self.sampler)
+                    .image_layout(ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                    .sampler(*sampler)]
             })
             .collect();
 

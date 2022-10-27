@@ -128,7 +128,7 @@ void main()
 
     if(material.maps[0] != -1)
     {
-        base_color *= texture(images[material.maps[0]], uv).rgb;
+        base_color = texture(images[material.maps[0]], uv).rgb;
     }
     base_color = pow(base_color, vec3(2.2));
     float metal = material.properties[1];

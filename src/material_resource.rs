@@ -6,7 +6,6 @@ use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
 use crate::{
     gpu_resource::{CpuResource, GpuResource},
-    gpu_resource_cache::GpuResourceCache,
     image_resource::TextureImageData,
 };
 
@@ -56,44 +55,38 @@ impl Material {
     }
 }
 
-impl GpuResource for Material {
-    type Item = crate::material::Material;
+// impl GpuResource for Material {
+//     type Item = crate::material::Material;
 
-    fn prepare(
-        &self,
-        _: Rc<DeviceContext>,
-        _: &RtxExtensions,
-        _: Rc<CommandQueue>,
-        cache: &GpuResourceCache,
-    ) -> Self::Item {
-        let mut mat = crate::material::Material::new(
-            self.base_color,
-            self.emission,
-            self.roughness,
-            self.metallic,
-            self.sheen,
-            self.clear_coat,
-        );
+//     fn prepare(&self, _: Rc<DeviceContext>, _: &RtxExtensions, _: Rc<CommandQueue>) -> Self::Item {
+//         let mut mat = crate::material::Material::new(
+//             self.base_color,
+//             self.emission,
+//             self.roughness,
+//             self.metallic,
+//             self.sheen,
+//             self.clear_coat,
+//         );
 
-        if let Some(base_color_texture) = &self.albedo_map {
-            mat = mat
-                .with_base_color_texture(cache.texture(base_color_texture.uid()).unwrap().clone())
-        }
-        if let Some(metallic_roughness_texture) = &self.metallic_roughness_map {
-            mat = mat.with_metallic_roughness_texture(
-                cache
-                    .texture(metallic_roughness_texture.uid())
-                    .unwrap()
-                    .clone(),
-            )
-        }
-        if let Some(emission_texture) = &self.emission_map {
-            mat = mat.with_emission_texture(cache.texture(emission_texture.uid()).unwrap().clone())
-        }
-        if let Some(normal_texture) = &self.emission_map {
-            mat = mat.with_emission_texture(cache.texture(normal_texture.uid()).unwrap().clone())
-        }
+//         if let Some(base_color_texture) = &self.albedo_map {
+//             mat = mat
+//                 .with_base_color_texture(cache.texture(base_color_texture.uid()).unwrap().clone())
+//         }
+//         if let Some(metallic_roughness_texture) = &self.metallic_roughness_map {
+//             mat = mat.with_metallic_roughness_texture(
+//                 cache
+//                     .texture(metallic_roughness_texture.uid())
+//                     .unwrap()
+//                     .clone(),
+//             )
+//         }
+//         if let Some(emission_texture) = &self.emission_map {
+//             mat = mat.with_emission_texture(cache.texture(emission_texture.uid()).unwrap().clone())
+//         }
+//         if let Some(normal_texture) = &self.emission_map {
+//             mat = mat.with_emission_texture(cache.texture(normal_texture.uid()).unwrap().clone())
+//         }
 
-        mat
-    }
-}
+//         mat
+//     }
+// }

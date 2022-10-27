@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use ash::extensions::ext::DebugUtils;
 
-use cgmath::vec3;
+use cgmath::{vec3, vec4};
 use renderer::{
     camera::Camera,
     ctx::Ctx,
@@ -142,12 +142,23 @@ fn main() {
     for i in -10..10 {
         let f = i as f32;
         let cube_instance = ctx.create_instance(cube_mesh);
+
+        let material_handle = ctx.create_material();
+        if let Some(material) = ctx.material_mut(material_handle) {
+            let n = (f + 10.0) / 20.0;
+            material.roughness = n;
+            material.metallic = 1.0 - n;
+            material.base_color.x = n;
+            material.base_color.y = 1.0 - n;
+        }
+
         if let Some(instance) = ctx.instance_mut(cube_instance) {
             let r = f * 10.;
             instance
                 .translate(&vec3(f, f.sin(), 0.0))
                 .scale(&vec3(0.5, 0.5, 0.5))
-                .rotate(&vec3(r, r, r));
+                .rotate(&vec3(r, r, r))
+                .set_material(material_handle);
         }
 
         scene.add_instance(cube_instance);
@@ -166,7 +177,7 @@ fn main() {
     ctx.render_frame(&mut framebuffer, &frame, 120, 4);
     let image_data = framebuffer.download_output();
     image::save_buffer(
-        "Instanced Cubes.png",
+        "Instance Cubes Materials.png",
         &image_data,
         image_width,
         image_height,

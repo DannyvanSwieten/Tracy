@@ -7,7 +7,7 @@ use crate::{
 };
 use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
 
-use crate::{gpu_resource::GpuResource, gpu_resource_cache::GpuResourceCache};
+use crate::gpu_resource::GpuResource;
 
 pub struct MeshResource {
     pub indices: Vec<u32>,
@@ -43,7 +43,6 @@ impl GpuResource for MeshResource {
         device: Rc<DeviceContext>,
         rtx: &RtxExtensions,
         queue: Rc<CommandQueue>,
-        _: &GpuResourceCache,
     ) -> Self::Item {
         // Turn Cpu mesh into Gpu mesh
         Mesh::new(
