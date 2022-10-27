@@ -1,13 +1,3 @@
-use std::rc::Rc;
-
-use crate::{gpu_scene::GpuTexture, rtx_extensions::RtxExtensions};
-use vk_utils::{
-    buffer_resource::BufferResource, command_buffer::CommandBuffer, device_context::DeviceContext,
-    image2d_resource::Image2DResource, image_resource::ImageResource, queue::CommandQueue,
-};
-
-use crate::gpu_resource::GpuResource;
-
 pub struct TextureImageData {
     pub format: ash::vk::Format,
     pub width: u32,
@@ -40,70 +30,4 @@ impl TextureImageData {
             }
         }
     }
-}
-
-impl GpuResource for TextureImageData {
-    type Item = GpuTexture;
-
-    fn prepare(
-        &self,
-        device: Rc<DeviceContext>,
-        _: &RtxExtensions,
-        queue: Rc<CommandQueue>,
-    ) -> Self::Item {
-        let mut image = Image2DResource::new(
-            device.clone(),
-            self.width,
-            self.height,
-            self.format,
-            ash::vk::ImageUsageFlags::TRANSFER_DST | ash::vk::ImageUsageFlags::SAMPLED,
-            ash::vk::MemoryPropertyFlags::DEVICE_LOCAL,
-        );
-
-        let mut buffer = BufferResource::new(
-            device.clone(),
-            self.pixels.len() as u64,
-            ash::vk::MemoryPropertyFlags::HOST_VISIBLE,
-            ash::vk::BufferUsageFlags::TRANSFER_SRC,
-        );
-
-        buffer.upload(&self.pixels);
-
-        let mut command_buffer = CommandBuffer::new(device.clone(), queue.clone());
-        command_buffer.begin();
-        command_buffer
-            .image_resource_transition(&mut image, ash::vk::ImageLayout::TRANSFER_DST_OPTIMAL);
-
-        command_buffer.copy_buffer_to_image(&buffer, &mut image);
-
-        command_buffer
-            .image_resource_transition(&mut image, ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
-
-        command_buffer.submit();
-
-        let view_info = *ash::vk::ImageViewCreateInfo::builder()
-            .format(self.format)
-            .view_type(ash::vk::ImageViewType::TYPE_2D)
-            .image(image.handle())
-            .subresource_range(
-                *ash::vk::ImageSubresourceRange::builder()
-                    .layer_count(1)
-                    .level_count(1)
-                    .aspect_mask(ash::vk::ImageAspectFlags::COLOR),
-            );
-
-        let image_view = unsafe {
-            device
-                .handle()
-                .create_image_view(&view_info, None)
-                .expect("Image view creation failed")
-        };
-
-        GpuTexture { image_view, image }
-    }
-}
-
-pub struct TextureResource {
-    pub id: usize,
-    pub image: TextureImageData,
 }

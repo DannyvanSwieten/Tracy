@@ -1,13 +1,4 @@
-use std::rc::Rc;
-
-use crate::{
-    geometry::{Normal, Position, Tangent, Texcoord},
-    mesh::Mesh,
-    rtx_extensions::RtxExtensions,
-};
-use vk_utils::{device_context::DeviceContext, queue::CommandQueue};
-
-use crate::gpu_resource::GpuResource;
+use crate::geometry::{Normal, Position, Tangent, Texcoord};
 
 pub struct MeshResource {
     pub indices: Vec<u32>,
@@ -32,28 +23,5 @@ impl MeshResource {
             tangents,
             tex_coords,
         }
-    }
-}
-
-impl GpuResource for MeshResource {
-    type Item = Mesh;
-
-    fn prepare(
-        &self,
-        device: Rc<DeviceContext>,
-        rtx: &RtxExtensions,
-        queue: Rc<CommandQueue>,
-    ) -> Self::Item {
-        // Turn Cpu mesh into Gpu mesh
-        Mesh::new(
-            device,
-            rtx,
-            queue,
-            &self.indices,
-            &self.vertices,
-            &self.normals,
-            &self.tangents,
-            &self.tex_coords,
-        )
     }
 }

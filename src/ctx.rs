@@ -517,7 +517,7 @@ impl Ctx {
                     instance_id as u32,
                     0xff,
                     0,
-                    GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE,
+                    GeometryInstanceFlagsKHR::FORCE_OPAQUE,
                     mesh.blas.address(),
                     instance.transform(),
                 ));
