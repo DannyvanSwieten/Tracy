@@ -151,7 +151,6 @@ fn main() {
             material.base_color.x = n;
             material.base_color.y = 1.0 - n;
             material.transmission = 1.0;
-            material.ior = 1.025;
         }
 
         if let Some(instance) = ctx.instance_mut(cube_instance) {
