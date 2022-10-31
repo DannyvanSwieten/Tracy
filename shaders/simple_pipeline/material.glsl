@@ -11,5 +11,6 @@ struct Material
     // int metallic_roughness_texture;
     // int normal_texture;
     // int emission_texture;
+    vec2 transmission;
     ivec4 maps;
 };

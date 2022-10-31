@@ -120,10 +120,6 @@ void main()
     }
 
     ray.normal = N;
-
-    float pdf = 0.0;
-    vec3 wi = vec3(0.0);
-    vec3 wo = normalize(-gl_WorldRayDirectionEXT);
     vec3 base_color = material.base_color.rgb;
 
     if(material.maps[0] != -1)
@@ -141,9 +137,9 @@ void main()
     }
 
     vec3 random = random_pcg3d(uvec3(gl_LaunchIDEXT.xy, ray.seed));
-    vec3 nextFactor;
-    vec3 nextDir = sampleMicrofacetBRDF(wo, N, base_color, metal, 0.5, roughness, 0.0, 1.5, random, nextFactor);
-    vec3 P = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
+    vec3 nextFactor = vec3(0);
+    vec3 wo = normalize(-gl_WorldRayDirectionEXT);
+    vec3 nextDir = sampleMicrofacetBRDF(wo, N, base_color, metal, 0.5, roughness, material.transmission.y, material.transmission.x, random, nextFactor);
 
     ray.hit = true;
     ray.color = vec4(max(nextFactor, 0), 1);
@@ -156,5 +152,5 @@ void main()
     ray.color.rgb += ray.emission.rgb * ray.emission.a;
     ray.direct = vec3(0);
     ray.w_out = nextDir;
-    ray.point = P;
+    ray.point = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;;
 }

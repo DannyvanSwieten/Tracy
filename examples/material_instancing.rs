@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use ash::extensions::ext::DebugUtils;
 
-use cgmath::{vec3, vec4};
+use cgmath::vec3;
 use renderer::{
     camera::Camera,
     ctx::Ctx,
@@ -147,16 +147,18 @@ fn main() {
         if let Some(material) = ctx.material_mut(material_handle) {
             let n = (f + 10.0) / 20.0;
             material.roughness = n;
-            material.metallic = 1.0 - n;
+            material.metallic = 0.0; // 1.0 - n;
             material.base_color.x = n;
             material.base_color.y = 1.0 - n;
+            material.transmission = 1.0;
+            material.ior = 1.025;
         }
 
         if let Some(instance) = ctx.instance_mut(cube_instance) {
             let r = f * 10.;
             instance
                 .translate(&vec3(f, f.sin(), 0.0))
-                .scale(&vec3(0.5, 0.5, 0.5))
+                .scale(&vec3(0.75, 0.75, 0.75))
                 .rotate(&vec3(r, r, r))
                 .set_material(material_handle);
         }

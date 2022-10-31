@@ -24,8 +24,8 @@ float D_GGX(float NoH, float roughness) {
 }
 
 float G1_GGX_Schlick(float NdotV, float roughness) {
-  float r = roughness; // original
-  //float r = 0.5 + 0.5 * roughness; // Disney remapM_PIng
+  // float r = roughness; // original
+  float r = 0.5 + 0.5 * roughness; // Disney remapM_PIng
   float k = (r * r) / 2.0;
   float denom = NdotV * (1.0 - k) + k;
   return NdotV / denom;
@@ -75,10 +75,10 @@ vec3 sampleMicrofacetBRDF(in vec3 V, in vec3 N, in vec3 baseColor, in float meta
               in float ior, in vec3 random, out vec3 nextFactor) {
   
   if(random.z < 0.5) { // non-specular light
-    if(2.0 * random.z < transmission) { // transmitted light
+    if((2.0 * random.z) < transmission) { // transmitted light
       vec3 forwardNormal = N;
       float frontFacing = dot(V, N);
-      float eta =1.0 / ior;
+      float eta = 1.0 / ior;
       if(frontFacing < 0.0) {
          forwardNormal = -N;
          eta = ior;
@@ -94,7 +94,7 @@ vec3 sampleMicrofacetBRDF(in vec3 V, in vec3 N, in vec3 baseColor, in float meta
       vec3 H = getNormalSpace(forwardNormal) * localH;  
       
       // compute L from sampled H
-      vec3 L = refract(-V, H, eta);
+      vec3 L = normalize(refract(-V, H, eta));
       
       // all required dot products
       float NoV = clamp(dot(forwardNormal, V), 0.0, 1.0);

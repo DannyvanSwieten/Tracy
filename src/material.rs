@@ -8,6 +8,8 @@ pub struct GpuMaterial {
     pub _metallic: f32,
     pub _sheen: f32,
     pub _clear_coat: f32,
+    pub _ior: f32,
+    pub _transmission: f32,
     pub _base_color_texture: i32,
     pub _metallic_roughness_texture: i32,
     pub _normal_texture: i32,
