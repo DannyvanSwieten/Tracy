@@ -1,8 +1,9 @@
-use crate::{camera::Camera, ctx::Handle};
+use crate::{camera::Camera, ctx::Handle, skybox::SkyBox};
 
 pub struct Scene {
     instances: Vec<Handle>,
     camera: Camera,
+    skybox: Option<SkyBox>,
 }
 
 impl Scene {
@@ -10,6 +11,7 @@ impl Scene {
         Self {
             instances: Vec::new(),
             camera: Camera::new(1.13, 0.01, 1000.0),
+            skybox: None,
         }
     }
 
@@ -23,6 +25,14 @@ impl Scene {
 
     pub fn set_camera(&mut self, camera: Camera) {
         self.camera = camera
+    }
+
+    pub fn set_skybox(&mut self, skybox: SkyBox) {
+        self.skybox = Some(skybox)
+    }
+
+    pub fn skybox(&self) -> Option<SkyBox> {
+        self.skybox
     }
 
     pub fn camera(&self) -> &Camera {

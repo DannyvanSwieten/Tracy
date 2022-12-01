@@ -19,6 +19,7 @@ pub const CAMERA_BUFFER_LOCATION: (u32, u32) = (1, 0);
 pub const BUFFER_ADDRESS_LOCATION: (u32, u32) = (1, 1);
 pub const MESH_BUFFERS_LOCATION: (u32, u32) = (1, 2);
 pub const MATERIAL_TEXTURE_LOCATION: (u32, u32) = (1, 3);
+pub const SKYBOX_TEXTURE_LOCATION: (u32, u32) = (1, 4);
 
 pub struct RTXDescriptorSets {
     pub max_sets: u32,
@@ -75,6 +76,11 @@ impl RTXDescriptorSets {
                     .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
                     .stage_flags(ShaderStageFlags::CLOSEST_HIT_KHR)
                     .binding(MATERIAL_TEXTURE_LOCATION.1),
+                *DescriptorSetLayoutBinding::builder()
+                    .descriptor_count(1)
+                    .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .stage_flags(ShaderStageFlags::MISS_KHR)
+                    .binding(SKYBOX_TEXTURE_LOCATION.1),
             ];
 
             let set_1 = *DescriptorSetLayoutCreateInfo::builder().bindings(&set_1_bindings);
@@ -127,6 +133,10 @@ impl RTXDescriptorSets {
                 DescriptorPoolSize {
                     ty: DescriptorType::COMBINED_IMAGE_SAMPLER,
                     descriptor_count: 1024,
+                },
+                DescriptorPoolSize {
+                    ty: DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    descriptor_count: 1,
                 },
             ];
             let descriptor_pool_create_info = DescriptorPoolCreateInfo::builder()
@@ -195,6 +205,7 @@ impl FrameDescriptors {
         self.update_geometry_address_buffer(&resources.geometry_address_buffer);
         self.update_camera_buffer(&resources.camera_buffer);
         self.update_output_images(&resources.output_image_views);
+        self.update_skybox(&resources.skybox_image_view, &resources.sampler);
     }
 
     fn update_acceleration_structure(&self, acc_structure: &TopLevelAccelerationStructure) {
@@ -310,6 +321,23 @@ impl FrameDescriptors {
                 .dst_binding(ACCUMULATION_IMAGE_LOCATION.1)
                 .descriptor_type(DescriptorType::STORAGE_IMAGE),
         ];
+
+        unsafe {
+            self.device.handle().update_descriptor_sets(&writes, &[]);
+        }
+    }
+
+    fn update_skybox(&self, image_view: &ImageView, sampler: &Sampler) {
+        let image_writes = [*DescriptorImageInfo::builder()
+            .image_view(*image_view)
+            .image_layout(ImageLayout::GENERAL)
+            .sampler(*sampler)];
+
+        let writes = [*WriteDescriptorSet::builder()
+            .image_info(&image_writes)
+            .dst_set(self.sets[SKYBOX_TEXTURE_LOCATION.0 as usize])
+            .dst_binding(SKYBOX_TEXTURE_LOCATION.1)
+            .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)];
 
         unsafe {
             self.device.handle().update_descriptor_sets(&writes, &[]);

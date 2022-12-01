@@ -2,6 +2,7 @@ use ash::extensions::khr::AccelerationStructure;
 use ash::extensions::khr::DeferredHostOperations;
 use ash::extensions::khr::RayTracingPipeline;
 use ash::vk::BufferUsageFlags;
+use ash::vk::Format;
 use ash::vk::GeometryInstanceFlagsKHR;
 use ash::vk::ImageLayout;
 use ash::vk::ImageView;
@@ -13,7 +14,6 @@ use ash::vk::QueueFlags;
 use ash::vk::Sampler;
 use ash::vk::SamplerCreateInfo;
 use ash::vk::ShaderStageFlags;
-use cgmath::SquareMatrix;
 use slotmap::DefaultKey;
 use slotmap::SlotMap;
 use std::collections::HashMap;
@@ -34,15 +34,16 @@ use crate::geometry::TopLevelAccelerationStructure;
 use crate::gpu_scene::GpuTexture;
 use crate::image_resource::TextureImageData;
 use crate::material::GpuMaterial;
+use crate::material::Material;
 use crate::math::Mat4;
-use crate::math::Vec3;
-use crate::math::Vec4;
 use crate::mesh::Mesh;
 use crate::mesh::MeshAddress;
+use crate::mesh_instance::MeshInstance;
 use crate::mesh_resource::MeshResource;
 use crate::rtx_extensions::RtxExtensions;
 use crate::rtx_pipeline::RtxPipeline;
 use crate::scene::Scene;
+use crate::skybox::SkyBox;
 
 pub type Handle = DefaultKey;
 type Map<V> = SlotMap<Handle, V>;
@@ -59,6 +60,7 @@ pub struct CpuResources {
     pub instance_properties: Vec<InstanceProperties>,
     pub geometry_addresses: Vec<MeshAddress>,
     pub camera: Camera,
+    pub skybox: Option<SkyBox>,
 }
 
 impl CpuResources {
@@ -84,6 +86,7 @@ pub struct GpuResources {
     pub buffer_address_buffer: BufferResource,
     pub camera_buffer: BufferResource,
     pub output_image_views: [ImageView; 2],
+    pub skybox_image_view: ImageView,
 }
 
 pub struct InstanceProperties {
@@ -100,97 +103,9 @@ pub struct Ctx {
     meshes: Map<Mesh>,
     instances: Map<MeshInstance>,
     default_material: Handle,
-    materials: Map<Material2>,
+    materials: Map<Material>,
     default_sampler: Sampler,
-}
-
-pub struct MeshInstance {
-    mesh: Handle,
-    material: Handle,
-    transform: Mat4,
-}
-
-impl MeshInstance {
-    fn new(mesh: Handle, material: Handle) -> Self {
-        Self {
-            mesh,
-            material,
-            transform: Mat4::identity(),
-        }
-    }
-
-    pub fn mesh(&self) -> Handle {
-        self.mesh
-    }
-
-    pub fn set_material(&mut self, material: Handle) -> &mut Self {
-        self.material = material;
-        self
-    }
-
-    pub fn material(&self) -> Handle {
-        self.material
-    }
-
-    pub fn transform(&self) -> &Mat4 {
-        &self.transform
-    }
-
-    pub fn scale(&mut self, scale: &Vec3) -> &mut Self {
-        self.transform = self.transform * Mat4::from_nonuniform_scale(scale.x, scale.y, scale.z);
-        self
-    }
-
-    pub fn translate(&mut self, translation: &Vec3) -> &mut Self {
-        self.transform = self.transform * Mat4::from_translation(*translation);
-        self
-    }
-
-    pub fn rotate(&mut self, rotation: &Vec3) -> &mut Self {
-        self.transform = self.transform * Mat4::from_angle_x(cgmath::Deg(rotation.x));
-        self.transform = self.transform * Mat4::from_angle_y(cgmath::Deg(rotation.y));
-        self.transform = self.transform * Mat4::from_angle_z(cgmath::Deg(rotation.z));
-        self
-    }
-}
-pub struct Material2 {
-    pub base_color: Vec4,
-    pub emission: Vec4,
-    pub roughness: f32,
-    pub metallic: f32,
-    pub sheen: f32,
-    pub clear_coat: f32,
-    pub ior: f32,
-    pub transmission: f32,
-    pub base_color_texture: Option<Handle>,
-    pub metallic_roughness_texture: Option<Handle>,
-    pub normal_texture: Option<Handle>,
-    pub emission_texture: Option<Handle>,
-}
-
-impl Material2 {
-    pub fn new() -> Self {
-        Self {
-            base_color: Vec4::new(0.5, 0.5, 0.5, 1.0),
-            emission: Vec4::new(0.0, 0.0, 0.0, 0.0),
-            roughness: 1.0,
-            metallic: 0.0,
-            sheen: 0.0,
-            clear_coat: 0.0,
-            ior: 1.0,
-            transmission: 0.0,
-            base_color_texture: None,
-            metallic_roughness_texture: None,
-            normal_texture: None,
-            emission_texture: None,
-        }
-    }
-}
-
-impl Default for Material2 {
-    fn default() -> Self {
-        Self::new()
-    }
+    default_skybox: SkyBox,
 }
 
 impl Ctx {
@@ -215,8 +130,17 @@ impl Ctx {
             materials: Map::new(),
             queue,
             default_sampler,
+            default_skybox: SkyBox {
+                gpu_texture_handle: Handle::default(),
+            },
         };
 
+        let skybox_image =
+            TextureImageData::new(Format::R8G8B8A8_UNORM, 1, 1, &[126, 126, 255, 255]);
+        let skybox_image_handle = instance.create_texture(&skybox_image);
+        instance.default_skybox = SkyBox {
+            gpu_texture_handle: skybox_image_handle,
+        };
         let default_material = instance.create_material();
         instance.default_material = default_material;
         instance
@@ -270,15 +194,20 @@ impl Ctx {
         })
     }
 
+    pub fn create_skybox(&mut self, data: &TextureImageData) -> SkyBox {
+        let gpu_texture_handle = self.create_texture(data);
+        SkyBox { gpu_texture_handle }
+    }
+
     pub fn create_framebuffer(&self, width: u32, height: u32) -> FrameBuffer {
         FrameBuffer::new(self.device.clone(), self.queue.clone(), width, height)
     }
 
     pub fn create_material(&mut self) -> Handle {
-        self.materials.insert(Material2::new())
+        self.materials.insert(Material::new())
     }
 
-    pub fn material_mut(&mut self, material: Handle) -> Option<&mut Material2> {
+    pub fn material_mut(&mut self, material: Handle) -> Option<&mut Material> {
         self.materials.get_mut(material)
     }
 
@@ -422,6 +351,12 @@ impl Ctx {
             framebuffer.accumulation_image_view,
         ];
 
+        let skybox_image_view = if let Some(skybox) = &frame.skybox {
+            self.textures[skybox.gpu_texture_handle].image_view
+        } else {
+            self.textures[self.default_skybox.gpu_texture_handle].image_view
+        };
+
         GpuResources {
             acceleration_structure,
             material_buffer,
@@ -432,6 +367,7 @@ impl Ctx {
             camera_buffer,
             output_image_views,
             sampler: *sampler,
+            skybox_image_view,
         }
     }
 
@@ -542,6 +478,7 @@ impl Ctx {
             geometry_addresses,
             instance_properties,
             camera: *scene.camera(),
+            skybox: scene.skybox(),
         };
 
         let gpu_resources = self.upload_frame(

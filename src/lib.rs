@@ -10,6 +10,8 @@ pub mod image_resource;
 pub mod material;
 pub mod math;
 pub mod mesh;
+pub mod mesh_instance;
 pub mod mesh_resource;
 pub mod rtx_pipeline;
 pub mod scene;
+pub mod skybox;

@@ -138,8 +138,8 @@ fn main() {
     let mut camera = Camera::new(45.0, 0.01, 1000.0);
     camera.translate(vec3(0.0, 0.0, -10.0));
     scene.set_camera(camera);
-    let image =
-        image::open("C:\\Users\\danny\\Documents\\code\\tracey\\assets\\checkerboard.png").unwrap();
+    let cwd = std::env::current_dir().expect("No working directory found");
+    let image = image::open(cwd.join("assets/images/checkerboard.png")).unwrap();
     let texture_handle = ctx.create_texture(&TextureImageData::new(
         Format::R8G8B8A8_UNORM,
         image.width(),

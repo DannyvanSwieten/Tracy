@@ -77,8 +77,8 @@ void main()
         break;
 
       // Russion roulette
-      // if(rand_float(pixelSeed) > dot(color, color) && i > 3)
-      //   break;
+      if(rand_float(pixelSeed) > dot(color, color) && i > 3)
+        break;
 
       origin.xyz = ray.point + ray.w_out * 1e-4;
       direction.xyz = ray.w_out;

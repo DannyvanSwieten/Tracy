@@ -1,4 +1,4 @@
-use cgmath::{perspective, Deg, Rad, SquareMatrix};
+use cgmath::{perspective, Deg, SquareMatrix};
 
 use crate::math::{Mat4, Real, Vec3};
 
