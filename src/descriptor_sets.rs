@@ -330,7 +330,7 @@ impl FrameDescriptors {
     fn update_skybox(&self, image_view: &ImageView, sampler: &Sampler) {
         let image_writes = [*DescriptorImageInfo::builder()
             .image_view(*image_view)
-            .image_layout(ImageLayout::GENERAL)
+            .image_layout(ImageLayout::SHADER_READ_ONLY_OPTIMAL)
             .sampler(*sampler)];
 
         let writes = [*WriteDescriptorSet::builder()

@@ -7,7 +7,7 @@ use renderer::{
     camera::Camera,
     ctx::Ctx,
     image_resource::TextureImageData,
-    math::{Vec2, Vec3},
+    math::{Vec2, Vec3, Vec4},
     mesh_resource::MeshResource,
     scene::Scene,
     vk::Format,
@@ -149,6 +149,7 @@ fn main() {
 
     let material_handle = ctx.create_material();
     if let Some(material) = ctx.material_mut(material_handle) {
+        material.base_color = Vec4::new(1.0, 1.0, 1.0, 1.0);
         material.base_color_texture = Some(texture_handle);
     }
 
@@ -157,6 +158,7 @@ fn main() {
     let cube_instance = ctx.create_instance(cube_mesh);
     if let Some(instance) = ctx.instance_mut(cube_instance) {
         instance.set_material(material_handle);
+        instance.rotate(&Vec3::new(45.0, 120.0, 0.0));
     }
 
     scene.add_instance(cube_instance);

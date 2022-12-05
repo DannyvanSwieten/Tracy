@@ -16,7 +16,7 @@ vec2 direction_to_spherical(vec3 dir){
 void main()
 {
 	const vec2 st = direction_to_spherical(gl_WorldRayDirectionEXT);
-	const vec3 c = texture(skybox_image, st).rgb;
+	const vec3 c = pow(texture(skybox_image, st).rgb, vec3(2.2));
 	ray.direct = c;
 	ray.hit = false;
 }

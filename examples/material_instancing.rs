@@ -146,11 +146,12 @@ fn main() {
         let material_handle = ctx.create_material();
         if let Some(material) = ctx.material_mut(material_handle) {
             let n = (f + 10.0) / 20.0;
-            material.roughness = n;
-            material.metallic = 0.0; // 1.0 - n;
+            material.roughness = 1.0 - n;
+            material.metallic = 1.0 - n;
             material.base_color.x = n;
             material.base_color.y = 1.0 - n;
-            material.transmission = 1.0;
+            material.transmission = n;
+            material.ior = 1.0 + n;
         }
 
         if let Some(instance) = ctx.instance_mut(cube_instance) {

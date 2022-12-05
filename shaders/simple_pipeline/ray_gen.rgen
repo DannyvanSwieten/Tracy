@@ -45,8 +45,9 @@ void main()
 
   for(int s = 0; s < Batch.spp; ++s)
   {       
+    vec2 pixelOffset = hammersley(Batch.current_batch * Batch.spp + s, 480);
     uint pixelSeed = rand_seed(rand_seed(gl_LaunchIDEXT.x, gl_LaunchIDEXT.y), Batch.current_batch * Batch.spp + s);
-    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + vec2(rand_float(pixelSeed), rand_float(pixelSeed));
+    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + pixelOffset;
     const vec2 inUV = pixelCenter / vec2(gl_LaunchSizeEXT.xy);
     vec2 d = inUV * 2.0 - 1.0;
     d.y = -d.y;
@@ -57,7 +58,7 @@ void main()
     vec3 color = vec3(0);
     vec3 contribution = vec3(1);
 
-    for(int i = 0; i < 5; ++i)
+    for(int i = 0; i < 16; ++i)
     {
       ray.seed = pixelSeed + i;
       ray.hit = false;

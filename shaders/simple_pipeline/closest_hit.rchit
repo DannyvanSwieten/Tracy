@@ -120,11 +120,12 @@ void main()
     }
 
     ray.normal = N;
-    vec3 base_color = material.base_color.rgb;
+    vec3 base_color = material.base_color.rgb * material.base_color.a;
 
     if(material.maps[0] != -1)
     {
-        base_color = texture(images[material.maps[0]], uv).rgb;
+        vec4 base_color_texel = texture(images[material.maps[0]], uv);
+        base_color = base_color_texel.rgb * (1.0 - base_color_texel.a) + base_color_texel.a * base_color;
     }
     base_color = pow(base_color, vec3(2.2));
     float metal = material.properties[1];

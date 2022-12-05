@@ -165,16 +165,6 @@ fn main() {
 
     scene.add_instance(floor_instance);
 
-    let cwd = std::env::current_dir().expect("No working directory found");
-    let skybox_path = cwd.join("assets/hdr/skybox.exr");
-    let image = image::open(skybox_path).expect("Unable to load skybox image");
-    let skybox = ctx.create_skybox(&TextureImageData::new(
-        Format::R32G32B32A32_SFLOAT,
-        image.width(),
-        image.height(),
-        image.to_rgba32f().as_bytes(),
-    ));
-    scene.set_skybox(skybox);
     let frame = ctx.build_frame_resources(&framebuffer, &scene);
     ctx.render_frame(&mut framebuffer, &frame, 120, 4);
     let image_data = framebuffer.download_output();

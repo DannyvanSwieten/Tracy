@@ -68,15 +68,3 @@ vec2 rand_disk(inout uint seed)
 		}
 	}
 }
-
-vec3 rand_sphere(inout uint seed)
-{
-	for (;;)
-	{
-		const vec3 p = 2 * vec3(rand_float(seed), rand_float(seed), rand_float(seed)) - 1;
-		if (dot(p, p) < 1)
-		{
-			return p;
-		}
-	}
-}

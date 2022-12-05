@@ -2,6 +2,7 @@ use ash::extensions::khr::AccelerationStructure;
 use ash::extensions::khr::DeferredHostOperations;
 use ash::extensions::khr::RayTracingPipeline;
 use ash::vk::BufferUsageFlags;
+use ash::vk::Filter;
 use ash::vk::Format;
 use ash::vk::GeometryInstanceFlagsKHR;
 use ash::vk::ImageLayout;
@@ -112,7 +113,9 @@ impl Ctx {
     pub fn new(device: Rc<DeviceContext>, max_frames_in_flight: u32) -> Self {
         let rtx = Rc::new(RtxExtensions::new(&device));
         let queue = Rc::new(CommandQueue::new(device.clone(), QueueFlags::GRAPHICS));
-        let sampler_info = *SamplerCreateInfo::builder();
+        let sampler_info = *SamplerCreateInfo::builder()
+            .mag_filter(Filter::LINEAR)
+            .min_filter(Filter::LINEAR);
         let default_sampler = unsafe {
             device
                 .handle()
@@ -136,7 +139,7 @@ impl Ctx {
         };
 
         let skybox_image =
-            TextureImageData::new(Format::R8G8B8A8_UNORM, 1, 1, &[126, 126, 255, 255]);
+            TextureImageData::new(Format::R8G8B8A8_UNORM, 1, 1, &[228, 246, 248, 255]);
         let skybox_image_handle = instance.create_texture(&skybox_image);
         instance.default_skybox = SkyBox {
             gpu_texture_handle: skybox_image_handle,
