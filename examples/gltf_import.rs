@@ -1,4 +1,9 @@
-use std::{collections::HashMap, path::Path, rc::Rc};
+use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
+    path::Path,
+    rc::Rc,
+};
 
 use cgmath::{vec2, vec3, vec4};
 use gltf::{
@@ -7,11 +12,40 @@ use gltf::{
 };
 
 use renderer::{
+    ctx::Handle,
     image_resource::TextureImageData,
     math::Vec4,
     mesh_resource::MeshResource,
     vk::{self, Format, Image},
 };
+use slotmap::SlotMap;
+
+struct ResourceManager {
+    resources: HashMap<std::any::TypeId, SlotMap<Handle, Rc<dyn Any>>>,
+}
+
+impl ResourceManager {
+    pub fn register<T: Sized + 'static>(&mut self, resource: T) -> Handle {
+        let any: Rc<dyn Any> = Rc::new(resource);
+        self.resources
+            .entry(any.type_id())
+            .or_insert_with(SlotMap::new)
+            .insert(any)
+    }
+
+    pub fn get<T: 'static>(&self, handle: Handle) -> Option<&T> {
+        let id = TypeId::of::<T>();
+        if let Some(map) = self.resources.get(&id) {
+            if let Some(any) = map.get(handle) {
+                any.downcast_ref::<T>()
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
 
 struct Resource<T> {
     id: String,
