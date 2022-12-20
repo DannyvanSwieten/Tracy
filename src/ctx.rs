@@ -230,23 +230,58 @@ impl Ctx {
     }
 
     pub fn create_texture(&mut self, data: &TextureImageData) -> Handle {
-        let mut image = Image2DResource::new(
-            self.device.clone(),
-            data.width,
-            data.height,
-            data.format,
-            ash::vk::ImageUsageFlags::TRANSFER_DST | ash::vk::ImageUsageFlags::SAMPLED,
-            ash::vk::MemoryPropertyFlags::DEVICE_LOCAL,
-        );
+        let (mut image, buffer, format) = if data.format == Format::R8G8B8_UINT {
+            let mut pixels = Vec::new();
 
-        let mut buffer = BufferResource::new(
-            self.device.clone(),
-            data.pixels.len() as u64,
-            ash::vk::MemoryPropertyFlags::HOST_VISIBLE,
-            ash::vk::BufferUsageFlags::TRANSFER_SRC,
-        );
+            for i in (0..data.pixels.len()).step_by(3) {
+                pixels.push(data.pixels[i]);
+                pixels.push(data.pixels[i + 1]);
+                pixels.push(data.pixels[i + 2]);
+                pixels.push(255);
+            }
 
-        buffer.upload(&data.pixels);
+            let data =
+                TextureImageData::new(Format::R8G8B8A8_UINT, data.width, data.height, &pixels);
+
+            let image = Image2DResource::new(
+                self.device.clone(),
+                data.width,
+                data.height,
+                data.format,
+                ash::vk::ImageUsageFlags::TRANSFER_DST | ash::vk::ImageUsageFlags::SAMPLED,
+                ash::vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            );
+
+            let mut buffer = BufferResource::new(
+                self.device.clone(),
+                pixels.len() as u64,
+                ash::vk::MemoryPropertyFlags::HOST_VISIBLE,
+                ash::vk::BufferUsageFlags::TRANSFER_SRC,
+            );
+
+            buffer.upload(&pixels);
+            (image, buffer, data.format)
+        } else {
+            let image = Image2DResource::new(
+                self.device.clone(),
+                data.width,
+                data.height,
+                data.format,
+                ash::vk::ImageUsageFlags::TRANSFER_DST | ash::vk::ImageUsageFlags::SAMPLED,
+                ash::vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            );
+
+            let mut buffer = BufferResource::new(
+                self.device.clone(),
+                data.pixels.len() as u64,
+                ash::vk::MemoryPropertyFlags::HOST_VISIBLE,
+                ash::vk::BufferUsageFlags::TRANSFER_SRC,
+            );
+
+            buffer.upload(&data.pixels);
+
+            (image, buffer, data.format)
+        };
 
         let mut command_buffer = CommandBuffer::new(self.device.clone(), self.queue.clone());
         command_buffer.begin();
@@ -261,7 +296,7 @@ impl Ctx {
         command_buffer.submit();
 
         let view_info = *ash::vk::ImageViewCreateInfo::builder()
-            .format(data.format)
+            .format(format)
             .view_type(ash::vk::ImageViewType::TYPE_2D)
             .image(image.handle())
             .subresource_range(
