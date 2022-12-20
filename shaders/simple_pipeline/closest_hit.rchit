@@ -37,7 +37,7 @@ layout(set = 1, binding = 1) uniform BufferAddressBuffer {
 };
 
 layout(set = 1, binding = 2, scalar) buffer AddressBuffer { BufferAddresses addresses[]; } meshes;
-layout(set = 1, binding = 3) uniform sampler2D images[1024];
+layout(set = 1, binding = 3) uniform sampler2D images[];
 
 void direction_of_anisotropicity(vec3 N, out vec3 tangent, out vec3 binormal){
     tangent = cross(N, vec3(1.,0.,1.));
@@ -125,7 +125,7 @@ void main()
     if(material.maps[0] != -1)
     {
         vec4 base_color_texel = texture(images[material.maps[0]], uv);
-        base_color = base_color_texel.rgb * (1.0 - base_color_texel.a) + base_color_texel.a * base_color;
+        base_color = base_color_texel.rgb;// * (1.0 - base_color_texel.a) + base_color_texel.a * base_color;
     }
     base_color = pow(base_color, vec3(2.2));
     float metal = material.properties[1];

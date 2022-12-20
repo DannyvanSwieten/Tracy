@@ -7,17 +7,18 @@ use std::{
 };
 
 use ash::extensions::ext::DebugUtils;
-use cgmath::{vec2, vec3, vec4};
+use cgmath::{vec2, vec3, vec4, SquareMatrix};
 use gltf::{
     accessor::{DataType, Dimensions, Iter},
     Semantic,
 };
 
+use image::EncodableLayout;
 use renderer::{
     camera::Camera,
     ctx::{Ctx, Handle},
     image_resource::TextureImageData,
-    math::{Quat, Vec3, Vec4},
+    math::{Mat4, Quat, Vec3, Vec4},
     mesh_resource::MeshResource,
     scene::Scene,
     vk::{self, Format},
@@ -39,6 +40,14 @@ impl Transform {
             scale: vec3(1.0, 1.0, 1.0),
         }
     }
+
+    pub fn to_matrix(&self) -> Mat4 {
+        let r = Mat4::from(self.orientation);
+        let s = Mat4::from_nonuniform_scale(self.scale.x, self.scale.y, self.scale.z);
+        let t = Mat4::from_translation(self.translation);
+
+        t * r * s
+    }
 }
 
 impl Default for Transform {
@@ -50,7 +59,7 @@ impl Default for Transform {
 impl From<([f32; 3], [f32; 4], [f32; 3])> for Transform {
     fn from((t, quat, s): ([f32; 3], [f32; 4], [f32; 3])) -> Self {
         Self {
-            orientation: Quat::new(quat[0], quat[1], quat[2], quat[3]),
+            orientation: Quat::new(quat[3], quat[0], quat[1], quat[2]),
             translation: vec3(t[0], t[1], t[2]),
             scale: vec3(s[0], s[1], s[2]),
         }
@@ -59,6 +68,7 @@ impl From<([f32; 3], [f32; 4], [f32; 3])> for Transform {
 
 pub struct Actor {
     pub transform: Transform,
+    mat: Mat4,
     pub mesh: Option<Rc<ResourceHandle<MeshResource>>>,
     pub material: Option<Rc<ResourceHandle<ImportedMaterial>>>,
     pub children: Vec<usize>,
@@ -68,6 +78,7 @@ impl Actor {
     pub fn new() -> Self {
         Self {
             transform: Transform::default(),
+            mat: Transform::default().to_matrix(),
             mesh: None,
             material: None,
             children: Vec::new(),
@@ -97,12 +108,34 @@ impl Default for Actor {
 }
 
 pub struct SceneGraph {
+    root: usize,
     actors: Vec<Actor>,
 }
 
 impl SceneGraph {
     pub fn new() -> Self {
-        Self { actors: Vec::new() }
+        Self {
+            actors: Vec::new(),
+            root: 0,
+        }
+    }
+
+    pub fn set_root(&mut self, root: usize) {
+        self.root = root;
+        self.apply_transform(self.root, Mat4::identity())
+    }
+
+    fn apply_transform(&mut self, id: usize, parent_transform: Mat4) {
+        self.actors[id].mat = parent_transform * self.actors[id].transform.to_matrix();
+        let children = self.actors[id].children.clone();
+        for child in children {
+            self.apply_transform(child, self.actors[id].mat)
+        }
+    }
+
+    pub fn set_root_transform(&mut self, transform: Transform) {
+        self.actors[0].transform = transform;
+        self.apply_transform(0, transform.to_matrix())
     }
 
     pub fn add_actor(&mut self, actor: Actor) -> usize {
@@ -116,6 +149,15 @@ impl SceneGraph {
 
     pub fn get_mut(&mut self, id: usize) -> &mut Actor {
         &mut self.actors[id]
+    }
+
+    pub fn for_each<F>(&self, mut visitor: F)
+    where
+        F: FnMut(&Actor),
+    {
+        for actor in self.actors() {
+            visitor(actor)
+        }
     }
 }
 
@@ -224,6 +266,10 @@ impl ResourceCache {
 
     pub fn register(&mut self, path: &str, gpu_handle: Handle) {
         self.resources.insert(path.to_owned(), gpu_handle);
+    }
+
+    pub fn get(&self, path: &str) -> Option<&Handle> {
+        self.resources.get(path)
     }
 }
 
@@ -493,7 +539,7 @@ fn load_gltf(gltf_path: &PathBuf, loader: &mut ResourceManager) -> SceneGraph {
             }
         }
     }
-
+    scene_graph.set_root(0);
     scene_graph
 }
 
@@ -516,12 +562,12 @@ fn main() {
     let mut framebuffer = ctx.create_framebuffer(image_width, image_height);
     let mut scene = Scene::new();
     let mut camera = Camera::new(45.0, 0.01, 1000.0);
-    camera.translate(vec3(0.0, 0.0, -10.0));
+    camera.translate(vec3(0.0, 0.0, -15.0));
     scene.set_camera(camera);
 
     let gltf_path = std::env::current_dir()
         .expect("No working directory found")
-        .join("assets/Sponza/glTF/Sponza.gltf");
+        .join("assets/MetalRoughSpheres/glTF/MetalRoughSpheres.gltf");
 
     let mut loader = ResourceManager::new();
     let mut cache = ResourceCache::new();
@@ -533,5 +579,72 @@ fn main() {
         })
     }
 
-    println!("{}", 100);
+    if let Some(meshes) = loader.get_all::<MeshResource>() {
+        meshes.for_each(|path, data| {
+            let handle = ctx.create_mesh(data);
+            cache.register(path, handle)
+        })
+    }
+    scene_graph.for_each(|actor| {
+        if let Some(mesh) = &actor.mesh {
+            let path = &mesh.path;
+            if let Some(handle) = cache.get(path) {
+                let instance_handle = ctx.create_instance(*handle);
+                {
+                    let instance = ctx.instance_mut(instance_handle).unwrap();
+                    instance.set_transform(actor.mat);
+                }
+                scene.add_instance(instance_handle);
+                if let Some(material) = &actor.material {
+                    if let Some(imported_material) = loader.get(material) {
+                        let material_handle = ctx.create_material();
+                        let material = ctx.material_mut(material_handle).unwrap();
+                        material.base_color = imported_material.base_color;
+                        material.roughness = imported_material.roughness;
+                        material.metallic = imported_material.metallic;
+                        if let Some(basecolor_texture) = &imported_material.base_color_texture {
+                            if let Some(albedo_texture) = cache.get(&basecolor_texture.path) {
+                                material.base_color_texture = Some(*albedo_texture)
+                            }
+                        }
+
+                        if let Some(metal_roughness_texture) =
+                            &imported_material.metallic_roughness_texture
+                        {
+                            if let Some(metal_roughness_texture) =
+                                cache.get(&metal_roughness_texture.path)
+                            {
+                                material.metallic_roughness_texture = Some(*metal_roughness_texture)
+                            }
+                        }
+                        let instance = ctx.instance_mut(instance_handle).unwrap();
+                        instance.set_material(material_handle);
+                    }
+                }
+            }
+        }
+    });
+    let cwd = std::env::current_dir().expect("No working directory found");
+    let skybox_path = cwd.join("assets/hdr/skybox.exr");
+    let image = image::open(skybox_path).expect("Unable to load skybox image");
+    let skybox = ctx.create_skybox(&TextureImageData::new(
+        Format::R32G32B32A32_SFLOAT,
+        image.width(),
+        image.height(),
+        image.to_rgba32f().as_bytes(),
+    ));
+    scene.set_skybox(skybox);
+
+    let frame = ctx.build_frame_resources(&framebuffer, &scene);
+    ctx.render_frame(&mut framebuffer, &frame, 128, 4);
+
+    let image_data = framebuffer.download_output();
+    image::save_buffer(
+        "GLTF Import.png",
+        &image_data,
+        image_width,
+        image_height,
+        image::ColorType::Rgba8,
+    )
+    .expect("Image Write failed");
 }

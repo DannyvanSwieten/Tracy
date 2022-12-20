@@ -45,7 +45,7 @@ void main()
 
   for(int s = 0; s < Batch.spp; ++s)
   {       
-    vec2 pixelOffset = hammersley(Batch.current_batch * Batch.spp + s, 480);
+    vec2 pixelOffset = hammersley(Batch.current_batch * Batch.spp + s, 512);
     uint pixelSeed = rand_seed(rand_seed(gl_LaunchIDEXT.x, gl_LaunchIDEXT.y), Batch.current_batch * Batch.spp + s);
     const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + pixelOffset;
     const vec2 inUV = pixelCenter / vec2(gl_LaunchSizeEXT.xy);

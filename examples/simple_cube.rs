@@ -151,7 +151,7 @@ fn main() {
     scene.add_instance(floor_instance);
 
     let frame = ctx.build_frame_resources(&framebuffer, &scene);
-    ctx.render_frame(&mut framebuffer, &frame, 120, 4);
+    ctx.render_frame(&mut framebuffer, &frame, 128, 4);
     let image_data = framebuffer.download_output();
     image::save_buffer(
         "Simple Cube.png",

@@ -3,6 +3,7 @@ use std::rc::Rc;
 use ash::extensions::ext::DebugUtils;
 
 use cgmath::vec3;
+use image::EncodableLayout;
 use renderer::{
     camera::Camera,
     ctx::Ctx,
@@ -139,7 +140,9 @@ fn main() {
     camera.translate(vec3(0.0, 0.0, -10.0));
     scene.set_camera(camera);
     let cwd = std::env::current_dir().expect("No working directory found");
-    let image = image::open(cwd.join("assets/images/checkerboard.png")).unwrap();
+    let image = image::open(cwd.join("assets/images/checkerboard.png"))
+        .unwrap()
+        .to_rgba8();
     let texture_handle = ctx.create_texture(&TextureImageData::new(
         Format::R8G8B8A8_UNORM,
         image.width(),
@@ -173,7 +176,7 @@ fn main() {
     scene.add_instance(floor_instance);
 
     let frame = ctx.build_frame_resources(&framebuffer, &scene);
-    ctx.render_frame(&mut framebuffer, &frame, 120, 4);
+    ctx.render_frame(&mut framebuffer, &frame, 128, 4);
     let image_data = framebuffer.download_output();
     image::save_buffer(
         "Textured Cube.png",

@@ -24,6 +24,10 @@ impl MeshInstance {
         self.mesh
     }
 
+    pub fn set_transform(&mut self, t: Mat4) {
+        self.transform = t
+    }
+
     pub fn set_material(&mut self, material: Handle) -> &mut Self {
         self.material = material;
         self

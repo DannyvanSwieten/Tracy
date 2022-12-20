@@ -158,8 +158,11 @@ impl Ctx {
 
         let mut rt_features = ash::vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::builder()
             .ray_tracing_pipeline(true);
-        let mut address_features =
-            ash::vk::PhysicalDeviceVulkan12Features::builder().buffer_device_address(true);
+        let mut address_features = ash::vk::PhysicalDeviceVulkan12Features::builder()
+            .buffer_device_address(true)
+            .shader_input_attachment_array_dynamic_indexing(true)
+            .descriptor_indexing(true)
+            .runtime_descriptor_array(true);
         let mut acc_features = ash::vk::PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
             .acceleration_structure(true);
         let mut features2 = ash::vk::PhysicalDeviceFeatures2KHR::default();
@@ -241,7 +244,7 @@ impl Ctx {
             }
 
             let data =
-                TextureImageData::new(Format::R8G8B8A8_UINT, data.width, data.height, &pixels);
+                TextureImageData::new(Format::R8G8B8A8_UNORM, data.width, data.height, &pixels);
 
             let image = Image2DResource::new(
                 self.device.clone(),
@@ -261,6 +264,26 @@ impl Ctx {
 
             buffer.upload(&pixels);
             (image, buffer, data.format)
+        } else if data.format == Format::R8G8B8A8_UINT {
+            let image = Image2DResource::new(
+                self.device.clone(),
+                data.width,
+                data.height,
+                Format::R8G8B8A8_UNORM,
+                ash::vk::ImageUsageFlags::TRANSFER_DST | ash::vk::ImageUsageFlags::SAMPLED,
+                ash::vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            );
+
+            let mut buffer = BufferResource::new(
+                self.device.clone(),
+                data.pixels.len() as u64,
+                ash::vk::MemoryPropertyFlags::HOST_VISIBLE,
+                ash::vk::BufferUsageFlags::TRANSFER_SRC,
+            );
+
+            buffer.upload(&data.pixels);
+
+            (image, buffer, Format::R8G8B8A8_UNORM)
         } else {
             let image = Image2DResource::new(
                 self.device.clone(),

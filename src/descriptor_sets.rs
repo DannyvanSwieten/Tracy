@@ -239,12 +239,14 @@ impl FrameDescriptors {
 
         let writes: Vec<WriteDescriptorSet> = image_infos
             .iter()
-            .map(|info| {
+            .enumerate()
+            .map(|(index, info)| {
                 *WriteDescriptorSet::builder()
                     .image_info(info)
                     .dst_set(self.sets[MATERIAL_TEXTURE_LOCATION.0 as usize])
                     .dst_binding(MATERIAL_TEXTURE_LOCATION.1)
                     .descriptor_type(DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .dst_array_element(index as u32)
             })
             .collect();
 
